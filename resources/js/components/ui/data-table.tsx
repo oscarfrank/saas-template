@@ -82,6 +82,15 @@ interface Product {
     created_at: string;
 }
 
+interface PrintConfig {
+    title: string;
+    columns: {
+        header: string;
+        accessor: string;
+        format?: (value: any) => string;
+    }[];
+}
+
 interface DataTableProps<TData extends Product, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
@@ -108,13 +117,8 @@ interface DataTableProps<TData extends Product, TValue> {
     isLoading?: boolean;
     error?: string;
     tableName?: string;
-    onPrint?: () => Promise<Array<{
-        name: string;
-        description: string;
-        price: number;
-        featured_image: string | null;
-        created_at: string;
-    }>>;
+    printConfig?: PrintConfig;
+    onPrint?: () => Promise<any[]>;
     onExport?: (format: 'csv' | 'json') => Promise<{
         format: 'csv' | 'json';
         headers?: string[];
@@ -155,6 +159,7 @@ export function DataTable<TData extends Product, TValue>({
     isLoading = false,
     error,
     tableName = "Items",
+    printConfig,
     onPrint,
     onExport,
 }: DataTableProps<TData, TValue>) {
@@ -358,10 +363,21 @@ export function DataTable<TData extends Product, TValue>({
                 return;
             }
 
+            const defaultPrintConfig: PrintConfig = {
+                title: `${tableName} List`,
+                columns: columns.map(col => ({
+                    header: String(col.header),
+                    accessor: col.id || '',
+                    format: (value: any) => String(value)
+                }))
+            };
+
+            const config = printConfig || defaultPrintConfig;
+
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>${tableName} List</title>
+                        <title>${config.title}</title>
                         <style>
                             @media print {
                                 @page {
@@ -390,25 +406,21 @@ export function DataTable<TData extends Product, TValue>({
                         </style>
                     </head>
                     <body>
-                        <h1>${tableName} List</h1>
+                        <h1>${config.title}</h1>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Price</th>
-                                    <th>Image</th>
-                                    <th>Created At</th>
+                                    ${config.columns.map(col => `<th>${col.header}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody>
-                                ${allItems.map((product) => `
+                                ${allItems.map((item) => `
                                     <tr>
-                                        <td>${product.name}</td>
-                                        <td>${product.description}</td>
-                                        <td>${product.price}</td>
-                                        <td>${product.featured_image ? `<img src="${product.featured_image}" alt="${product.name}">` : 'No image'}</td>
-                                        <td>${new Date(product.created_at).toLocaleDateString()}</td>
+                                        ${config.columns.map(col => {
+                                            const value = item[col.accessor];
+                                            const formattedValue = col.format ? col.format(value) : String(value);
+                                            return `<td>${formattedValue}</td>`;
+                                        }).join('')}
                                     </tr>
                                 `).join('')}
                             </tbody>

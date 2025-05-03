@@ -37,7 +37,15 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Produc
         enableSorting: true,
         enableHiding: true,
         cell: ({ row }) => {
-            return <div className="font-medium">{row.getValue("name")}</div>;
+            const product = row.original;
+            return (
+                <Link 
+                    href={route('products.show', product.id)}
+                    className="font-medium hover:underline cursor-pointer"
+                >
+                    {row.getValue("name")}
+                </Link>
+            );
         },
     },
     {

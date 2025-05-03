@@ -150,6 +150,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
     const [selectedColumn, setSelectedColumn] = useState<string>("");
     const [filterValue, setFilterValue] = useState<string>("");
     const [filters, setFilters] = useState<Filter[]>([]);
+    const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
 
     // Reset row selection when resetSelection prop changes
     useEffect(() => {
@@ -257,6 +258,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                 
                 setSelectedColumn("");
                 setFilterValue("");
+                setIsFilterPopoverOpen(false);
             }
         }
     };
@@ -665,7 +667,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                 </div>
             </div>
             <div className="flex items-center gap-2 py-2">
-                <Popover>
+                <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
                     <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="h-8 border-dashed">
                             <Plus className="mr-2 h-4 w-4" />

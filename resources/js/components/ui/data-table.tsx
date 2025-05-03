@@ -455,7 +455,7 @@ export function DataTable<TData extends Product, TValue>({
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `selected-products-${new Date().toISOString()}.csv`;
+                a.download = `selected-rows-${new Date().toISOString()}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -465,7 +465,7 @@ export function DataTable<TData extends Product, TValue>({
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `selected-products-${new Date().toISOString()}.json`;
+                a.download = `selected-rows-${new Date().toISOString()}.json`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);

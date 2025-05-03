@@ -3,12 +3,14 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { DataTable } from '@/components/ui/data-table';
-import { columns } from './components/table-columns';
+import { createColumns } from './components/table-columns';
 import { type Product } from './components/table-columns';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
+import { formatCurrency } from "@/lib/utils";
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -32,6 +34,10 @@ export default function Index({ products, pagination }: Props) {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [key, setKey] = useState(0);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+    const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
 
     const handlePageChange = (page: number) => {
         setIsLoading(true);
@@ -106,16 +112,17 @@ export default function Index({ products, pagination }: Props) {
     };
 
     const handleBulkDelete = useCallback(async (products: Product[]) => {
-        if (!window.confirm(`Are you sure you want to delete ${products.length} selected product(s)? This action cannot be undone.`)) {
-            return;
-        }
+        setSelectedProducts(products);
+        setIsBulkDeleteDialogOpen(true);
+    }, []);
 
+    const handleBulkDeleteConfirm = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         
         try {
             // Delete products sequentially
-            for (const product of products) {
+            for (const product of selectedProducts) {
                 await router.delete(route('products.destroy', product.id), {
                     preserveState: true,
                     preserveScroll: true,
@@ -132,6 +139,8 @@ export default function Index({ products, pagination }: Props) {
                 only: ['products', 'pagination'],
                 onSuccess: () => {
                     setIsLoading(false);
+                    setIsBulkDeleteDialogOpen(false);
+                    setSelectedProducts([]);
                 },
                 onError: (errors) => {
                     setIsLoading(false);
@@ -142,13 +151,61 @@ export default function Index({ products, pagination }: Props) {
             toast.error('Failed to delete some products');
             setIsLoading(false);
         }
+    }, [selectedProducts]);
+
+    const handleDelete = useCallback(async () => {
+        if (!selectedProduct) return;
+
+        setIsLoading(true);
+        router.delete(route('products.destroy', selectedProduct.id), {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Product deleted successfully');
+                setIsDeleteDialogOpen(false);
+                setSelectedProduct(null);
+                // Force a complete table reset
+                setKey(prev => prev + 1);
+                // Reload the data
+                router.reload({
+                    only: ['products', 'pagination'],
+                    onSuccess: () => {
+                        setIsLoading(false);
+                    },
+                    onError: () => {
+                        setIsLoading(false);
+                        toast.error('Failed to refresh data after deletion');
+                    }
+                });
+            },
+            onError: () => {
+                toast.error('Failed to delete product');
+                setIsLoading(false);
+            }
+        });
+    }, [selectedProduct]);
+
+    const handleDeleteClick = useCallback((product: Product) => {
+        setSelectedProduct(product);
+        setIsDeleteDialogOpen(true);
     }, []);
+
+    const handleDialogClose = useCallback(() => {
+        setIsDeleteDialogOpen(false);
+        setSelectedProduct(null);
+    }, []);
+
+    const columns = createColumns({
+        onDelete: handleDeleteClick
+    });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Products Management" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center">
+                    <div className="flex gap-2">
+                    </div>
                     <Link href={route('products.create')}>
                         <Button>
                             <Plus className="mr-2 h-4 w-4" />
@@ -171,6 +228,28 @@ export default function Index({ products, pagination }: Props) {
                     error={error ?? undefined}
                     onBulkDelete={handleBulkDelete}
                     resetSelection={true}
+                />
+
+                <CustomAlertDialog
+                    isOpen={isDeleteDialogOpen}
+                    onClose={() => setIsDeleteDialogOpen(false)}
+                    onConfirm={handleDelete}
+                    title="Are you sure?"
+                    description={`This action cannot be undone. This will permanently delete the product "${selectedProduct?.name}".`}
+                    isLoading={isLoading}
+                />
+
+                <CustomAlertDialog
+                    isOpen={isBulkDeleteDialogOpen}
+                    onClose={() => {
+                        setIsBulkDeleteDialogOpen(false);
+                        setSelectedProducts([]);
+                    }}
+                    onConfirm={handleBulkDeleteConfirm}
+                    title="Are you sure?"
+                    description={`This action cannot be undone. This will permanently delete ${selectedProducts.length} selected product(s).`}
+                    confirmText="Delete Selected"
+                    isLoading={isLoading}
                 />
             </div>
         </AppLayout>

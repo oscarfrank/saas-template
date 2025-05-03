@@ -12,16 +12,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency } from "@/lib/utils";
 import { useState } from 'react';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 
 export type Product = {
     id: number;
@@ -34,7 +25,11 @@ export type Product = {
     updated_at: string;
 };
 
-export const columns: ColumnDef<Product>[] = [
+interface TableColumnsProps {
+    onDelete: (product: Product) => void;
+}
+
+export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Product>[] => [
     {
         id: "name",
         accessorKey: "name",
@@ -107,6 +102,7 @@ export const columns: ColumnDef<Product>[] = [
         id: "actions",
         cell: ({ row }) => {
             const product = row.original;
+            const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
             const [isDeleting, setIsDeleting] = useState(false);
 
             const handleCopyId = () => {
@@ -121,16 +117,13 @@ export const columns: ColumnDef<Product>[] = [
             };
 
             const handleDelete = () => {
-                if (!window.confirm(`Are you sure you want to delete the product "${product.name}"? This action cannot be undone.`)) {
-                    return;
-                }
-
                 setIsDeleting(true);
                 router.delete(route('products.destroy', product.id), {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         toast.success('Product deleted successfully');
+                        setIsDeleteDialogOpen(false);
                         // Force a complete table reset
                         router.reload({
                             only: ['products', 'pagination'],
@@ -179,12 +172,21 @@ export const columns: ColumnDef<Product>[] = [
                                 Share Product
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                            <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete Product
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+
+                    <CustomAlertDialog
+                        isOpen={isDeleteDialogOpen}
+                        onClose={() => setIsDeleteDialogOpen(false)}
+                        onConfirm={handleDelete}
+                        title="Are you sure?"
+                        description={`This action cannot be undone. This will permanently delete the product "${product.name}".`}
+                        isLoading={isDeleting}
+                    />
                 </div>
             );
         },

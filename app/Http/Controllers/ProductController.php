@@ -17,7 +17,7 @@ class ProductController extends Controller
         $query = Product::query();
 
         // Handle search
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")

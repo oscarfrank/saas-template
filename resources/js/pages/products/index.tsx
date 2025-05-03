@@ -80,18 +80,36 @@ export default function Index({ products, pagination }: Props) {
     const handleSearchChange = (search: string) => {
         setIsLoading(true);
         setError(null);
-        router.get(route('products.index'), { search }, { 
-            preserveState: true,
-            preserveScroll: true,
-            only: ['products', 'pagination'],
-            onSuccess: () => {
-                setIsLoading(false);
-            },
-            onError: (errors) => {
-                setIsLoading(false);
-                setError('Failed to load data. Please try again.');
-            }
-        });
+        
+        // Only trigger search if there's actual input
+        if (search.trim()) {
+            router.get(route('products.index'), { search }, { 
+                preserveState: true,
+                preserveScroll: true,
+                only: ['products', 'pagination'],
+                onSuccess: () => {
+                    setIsLoading(false);
+                },
+                onError: (errors) => {
+                    setIsLoading(false);
+                    setError('Failed to load data. Please try again.');
+                }
+            });
+        } else {
+            // If search is empty, just reload the page without search parameter
+            router.get(route('products.index'), {}, { 
+                preserveState: true,
+                preserveScroll: true,
+                only: ['products', 'pagination'],
+                onSuccess: () => {
+                    setIsLoading(false);
+                },
+                onError: (errors) => {
+                    setIsLoading(false);
+                    setError('Failed to load data. Please try again.');
+                }
+            });
+        }
     };
 
     const handlePerPageChange = (perPage: number) => {

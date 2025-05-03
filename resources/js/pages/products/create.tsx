@@ -29,7 +29,7 @@ export default function Create() {
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
                     <Link href={route('products.index')}>
-                        <Button variant="outline">
+                        <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>
                     </Link>

@@ -23,7 +23,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
     ArrowUpDown, 
     ChevronLeft, 
@@ -153,6 +153,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
     const [filterValue, setFilterValue] = useState<string>("");
     const [filters, setFilters] = useState<Filter[]>([]);
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Reset row selection when resetSelection prop changes
     useEffect(() => {
@@ -181,6 +182,13 @@ export function DataTable<TData extends Record<string, any>, TValue>({
             onSortChange(sorting[0].id, sorting[0].desc ? 'desc' : 'asc');
         }
     }, [sorting]);
+
+    // Focus search input after data updates
+    useEffect(() => {
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [data]);
 
     const table = useReactTable({
         data,
@@ -556,6 +564,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
             <div className="flex items-center gap-4 py-4">
                 <div className="flex-1 flex items-center gap-2">
                     <Input
+                        ref={searchInputRef}
                         placeholder={searchPlaceholder}
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(event.target.value)}

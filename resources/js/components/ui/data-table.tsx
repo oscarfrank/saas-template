@@ -59,6 +59,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuItem,
     DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -411,28 +412,6 @@ export function DataTable<TData, TValue>({
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <FilterIcon className="mr-2 h-4 w-4" />
-                                Filter
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[200px]">
-                            {columns
-                                .filter(column => column.id !== "select" && column.id !== "actions")
-                                .map((column) => (
-                                    <DropdownMenuItem
-                                        key={column.id}
-                                        onClick={() => {
-                                            setSelectedColumn(column.id as string);
-                                        }}
-                                    >
-                                        {column.header as string}
-                                    </DropdownMenuItem>
-                                ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">

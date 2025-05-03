@@ -107,6 +107,13 @@ interface DataTableProps<TData extends Product, TValue> {
     onPerPageChange?: (perPage: number) => void;
     isLoading?: boolean;
     error?: string;
+    onPrint?: () => Promise<Array<{
+        name: string;
+        description: string;
+        price: number;
+        featured_image: string | null;
+        created_at: string;
+    }>>;
 }
 
 interface Filter {
@@ -139,6 +146,7 @@ export function DataTable<TData extends Product, TValue>({
     onPerPageChange,
     isLoading = false,
     error,
+    onPrint,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -332,20 +340,7 @@ export function DataTable<TData extends Product, TValue>({
 
     const handlePrint = async () => {
         try {
-            const response = await axios.post(route('products.all'), {}, {
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
-            const allProducts = response.data as Array<{
-                name: string;
-                description: string;
-                price: number;
-                featured_image: string | null;
-                created_at: string;
-            }>;
+            const allProducts = onPrint ? await onPrint() : [];
             
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
@@ -428,12 +423,6 @@ export function DataTable<TData extends Product, TValue>({
         }
     };
 
-    const handleArchive = () => {
-        const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
-        if (onBulkArchive) {
-            onBulkArchive(selectedRows);
-        }
-    };
 
     const handleBulkExport = async (format: 'csv' | 'json') => {
         try {

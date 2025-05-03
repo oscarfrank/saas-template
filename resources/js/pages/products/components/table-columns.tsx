@@ -146,33 +146,33 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Produc
             return (
                 <div className="flex items-center gap-2">
                     <Link href={route('products.show', product.id)}>
-                        <Button variant="outline" size="icon">
+                        <Button variant="outline" size="icon" className="cursor-pointer">
                             <Eye className="h-4 w-4" />
                         </Button>
                     </Link>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
+                            <Button variant="outline" size="icon" className="cursor-pointer">
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                                <Link href={route('products.edit', product.id)}>
+                                <Link href={route('products.edit', product.id)} className="cursor-pointer">
                                     <Pencil className="mr-2 h-4 w-4" />
                                     Edit Product
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleCopyId}>
+                            <DropdownMenuItem onClick={handleCopyId} className="cursor-pointer">
                                 <Copy className="mr-2 h-4 w-4" />
                                 Copy ID
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleShare}>
+                            <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
                                 <Share2 className="mr-2 h-4 w-4" />
                                 Share Product
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive">
+                            <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)} className="text-destructive cursor-pointer">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete Product
                             </DropdownMenuItem>

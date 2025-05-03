@@ -348,7 +348,7 @@ export function DataTable<TData extends Product, TValue>({
 
     const handlePrint = async () => {
         try {
-            const allProducts = onPrint ? await onPrint() : [];
+            const allItems = onPrint ? await onPrint() : [];
             
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
@@ -400,7 +400,7 @@ export function DataTable<TData extends Product, TValue>({
                                 </tr>
                             </thead>
                             <tbody>
-                                ${allProducts.map((product) => `
+                                ${allItems.map((product) => `
                                     <tr>
                                         <td>${product.name}</td>
                                         <td>${product.description}</td>

@@ -55,15 +55,7 @@ export function Table<TData extends Product, TValue>({
                 }
             });
             
-            const allProducts = response.data as Array<{
-                name: string;
-                description: string;
-                price: number;
-                featured_image: string | null;
-                created_at: string;
-            }>;
-
-            return allProducts;
+            return response.data as TData[];
         } catch (error) {
             console.error('Print failed:', error);
             return [];

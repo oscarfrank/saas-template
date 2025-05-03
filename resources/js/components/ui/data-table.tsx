@@ -9,7 +9,6 @@ import {
     ColumnFiltersState,
     getFilteredRowModel,
     VisibilityState,
-    Column,
     RowSelectionState,
 } from "@tanstack/react-table";
 
@@ -37,12 +36,10 @@ import {
     Download,
     Trash2,
     Copy,
-    FileSpreadsheet,
     FileJson,
     FileText,
     Printer,
     Share2,
-    Archive,
     Filter as FilterIcon,
     AlertCircle,
 } from "lucide-react";
@@ -70,19 +67,9 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PlaceholderPattern } from "@/components/ui/placeholder-pattern";
-import { router } from '@inertiajs/react';
-import axios from 'axios';
 import { toast } from 'sonner';
 
-interface Product {
-    name: string;
-    description: string;
-    price: number;
-    featured_image: string | null;
-    created_at: string;
-}
-
-interface PrintConfig {
+interface PrintConfig<TData> {
     title: string;
     columns: {
         header: string;
@@ -91,7 +78,7 @@ interface PrintConfig {
     }[];
 }
 
-interface DataTableProps<TData extends Product, TValue> {
+interface DataTableProps<TData extends Record<string, any>, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
     searchPlaceholder?: string;
@@ -117,8 +104,8 @@ interface DataTableProps<TData extends Product, TValue> {
     isLoading?: boolean;
     error?: string;
     tableName?: string;
-    printConfig?: PrintConfig;
-    onPrint?: () => Promise<any[]>;
+    printConfig?: PrintConfig<TData>;
+    onPrint?: () => Promise<TData[]>;
     onExport?: (format: 'csv' | 'json') => Promise<{
         format: 'csv' | 'json';
         headers?: string[];
@@ -134,15 +121,7 @@ interface Filter {
     value: string;
 }
 
-interface ExportData {
-    format: 'csv' | 'json';
-    headers?: string[];
-    data: any[];
-    filename: string;
-    error?: string;
-}
-
-export function DataTable<TData extends Product, TValue>({
+export function DataTable<TData extends Record<string, any>, TValue>({
     columns,
     data,
     searchPlaceholder = "Search...",
@@ -290,17 +269,6 @@ export function DataTable<TData extends Product, TValue>({
         }
     };
 
-    const getColumnValues = (columnId: string) => {
-        return Array.from(new Set(data.map(row => row[columnId as keyof TData])));
-    };
-
-    const getCellValue = (row: TData, columnId: string): string => {
-        const value = row[columnId as keyof TData];
-        if (value === undefined || value === null) return '';
-        if (typeof value === 'object') return JSON.stringify(value);
-        return String(value);
-    };
-
     const handleExport = async (format: 'csv' | 'json') => {
         try {
             const exportData = onExport ? await onExport(format) : null;
@@ -363,7 +331,7 @@ export function DataTable<TData extends Product, TValue>({
                 return;
             }
 
-            const defaultPrintConfig: PrintConfig = {
+            const defaultPrintConfig: PrintConfig<TData> = {
                 title: `${tableName} List`,
                 columns: columns.map(col => ({
                     header: String(col.header),
@@ -414,7 +382,7 @@ export function DataTable<TData extends Product, TValue>({
                                 </tr>
                             </thead>
                             <tbody>
-                                ${allItems.map((item) => `
+                                ${allItems.map((item: any) => `
                                     <tr>
                                         ${config.columns.map(col => {
                                             const value = item[col.accessor];
@@ -504,10 +472,21 @@ export function DataTable<TData extends Product, TValue>({
                 return;
             }
 
+            const defaultPrintConfig: PrintConfig<TData> = {
+                title: `Selected ${tableName} List`,
+                columns: columns.map(col => ({
+                    header: String(col.header),
+                    accessor: col.id || '',
+                    format: (value: any) => String(value)
+                }))
+            };
+
+            const config = printConfig || defaultPrintConfig;
+
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Selected ${tableName} List</title>
+                        <title>${config.title}</title>
                         <style>
                             @media print {
                                 @page {
@@ -536,25 +515,21 @@ export function DataTable<TData extends Product, TValue>({
                         </style>
                     </head>
                     <body>
-                        <h1>Selected ${tableName} List</h1>
+                        <h1>${config.title}</h1>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Description</th>
-                                    <th>Price</th>
-                                    <th>Image</th>
-                                    <th>Created At</th>
+                                    ${config.columns.map(col => `<th>${col.header}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody>
-                                ${selectedRows.map((product) => `
+                                ${selectedRows.map((item: any) => `
                                     <tr>
-                                        <td>${product.name}</td>
-                                        <td>${product.description}</td>
-                                        <td>${product.price}</td>
-                                        <td>${product.featured_image ? `<img src="${product.featured_image}" alt="${product.name}">` : 'No image'}</td>
-                                        <td>${new Date(product.created_at).toLocaleDateString()}</td>
+                                        ${config.columns.map(col => {
+                                            const value = item[col.accessor];
+                                            const formattedValue = col.format ? col.format(value) : String(value);
+                                            return `<td>${formattedValue}</td>`;
+                                        }).join('')}
                                     </tr>
                                 `).join('')}
                             </tbody>

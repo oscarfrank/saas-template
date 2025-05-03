@@ -495,7 +495,7 @@ export function DataTable<TData extends Product, TValue>({
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Selected Products List</title>
+                        <title>Selected ${tableName} List</title>
                         <style>
                             @media print {
                                 @page {

@@ -4,6 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { EditForm } from './components/EditForm';
+import { type Product } from './components/table-columns';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -11,12 +12,16 @@ const breadcrumbs: BreadcrumbItem[] = [
         href: '/products',
     },
     {
-        title: 'Create Product',
-        href: '/products/create',
+        title: 'Edit Product',
+        href: '/products/edit',
     },
 ];
 
-export default function Create() {
+interface EditProps {
+    product: Product;
+}
+
+export default function Edit({ product }: EditProps) {
     const fields = [
         { name: 'name', type: 'text' as const, label: 'Name', required: true },
         { name: 'description', type: 'textarea' as const, label: 'Description', required: true },
@@ -26,7 +31,7 @@ export default function Create() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Create Product" />
+            <Head title="Edit Product" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
                     <Link href={route('products.index')}>
@@ -36,6 +41,7 @@ export default function Create() {
                     </Link>
                 </div>
                 <EditForm
+                    entity={product}
                     fields={fields}
                     entityName="product"
                     onSubmit={(formData) => {
@@ -47,4 +53,4 @@ export default function Create() {
             </div>
         </AppLayout>
     );
-}
+} 

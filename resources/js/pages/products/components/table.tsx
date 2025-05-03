@@ -70,6 +70,16 @@ export function Table<TData extends Product, TValue>({
         }
     };
 
+    const handleExport = async (format: 'csv' | 'json') => {
+        try {
+            const response = await axios.post(route('products.export'), { format });
+            return response.data;
+        } catch (error) {
+            console.error('Export failed:', error);
+            return null;
+        }
+    };
+
     return (
         <BaseDataTable
             columns={columns}
@@ -88,6 +98,7 @@ export function Table<TData extends Product, TValue>({
             isLoading={isLoading}
             error={error}
             onPrint={handlePrint}
+            onExport={handleExport}
         />
     );
 } 

@@ -114,6 +114,13 @@ interface DataTableProps<TData extends Product, TValue> {
         featured_image: string | null;
         created_at: string;
     }>>;
+    onExport?: (format: 'csv' | 'json') => Promise<{
+        format: 'csv' | 'json';
+        headers?: string[];
+        data: any[];
+        filename: string;
+        error?: string;
+    } | null>;
 }
 
 interface Filter {
@@ -147,6 +154,7 @@ export function DataTable<TData extends Product, TValue>({
     isLoading = false,
     error,
     onPrint,
+    onExport,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -288,11 +296,11 @@ export function DataTable<TData extends Product, TValue>({
 
     const handleExport = async (format: 'csv' | 'json') => {
         try {
-            const response = await axios.post(route('products.export'), { format });
-            const data = response.data;
-            
-            if (data.format === 'csv') {
-                const { headers, data: csvData, filename } = data;
+            const exportData = onExport ? await onExport(format) : null;
+            if (!exportData) return;
+
+            if (exportData.format === 'csv') {
+                const { headers, data: csvData, filename } = exportData;
                 const csvContent = [
                     headers?.join(','),
                     ...csvData.map((row: any) => 
@@ -311,8 +319,8 @@ export function DataTable<TData extends Product, TValue>({
                 a.click();
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
-            } else if (data.format === 'json') {
-                const { data: jsonData, filename } = data;
+            } else if (exportData.format === 'json') {
+                const { data: jsonData, filename } = exportData;
                 const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');

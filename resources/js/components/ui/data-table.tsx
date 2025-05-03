@@ -70,8 +70,19 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PlaceholderPattern } from "@/components/ui/placeholder-pattern";
+import { router } from '@inertiajs/react';
+import axios from 'axios';
+import { toast } from 'sonner';
 
-interface DataTableProps<TData, TValue> {
+interface Product {
+    name: string;
+    description: string;
+    price: number;
+    featured_image: string | null;
+    created_at: string;
+}
+
+interface DataTableProps<TData extends Product, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
     searchPlaceholder?: string;
@@ -104,7 +115,15 @@ interface Filter {
     value: string;
 }
 
-export function DataTable<TData, TValue>({
+interface ExportData {
+    format: 'csv' | 'json';
+    headers?: string[];
+    data: any[];
+    filename: string;
+    error?: string;
+}
+
+export function DataTable<TData extends Product, TValue>({
     columns,
     data,
     searchPlaceholder = "Search...",
@@ -259,126 +278,132 @@ export function DataTable<TData, TValue>({
         return String(value);
     };
 
-    const handleExport = (format: 'csv' | 'json' | 'excel') => {
-        const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
-        const visibleColumns = columns.filter(col => 
-            col.id !== 'select' && 
-            col.id !== 'actions' && 
-            col.id && 
-            typeof col.header === 'string'
-        );
-        
-        switch (format) {
-            case 'csv':
+    const handleExport = async (format: 'csv' | 'json') => {
+        try {
+            const response = await axios.post(route('products.export'), { format });
+            const data = response.data;
+            
+            if (data.format === 'csv') {
+                const { headers, data: csvData, filename } = data;
                 const csvContent = [
-                    // Headers
-                    visibleColumns.map(col => `"${col.header}"`).join(','),
-                    // Data
-                    ...selectedRows.map(row => 
-                        visibleColumns
-                            .map(col => {
-                                const value = getCellValue(row, col.id as string);
-                                return `"${value.replace(/"/g, '""')}"`;
-                            })
+                    headers?.join(','),
+                    ...csvData.map((row: any) => 
+                        Object.values(row)
+                            .map(value => `"${String(value).replace(/"/g, '""')}"`)
                             .join(',')
                     )
                 ].join('\n');
 
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `export-${new Date().toISOString()}.csv`;
-                link.click();
-                break;
-
-            case 'json':
-                const jsonData = selectedRows.map(row => {
-                    const rowData: Record<string, any> = {};
-                    visibleColumns.forEach(col => {
-                        rowData[col.header as string] = getCellValue(row, col.id as string);
-                    });
-                    return rowData;
-                });
-                
-                const jsonContent = JSON.stringify(jsonData, null, 2);
-                const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
-                const jsonLink = document.createElement('a');
-                jsonLink.href = URL.createObjectURL(jsonBlob);
-                jsonLink.download = `export-${new Date().toISOString()}.json`;
-                jsonLink.click();
-                break;
-
-            case 'excel':
-                const excelContent = [
-                    visibleColumns.map(col => col.header).join('\t'),
-                    ...selectedRows.map(row => 
-                        visibleColumns
-                            .map(col => {
-                                const value = getCellValue(row, col.id as string);
-                                return value.replace(/\t/g, ' ').replace(/\n/g, ' ');
-                            })
-                            .join('\t')
-                    )
-                ].join('\n');
-
-                const excelBlob = new Blob([excelContent], { type: 'text/tab-separated-values;charset=utf-8;' });
-                const excelLink = document.createElement('a');
-                excelLink.href = URL.createObjectURL(excelBlob);
-                excelLink.download = `export-${new Date().toISOString()}.tsv`;
-                excelLink.click();
-                break;
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else if (data.format === 'json') {
+                const { data: jsonData, filename } = data;
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+        } catch (error) {
+            console.error('Export failed:', error);
         }
     };
 
     const handleCopy = () => {
         const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
         const textToCopy = JSON.stringify(selectedRows, null, 2);
-        navigator.clipboard.writeText(textToCopy);
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            toast.success(`Copied ${selectedRows.length} item(s) to clipboard`);
+        }).catch(() => {
+            toast.error('Failed to copy to clipboard');
+        });
     };
 
-    const handlePrint = () => {
-        const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
-        const visibleColumns = columns.filter(col => 
-            col.id !== 'select' && 
-            col.id !== 'actions' && 
-            col.id && 
-            typeof col.header === 'string'
-        );
+    const handlePrint = async () => {
+        try {
+            const response = await axios.post(route('products.all'), {}, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const allProducts = response.data as Array<{
+                name: string;
+                description: string;
+                price: number;
+                featured_image: string | null;
+                created_at: string;
+            }>;
+            
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                console.error('Please allow popups to print the table');
+                return;
+            }
 
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Print Selected Rows</title>
+                        <title>Products List</title>
                         <style>
-                            body { font-family: Arial, sans-serif; }
-                            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            tr:nth-child(even) { background-color: #f9f9f9; }
                             @media print {
-                                body { padding: 20px; }
-                                table { page-break-inside: auto; }
-                                tr { page-break-inside: avoid; page-break-after: auto; }
+                                @page {
+                                    size: landscape;
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                }
+                                th, td {
+                                    border: 1px solid #ddd;
+                                    padding: 8px;
+                                    text-align: left;
+                                }
+                                th {
+                                    background-color: #f2f2f2;
+                                }
+                                img {
+                                    max-width: 100px;
+                                    max-height: 100px;
+                                }
                             }
                         </style>
                     </head>
                     <body>
-                        <h2>Selected Rows</h2>
+                        <h1>Products List</h1>
                         <table>
                             <thead>
                                 <tr>
-                                    ${visibleColumns.map(col => `<th>${col.header}</th>`).join('')}
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Price</th>
+                                    <th>Image</th>
+                                    <th>Created At</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${selectedRows.map(row => `
+                                ${allProducts.map((product) => `
                                     <tr>
-                                        ${visibleColumns.map(col => {
-                                            const value = getCellValue(row, col.id as string);
-                                            return `<td>${value}</td>`;
-                                        }).join('')}
+                                        <td>${product.name}</td>
+                                        <td>${product.description}</td>
+                                        <td>${product.price}</td>
+                                        <td>${product.featured_image ? `<img src="${product.featured_image}" alt="${product.name}">` : 'No image'}</td>
+                                        <td>${new Date(product.created_at).toLocaleDateString()}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -386,8 +411,13 @@ export function DataTable<TData, TValue>({
                     </body>
                 </html>
             `);
+
             printWindow.document.close();
+            printWindow.focus();
             printWindow.print();
+            printWindow.close();
+        } catch (error) {
+            console.error('Print failed:', error);
         }
     };
 
@@ -405,15 +435,141 @@ export function DataTable<TData, TValue>({
         }
     };
 
+    const handleBulkExport = async (format: 'csv' | 'json') => {
+        try {
+            const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
+            if (selectedRows.length === 0) {
+                console.error('No rows selected');
+                return;
+            }
+
+            if (format === 'csv') {
+                const headers = Object.keys(selectedRows[0]);
+                const csvContent = [
+                    headers.join(','),
+                    ...selectedRows.map(row => 
+                        Object.values(row)
+                            .map(value => `"${String(value).replace(/"/g, '""')}"`)
+                            .join(',')
+                    )
+                ].join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `selected-products-${new Date().toISOString()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else if (format === 'json') {
+                const blob = new Blob([JSON.stringify(selectedRows, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `selected-products-${new Date().toISOString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+        } catch (error) {
+            console.error('Bulk export failed:', error);
+        }
+    };
+
+    const handleBulkPrint = async () => {
+        try {
+            const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
+            if (selectedRows.length === 0) {
+                console.error('No rows selected');
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                console.error('Please allow popups to print the table');
+                return;
+            }
+
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Selected Products List</title>
+                        <style>
+                            @media print {
+                                @page {
+                                    size: landscape;
+                                }
+                                body {
+                                    font-family: Arial, sans-serif;
+                                }
+                                table {
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                }
+                                th, td {
+                                    border: 1px solid #ddd;
+                                    padding: 8px;
+                                    text-align: left;
+                                }
+                                th {
+                                    background-color: #f2f2f2;
+                                }
+                                img {
+                                    max-width: 100px;
+                                    max-height: 100px;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>Selected Products List</h1>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Price</th>
+                                    <th>Image</th>
+                                    <th>Created At</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${selectedRows.map((product) => `
+                                    <tr>
+                                        <td>${product.name}</td>
+                                        <td>${product.description}</td>
+                                        <td>${product.price}</td>
+                                        <td>${product.featured_image ? `<img src="${product.featured_image}" alt="${product.name}">` : 'No image'}</td>
+                                        <td>${new Date(product.created_at).toLocaleDateString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </body>
+                </html>
+            `);
+
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        } catch (error) {
+            console.error('Bulk print failed:', error);
+        }
+    };
+
     return (
         <div>
-            <div className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4 py-4">
+                <div className="flex-1 flex items-center gap-2">
                     <Input
                         placeholder={searchPlaceholder}
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(event.target.value)}
-                        className="max-w-sm"
+                        className="w-full"
                         disabled={isLoading}
                     />
                     {table.getSelectedRowModel().rows.length > 0 && (
@@ -426,15 +582,11 @@ export function DataTable<TData, TValue>({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start" className="w-[200px]">
-                                    <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                    <DropdownMenuItem onClick={() => handleBulkExport('csv')}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Export as CSV
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleExport('excel')}>
-                                        <FileSpreadsheet className="mr-2 h-4 w-4" />
-                                        Export as Excel
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleExport('json')}>
+                                    <DropdownMenuItem onClick={() => handleBulkExport('json')}>
                                         <FileJson className="mr-2 h-4 w-4" />
                                         Export as JSON
                                     </DropdownMenuItem>
@@ -443,15 +595,11 @@ export function DataTable<TData, TValue>({
                                         <Copy className="mr-2 h-4 w-4" />
                                         Copy Selected
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handlePrint}>
+                                    <DropdownMenuItem onClick={handleBulkPrint}>
                                         <Printer className="mr-2 h-4 w-4" />
                                         Print Selected
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleArchive}>
-                                        <Archive className="mr-2 h-4 w-4" />
-                                        Archive Selected
-                                    </DropdownMenuItem>
                                     <DropdownMenuItem 
                                         onClick={handleDelete}
                                         className="text-red-600"
@@ -503,6 +651,29 @@ export function DataTable<TData, TValue>({
                                         </DropdownMenuCheckboxItem>
                                     );
                                 })}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Download className="mr-2 h-4 w-4" />
+                                Export
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                Export All Products as CSV
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport('json')}>
+                                <FileJson className="mr-2 h-4 w-4" />
+                                Export All Products as JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handlePrint}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Print All
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>

@@ -173,4 +173,96 @@ class ProductController extends Controller
             ]);
         }
     }
+
+    /**
+     * Get all products for printing or exporting
+     */
+    public function getAllProducts()
+    {
+        \Log::info('getAllProducts method called');
+        $products = Product::all()->map(function ($product) {
+            if ($product->featured_image) {
+                $product->featured_image = asset('storage/' . $product->featured_image);
+            }
+            return $product;
+        });
+
+        \Log::info('Products retrieved', ['count' => $products->count()]);
+        return response()->json($products);
+    }
+
+    /**
+     * Export all products as CSV
+     */
+    public function exportAllProducts()
+    {
+        $products = Product::all();
+        $headers = ['Name', 'Description', 'Price', 'Created At'];
+        
+        $callback = function() use($products, $headers) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+            
+            foreach ($products as $product) {
+                fputcsv($file, [
+                    $product->name,
+                    $product->description,
+                    $product->price,
+                    $product->created_at->format('Y-m-d H:i:s')
+                ]);
+            }
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="products_' . date('Y-m-d') . '.csv"',
+        ]);
+    }
+
+    /**
+     * Handle export requests through Inertia
+     */
+    public function export(Request $request)
+    {
+        $format = $request->input('format', 'csv');
+        $products = Product::all();
+
+        if ($format === 'csv') {
+            $headers = ['Name', 'Description', 'Price', 'Created At'];
+            $data = $products->map(function ($product) {
+                return [
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'created_at' => $product->created_at->format('Y-m-d H:i:s')
+                ];
+            })->toArray();
+
+            return response()->json([
+                'format' => 'csv',
+                'headers' => $headers,
+                'data' => $data,
+                'filename' => 'products_' . date('Y-m-d') . '.csv'
+            ]);
+        }
+
+        if ($format === 'json') {
+            $data = $products->map(function ($product) {
+                if ($product->featured_image) {
+                    $product->featured_image = asset('storage/' . $product->featured_image);
+                }
+                return $product;
+            });
+
+            return response()->json([
+                'format' => 'json',
+                'data' => $data,
+                'filename' => 'products_' . date('Y-m-d') . '.json'
+            ]);
+        }
+
+        return response()->json(['error' => 'Invalid format'], 400);
+    }
 }

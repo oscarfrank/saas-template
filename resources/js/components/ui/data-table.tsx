@@ -524,7 +524,7 @@ export function DataTable<TData extends Product, TValue>({
                         </style>
                     </head>
                     <body>
-                        <h1>Selected Products List</h1>
+                        <h1>Selected ${tableName} List</h1>
                         <table>
                             <thead>
                                 <tr>

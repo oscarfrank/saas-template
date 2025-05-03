@@ -5,22 +5,53 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::all()->map(function ($product) {
+        $query = Product::query();
+
+        // Handle search
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        // Handle sorting
+        if ($request->has('sort')) {
+            $sort = $request->sort;
+            $direction = $request->direction ?? 'asc';
+            $query->orderBy($sort, $direction);
+        }
+
+        // Handle pagination
+        $perPage = $request->per_page ?? 10;
+        $products = $query->paginate($perPage);
+
+        // Format image URLs for each product
+        $formattedProducts = collect($products->items())->map(function ($product) {
             if ($product->featured_image) {
                 $product->featured_image = asset('storage/' . $product->featured_image);
             }
             return $product;
         });
+
         return Inertia::render('products/index', [
-            'products' => $products,
+            'products' => $formattedProducts,
+            'pagination' => [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+            ],
         ]);
     }
 
@@ -125,6 +156,21 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        //
+        try {
+            // Delete the product image if it exists
+            if ($product->featured_image) {
+                Storage::disk('public')->delete($product->featured_image);
+            }
+
+            // Delete the product
+            $product->delete();
+
+            return redirect()->route('products.index')
+                ->with('success', 'Product deleted successfully.');
+        } catch (\Exception $e) {
+            return back()->withErrors([
+                'error' => 'Failed to delete product. Please try again.',
+            ]);
+        }
     }
 }

@@ -42,6 +42,8 @@ import {
     Share2,
     Filter as FilterIcon,
     AlertCircle,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import {
     Select,
@@ -763,7 +765,15 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                                                         header.getContext()
                                                     )}
                                                     {header.column.getCanSort() && (
-                                                        <ArrowUpDown className="h-4 w-4" />
+                                                        <div className="flex flex-col">
+                                                            {header.column.getIsSorted() === "asc" ? (
+                                                                <ArrowUp className="h-3 w-3" />
+                                                            ) : header.column.getIsSorted() === "desc" ? (
+                                                                <ArrowDown className="h-3 w-3" />
+                                                            ) : (
+                                                                <ArrowUpDown className="h-3 w-3" />
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}

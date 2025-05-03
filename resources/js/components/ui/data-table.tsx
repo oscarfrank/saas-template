@@ -24,7 +24,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
     ArrowUpDown, 
     ChevronLeft, 
@@ -44,6 +44,7 @@ import {
     Share2,
     Archive,
     Filter as FilterIcon,
+    AlertCircle,
 } from "lucide-react";
 import {
     Select,
@@ -68,6 +69,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PlaceholderPattern } from "@/components/ui/placeholder-pattern";
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -79,6 +81,21 @@ interface DataTableProps<TData, TValue> {
         action: (selectedRows: TData[]) => void;
         icon?: React.ReactNode;
     }[];
+    onBulkDelete?: (selectedRows: TData[]) => void;
+    onBulkArchive?: (selectedRows: TData[]) => void;
+    resetSelection?: boolean;
+    pagination?: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    onPageChange?: (page: number) => void;
+    onSortChange?: (sort: string, direction: 'asc' | 'desc') => void;
+    onSearchChange?: (search: string) => void;
+    onPerPageChange?: (perPage: number) => void;
+    isLoading?: boolean;
+    error?: string;
 }
 
 interface Filter {
@@ -93,6 +110,16 @@ export function DataTable<TData, TValue>({
     searchPlaceholder = "Search...",
     searchColumns = ["name"],
     bulkActions = [],
+    onBulkDelete,
+    onBulkArchive,
+    resetSelection = false,
+    pagination,
+    onPageChange,
+    onSortChange,
+    onSearchChange,
+    onPerPageChange,
+    isLoading = false,
+    error,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -102,6 +129,34 @@ export function DataTable<TData, TValue>({
     const [selectedColumn, setSelectedColumn] = useState<string>("");
     const [filterValue, setFilterValue] = useState<string>("");
     const [filters, setFilters] = useState<Filter[]>([]);
+
+    // Reset row selection when resetSelection prop changes
+    useEffect(() => {
+        if (resetSelection) {
+            setRowSelection({});
+        }
+    }, [resetSelection]);
+
+    // Handle search changes
+    useEffect(() => {
+        if (globalFilter === undefined) return;
+        
+        const timeout = setTimeout(() => {
+            if (onSearchChange) {
+                onSearchChange(globalFilter);
+            }
+        }, 500);
+        return () => clearTimeout(timeout);
+    }, [globalFilter]);
+
+    // Handle sort changes
+    useEffect(() => {
+        if (sorting.length === 0) return;
+        
+        if (onSortChange) {
+            onSortChange(sorting[0].id, sorting[0].desc ? 'desc' : 'asc');
+        }
+    }, [sorting]);
 
     const table = useReactTable({
         data,
@@ -141,6 +196,10 @@ export function DataTable<TData, TValue>({
             globalFilter,
             columnVisibility,
             rowSelection,
+            pagination: {
+                pageIndex: (pagination?.current_page ?? 1) - 1,
+                pageSize: pagination?.per_page ?? 10,
+            },
         },
         onGlobalFilterChange: setGlobalFilter,
         globalFilterFn: (row, columnId, filterValue) => {
@@ -158,6 +217,8 @@ export function DataTable<TData, TValue>({
         filterFromLeafRows: true,
         enableColumnFilters: true,
         enableFilters: true,
+        manualPagination: true,
+        pageCount: pagination?.last_page ?? 1,
     });
 
     const addFilter = () => {
@@ -330,16 +391,18 @@ export function DataTable<TData, TValue>({
         }
     };
 
-    const handleArchive = () => {
-        const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
-        // Implement archive logic here
-        console.log('Archiving rows:', selectedRows);
-    };
-
     const handleDelete = () => {
         const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
-        // Implement delete logic here
-        console.log('Deleting rows:', selectedRows);
+        if (onBulkDelete) {
+            onBulkDelete(selectedRows);
+        }
+    };
+
+    const handleArchive = () => {
+        const selectedRows = table.getSelectedRowModel().rows.map(row => row.original);
+        if (onBulkArchive) {
+            onBulkArchive(selectedRows);
+        }
     };
 
     return (
@@ -351,6 +414,7 @@ export function DataTable<TData, TValue>({
                         value={globalFilter ?? ""}
                         onChange={(event) => setGlobalFilter(event.target.value)}
                         className="max-w-sm"
+                        disabled={isLoading}
                     />
                     {table.getSelectedRowModel().rows.length > 0 && (
                         <div className="flex items-center gap-2">
@@ -551,7 +615,25 @@ export function DataTable<TData, TValue>({
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {table.getRowModel().rows?.length ? (
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={columns.length + 1} className="h-96">
+                                    <div className="flex flex-col items-center justify-center h-full">
+                                        <PlaceholderPattern className="w-16 h-16" />
+                                        <p className="mt-4 text-sm text-muted-foreground">Loading data...</p>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : error ? (
+                            <TableRow>
+                                <TableCell colSpan={columns.length + 1} className="h-96">
+                                    <div className="flex flex-col items-center justify-center h-full">
+                                        <AlertCircle className="w-16 h-16 text-destructive" />
+                                        <p className="mt-4 text-sm text-destructive">{error}</p>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
@@ -570,7 +652,7 @@ export function DataTable<TData, TValue>({
                         ) : (
                             <TableRow>
                                 <TableCell
-                                    colSpan={columns.length}
+                                    colSpan={columns.length + 1}
                                     className="h-24 text-center"
                                 >
                                     No results.
@@ -580,76 +662,77 @@ export function DataTable<TData, TValue>({
                     </TableBody>
                 </Table>
             </div>
-            <div className="flex items-center justify-between px-2 py-4">
-                <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+            {pagination && (
+                <div className="flex items-center justify-between px-2 py-4">
+                    <div className="flex-1 text-sm text-muted-foreground">
+                        {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                        {pagination.total} row(s) selected.
+                    </div>
+                    <div className="flex items-center space-x-6 lg:space-x-8">
+                        <div className="flex items-center space-x-2">
+                            <p className="text-sm font-medium">Rows per page</p>
+                            <Select
+                                value={`${pagination.per_page}`}
+                                onValueChange={(value) => {
+                                    onPerPageChange?.(Number(value));
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[70px]">
+                                    <SelectValue placeholder={pagination.per_page} />
+                                </SelectTrigger>
+                                <SelectContent side="top">
+                                    {[5, 10, 20, 30, 40, 50].map((pageSize) => (
+                                        <SelectItem key={pageSize} value={`${pageSize}`}>
+                                            {pageSize}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+                            Page {pagination.current_page} of {pagination.last_page}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Button
+                                variant="outline"
+                                className="hidden h-8 w-8 p-0 lg:flex"
+                                onClick={() => onPageChange?.(1)}
+                                disabled={pagination.current_page === 1}
+                            >
+                                <span className="sr-only">Go to first page</span>
+                                <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-8 w-8 p-0"
+                                onClick={() => onPageChange?.(pagination.current_page - 1)}
+                                disabled={pagination.current_page === 1}
+                            >
+                                <span className="sr-only">Go to previous page</span>
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-8 w-8 p-0"
+                                onClick={() => onPageChange?.(pagination.current_page + 1)}
+                                disabled={pagination.current_page === pagination.last_page}
+                            >
+                                <span className="sr-only">Go to next page</span>
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="hidden h-8 w-8 p-0 lg:flex"
+                                onClick={() => onPageChange?.(pagination.last_page)}
+                                disabled={pagination.current_page === pagination.last_page}
+                            >
+                                <span className="sr-only">Go to last page</span>
+                                <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center space-x-6 lg:space-x-8">
-                    <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium">Rows per page</p>
-                        <Select
-                            value={`${table.getState().pagination.pageSize}`}
-                            onValueChange={(value) => {
-                                table.setPageSize(Number(value));
-                            }}
-                        >
-                            <SelectTrigger className="h-8 w-[70px]">
-                                <SelectValue placeholder={table.getState().pagination.pageSize} />
-                            </SelectTrigger>
-                            <SelectContent side="top">
-                                {[5, 10, 20, 30, 40, 50].map((pageSize) => (
-                                    <SelectItem key={pageSize} value={`${pageSize}`}>
-                                        {pageSize}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-                        Page {table.getState().pagination.pageIndex + 1} of{" "}
-                        {table.getPageCount()}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Button
-                            variant="outline"
-                            className="hidden h-8 w-8 p-0 lg:flex"
-                            onClick={() => table.setPageIndex(0)}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            <span className="sr-only">Go to first page</span>
-                            <ChevronsLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            <span className="sr-only">Go to previous page</span>
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="h-8 w-8 p-0"
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            <span className="sr-only">Go to next page</span>
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            className="hidden h-8 w-8 p-0 lg:flex"
-                            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            <span className="sr-only">Go to last page</span>
-                            <ChevronsRight className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </div>
-            </div>
+            )}
         </div>
     );
 } 

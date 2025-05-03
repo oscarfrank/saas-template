@@ -11,6 +11,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { formatCurrency } from "@/lib/utils";
+import { useState } from 'react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export type Product = {
     id: number;
@@ -96,6 +107,7 @@ export const columns: ColumnDef<Product>[] = [
         id: "actions",
         cell: ({ row }) => {
             const product = row.original;
+            const [isDeleting, setIsDeleting] = useState(false);
 
             const handleCopyId = () => {
                 navigator.clipboard.writeText(String(product.id));
@@ -109,16 +121,33 @@ export const columns: ColumnDef<Product>[] = [
             };
 
             const handleDelete = () => {
-                if (confirm('Are you sure you want to delete this product?')) {
-                    router.delete(route('products.destroy', product.id), {
-                        onSuccess: () => {
-                            toast.success('Product deleted successfully');
-                        },
-                        onError: () => {
-                            toast.error('Failed to delete product');
-                        },
-                    });
+                if (!window.confirm(`Are you sure you want to delete the product "${product.name}"? This action cannot be undone.`)) {
+                    return;
                 }
+
+                setIsDeleting(true);
+                router.delete(route('products.destroy', product.id), {
+                    preserveState: true,
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        toast.success('Product deleted successfully');
+                        // Force a complete table reset
+                        router.reload({
+                            only: ['products', 'pagination'],
+                            onSuccess: () => {
+                                setIsDeleting(false);
+                            },
+                            onError: () => {
+                                setIsDeleting(false);
+                                toast.error('Failed to refresh data after deletion');
+                            }
+                        });
+                    },
+                    onError: () => {
+                        toast.error('Failed to delete product');
+                        setIsDeleting(false);
+                    }
+                });
             };
 
             return (

@@ -2,7 +2,7 @@ import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Table } from '@/components/table';
+import { Table } from './components/table';
 import { createColumns } from './components/table-columns';
 import { type Product } from './components/table-columns';
 import { Button } from '@/components/ui/button';

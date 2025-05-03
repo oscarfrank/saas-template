@@ -1,5 +1,6 @@
 import { DataTable as BaseDataTable } from '@/components/ui/data-table';
 import { type Product } from '@/pages/products/components/table-columns';
+import axios from 'axios';
 
 interface TableProps<TData extends Product, TValue> {
     columns: any[];
@@ -45,6 +46,30 @@ export function Table<TData extends Product, TValue>({
     isLoading,
     error,
 }: TableProps<TData, TValue>) {
+    const handlePrint = async () => {
+        try {
+            const response = await axios.post(route('products.all'), {}, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            
+            const allProducts = response.data as Array<{
+                name: string;
+                description: string;
+                price: number;
+                featured_image: string | null;
+                created_at: string;
+            }>;
+
+            return allProducts;
+        } catch (error) {
+            console.error('Print failed:', error);
+            return [];
+        }
+    };
+
     return (
         <BaseDataTable
             columns={columns}
@@ -62,6 +87,7 @@ export function Table<TData extends Product, TValue>({
             onPerPageChange={onPerPageChange}
             isLoading={isLoading}
             error={error}
+            onPrint={handlePrint}
         />
     );
 } 

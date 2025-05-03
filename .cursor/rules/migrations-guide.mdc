@@ -1,0 +1,819 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Laravel 12 Database Migrations Guide
+
+This comprehensive guide outlines Laravel 12's database migration system to help AI agents write better structured and optimized database schema definitions. Migrations function like version control for your database, allowing teams to collaboratively define and evolve the application's database schema.
+
+## Core Principles
+
+- **Version Control for Database**: Track and share database schema changes
+- **Database Agnostic**: Work across all Laravel-supported database systems
+- **Reversible Changes**: Migrations can be rolled back when needed
+- **Team Collaboration**: Enable teams to synchronize database structure changes
+
+## Basic Migration Structure
+
+Laravel migrations are PHP classes that contain two primary methods:
+
+- **up()**: Implements the changes (create tables, add columns, etc.)
+- **down()**: Reverses those changes (drop tables, remove columns, etc.)
+
+Example migration structure:
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('flights', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('airline');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::drop('flights');
+    }
+};
+```
+
+## Generating Migrations
+
+Generate a new migration file using the Artisan command:
+
+```bash
+php artisan make:migration create_flights_table
+```
+
+Laravel will:
+- Place the file in the `database/migrations` directory
+- Add a timestamp to the filename (for proper ordering)
+- Attempt to determine the table name from the migration name
+- Pre-fill the file with appropriate schema
+
+For custom path:
+
+```bash
+php artisan make:migration create_flights_table --path=app/Database/Migrations
+```
+
+## Migration Commands
+
+### Running Migrations
+
+```bash
+# Run all pending migrations
+php artisan migrate
+
+# Check migration status
+php artisan migrate:status
+
+# Preview migrations without running
+php artisan migrate:pretend
+
+# Run migrations in isolation (with lock)
+php artisan migrate --isolated
+
+# Force run in production
+php artisan migrate --force
+```
+
+### Rolling Back Migrations
+
+```bash
+# Rollback the last batch of migrations
+php artisan migrate:rollback
+
+# Rollback a specific number of migrations
+php artisan migrate:rollback --step=5
+
+# Rollback a specific batch
+php artisan migrate:rollback --batch=3
+
+# Preview rollback without executing
+php artisan migrate:rollback --pretend
+
+# Reset all migrations
+php artisan migrate:reset
+```
+
+### Special Commands
+
+```bash
+# Rollback and re-run all migrations
+php artisan migrate:refresh
+
+# Rollback and re-run with seeding
+php artisan migrate:refresh --seed
+
+# Refresh only the last n migrations
+php artisan migrate:refresh --step=5
+
+# Drop all tables and re-run migrations
+php artisan migrate:fresh
+
+# Fresh migrations with seeding
+php artisan migrate:fresh --seed
+
+# Specify database connection for fresh migrations
+php artisan migrate:fresh --database=admin
+```
+
+### Squashing Migrations
+
+For projects with many migrations, you can squash them into a single SQL file:
+
+```bash
+# Dump the current schema
+php artisan schema:dump
+
+# Dump and remove existing migrations
+php artisan schema:dump --prune
+
+# Dump for specific database connection
+php artisan schema:dump --database=testing --prune
+```
+
+## Working with Tables
+
+### Creating Tables
+
+```php
+Schema::create('users', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('email')->unique();
+    $table->timestamp('email_verified_at')->nullable();
+    $table->string('password');
+    $table->rememberToken();
+    $table->timestamps();
+});
+```
+
+### Table Options
+
+```php
+// Specify database connection
+Schema::connection('sqlite')->create('users', function (Blueprint $table) {
+    $table->id();
+    // ...
+});
+
+// Specify storage engine (MySQL/MariaDB)
+Schema::create('users', function (Blueprint $table) {
+    $table->engine('InnoDB');
+    // ...
+});
+
+// Set character set and collation (MySQL/MariaDB)
+Schema::create('users', function (Blueprint $table) {
+    $table->charset('utf8mb4');
+    $table->collation('utf8mb4_unicode_ci');
+    // ...
+});
+
+// Create temporary table
+Schema::create('calculations', function (Blueprint $table) {
+    $table->temporary();
+    // ...
+});
+
+// Add table comment (MySQL/MariaDB/PostgreSQL)
+Schema::create('calculations', function (Blueprint $table) {
+    $table->comment('Business calculations');
+    // ...
+});
+```
+
+### Checking Table/Column Existence
+
+```php
+// Check if table exists
+if (Schema::hasTable('users')) {
+    // The "users" table exists...
+}
+
+// Check if column exists
+if (Schema::hasColumn('users', 'email')) {
+    // The "users" table exists and has an "email" column...
+}
+
+// Check if index exists
+if (Schema::hasIndex('users', ['email'], 'unique')) {
+    // The "users" table exists and has a unique index on the "email" column...
+}
+```
+
+### Updating Tables
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes');
+});
+```
+
+### Renaming and Dropping Tables
+
+```php
+// Rename table
+Schema::rename($from, $to);
+
+// Drop table
+Schema::drop('users');
+
+// Drop if exists
+Schema::dropIfExists('users');
+```
+
+## Working with Columns
+
+### Adding Columns
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->string('address')->nullable();
+    $table->integer('votes');
+});
+```
+
+### Column Types
+
+Laravel provides numerous column type methods. Here are the most commonly used ones:
+
+#### ID & Integer Types
+
+```php
+$table->id();                          // Auto-incrementing UNSIGNED BIGINT primary key
+$table->bigIncrements('id');           // Auto-incrementing UNSIGNED BIGINT primary key
+$table->increments('id');              // Auto-incrementing UNSIGNED INTEGER primary key
+$table->integer('votes');              // INTEGER equivalent
+$table->bigInteger('votes');           // BIGINT equivalent
+$table->mediumInteger('votes');        // MEDIUMINT equivalent
+$table->smallInteger('votes');         // SMALLINT equivalent
+$table->tinyInteger('votes');          // TINYINT equivalent
+$table->unsignedBigInteger('votes');   // UNSIGNED BIGINT equivalent
+$table->unsignedInteger('votes');      // UNSIGNED INTEGER equivalent
+$table->unsignedMediumInteger('votes');// UNSIGNED MEDIUMINT equivalent
+$table->unsignedSmallInteger('votes'); // UNSIGNED SMALLINT equivalent
+$table->unsignedTinyInteger('votes');  // UNSIGNED TINYINT equivalent
+$table->foreignId('user_id');          // UNSIGNED BIGINT for foreign keys
+```
+
+#### String & Text Types
+
+```php
+$table->string('name', 100);          // VARCHAR with length
+$table->char('name', 100);            // CHAR with length
+$table->text('description');          // TEXT equivalent
+$table->mediumText('description');    // MEDIUMTEXT equivalent
+$table->longText('description');      // LONGTEXT equivalent
+$table->tinyText('notes');            // TINYTEXT equivalent
+```
+
+#### Boolean Type
+
+```php
+$table->boolean('confirmed');         // BOOLEAN equivalent
+```
+
+#### Decimal Types
+
+```php
+$table->decimal('amount', 8, 2);      // DECIMAL with precision and scale
+$table->float('amount', 8, 2);        // FLOAT equivalent with precision
+$table->double('amount', 8, 2);       // DOUBLE equivalent with precision
+```
+
+#### Date and Time Types
+
+```php
+$table->dateTime('created_at');        // DATETIME equivalent
+$table->dateTimeTz('created_at');      // DATETIME with timezone
+$table->date('created_at');            // DATE equivalent
+$table->time('sunrise');               // TIME equivalent
+$table->timeTz('sunrise');             // TIME with timezone
+$table->timestamp('added_on');         // TIMESTAMP equivalent
+$table->timestampTz('added_on');       // TIMESTAMP with timezone
+$table->timestamps();                  // Adds created_at and updated_at columns
+$table->timestampsTz();                // Adds created_at and updated_at with timezone
+$table->softDeletes();                 // Adds deleted_at column for soft deletes
+$table->softDeletesTz();               // Adds deleted_at with timezone
+$table->year('birth_year');            // YEAR equivalent
+```
+
+#### Binary Types
+
+```php
+$table->binary('data');                // BLOB equivalent
+```
+
+#### UUID and ULID Types
+
+```php
+$table->uuid('id');                    // UUID equivalent
+$table->ulid('id');                    // ULID equivalent
+$table->foreignUuid('user_id');        // UUID for foreign keys
+$table->foreignUlid('user_id');        // ULID for foreign keys
+```
+
+#### JSON Types
+
+```php
+$table->json('options');               // JSON equivalent
+$table->jsonb('options');              // JSONB equivalent (PostgreSQL)
+```
+
+#### Spatial Types
+
+```php
+$table->geometry('positions');          // GEOMETRY equivalent
+$table->geometryCollection('positions');// GEOMETRYCOLLECTION equivalent
+$table->point('position');              // POINT equivalent
+$table->lineString('path');             // LINESTRING equivalent
+$table->polygon('area');                // POLYGON equivalent
+$table->multiPoint('positions');        // MULTIPOINT equivalent
+$table->multiLineString('paths');       // MULTILINESTRING equivalent
+$table->multiPolygon('areas');          // MULTIPOLYGON equivalent
+$table->geography('positions');         // GEOGRAPHY equivalent (PostGIS)
+```
+
+#### Other Types
+
+```php
+$table->enum('difficulty', ['easy', 'hard']); // ENUM type
+$table->set('flavors', ['strawberry', 'vanilla']); // SET type (MySQL)
+$table->ipAddress('visitor');          // IP address storage
+$table->macAddress('device');          // MAC address storage
+$table->rememberToken();               // VARCHAR(100) for "remember me" tokens
+$table->vector('embedding', 100);      // Vector column (PostgreSQL+pgvector)
+```
+
+#### Morphs Columns (for Polymorphic Relations)
+
+```php
+$table->morphs('taggable');           // Adds taggable_id and taggable_type columns
+$table->nullableMorphs('taggable');   // Nullable morphs columns
+$table->uuidMorphs('taggable');       // Uses UUID for morphs columns
+$table->nullableUuidMorphs('taggable'); // Nullable UUID morphs
+$table->ulidMorphs('taggable');       // Uses ULID for morphs columns
+$table->nullableUlidMorphs('taggable'); // Nullable ULID morphs
+```
+
+### Column Modifiers
+
+Modifiers can be chained to column definitions:
+
+```php
+// Basic modifiers
+$table->string('email')->nullable();
+$table->integer('votes')->default(0);
+$table->timestamp('created_at')->useCurrent();
+$table->timestamp('updated_at')->useCurrentOnUpdate();
+
+// Position modifiers (MySQL/MariaDB)
+$table->string('password')->after('email');
+$table->string('name')->first();
+
+// Collation/Character Set (MySQL/MariaDB)
+$table->string('content')->charset('utf8mb4')->collation('utf8mb4_unicode_ci');
+
+// Comment
+$table->integer('votes')->comment('Number of votes received');
+
+// Auto-incrementing from specific value
+$table->increments('id')->from(1000);
+
+// Make column invisible to SELECT * queries (MySQL)
+$table->string('secret_key')->invisible();
+
+// Generated/Computed columns
+$table->integer('price');
+$table->integer('discounted_price')->virtualAs('price * 0.9');
+$table->integer('final_price')->storedAs('price * 0.9');
+```
+
+### Default Expressions
+
+For database-specific expressions as defaults:
+
+```php
+use Illuminate\Database\Query\Expression;
+
+$table->json('options')->default(new Expression('(JSON_ARRAY())'));
+```
+
+### Column Order (MySQL/MariaDB)
+
+```php
+// Add multiple columns after a specific column
+$table->after('password', function (Blueprint $table) {
+    $table->string('address_line1');
+    $table->string('address_line2');
+    $table->string('city');
+});
+```
+
+### Modifying Columns
+
+To update an existing column:
+
+```php
+// Increase string column length
+Schema::table('users', function (Blueprint $table) {
+    $table->string('name', 50)->change();
+});
+
+// Change with all modifiers
+Schema::table('users', function (Blueprint $table) {
+    $table->integer('votes')
+          ->unsigned()
+          ->default(1)
+          ->comment('my comment')
+          ->change();
+});
+
+// Add/drop index while changing
+$table->bigIncrements('id')->primary()->change();
+$table->char('postal_code', 10)->unique(false)->change();
+```
+
+### Renaming Columns
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->renameColumn('from', 'to');
+});
+```
+
+### Dropping Columns
+
+```php
+// Drop single column
+Schema::table('users', function (Blueprint $table) {
+    $table->dropColumn('votes');
+});
+
+// Drop multiple columns
+Schema::table('users', function (Blueprint $table) {
+    $table->dropColumn(['votes', 'avatar', 'location']);
+});
+
+// Drop special columns
+Schema::table('users', function (Blueprint $table) {
+    $table->dropMorphs('taggable');
+    $table->dropRememberToken();
+    $table->dropSoftDeletes();
+    $table->dropSoftDeletesTz();
+    $table->dropTimestamps();
+    $table->dropTimestampsTz();
+});
+```
+
+## Working with Indexes
+
+### Creating Indexes
+
+```php
+// Add index when creating column
+Schema::table('users', function (Blueprint $table) {
+    $table->string('email')->unique();
+});
+
+// Add index after defining column
+Schema::table('users', function (Blueprint $table) {
+    $table->unique('email');
+});
+
+// Compound/Composite index
+Schema::table('users', function (Blueprint $table) {
+    $table->index(['account_id', 'created_at']);
+});
+
+// Custom index name
+Schema::table('users', function (Blueprint $table) {
+    $table->unique('email', 'unique_email');
+});
+```
+
+### Available Index Types
+
+```php
+// Primary key
+$table->primary('id');
+$table->primary(['id', 'parent_id']); // Composite primary key
+
+// Unique index
+$table->unique('email');
+
+// Basic index
+$table->index('state');
+
+// Full text index (MariaDB/MySQL/PostgreSQL)
+$table->fullText('body');
+
+// Full text with language (PostgreSQL)
+$table->fullText('body')->language('english');
+
+// Spatial index (except SQLite)
+$table->spatialIndex('location');
+```
+
+### Renaming Indexes
+
+```php
+$table->renameIndex('from', 'to');
+```
+
+### Dropping Indexes
+
+```php
+// Drop with explicit name
+$table->dropPrimary('users_id_primary');
+$table->dropUnique('users_email_unique');
+$table->dropIndex('geo_state_index');
+$table->dropFullText('posts_body_fulltext');
+$table->dropSpatialIndex('geo_location_spatialindex');
+
+// Drop with column array (auto-generates name)
+$table->dropIndex(['state']); // Drops index 'geo_state_index'
+```
+
+## Foreign Key Constraints
+
+### Creating Foreign Keys
+
+Verbose syntax:
+
+```php
+Schema::table('posts', function (Blueprint $table) {
+    $table->unsignedBigInteger('user_id');
+    
+    $table->foreign('user_id')
+          ->references('id')
+          ->on('users');
+});
+```
+
+Shorthand syntax with conventions:
+
+```php
+Schema::table('posts', function (Blueprint $table) {
+    $table->foreignId('user_id')->constrained();
+});
+```
+
+Specify table and index name:
+
+```php
+Schema::table('posts', function (Blueprint $table) {
+    $table->foreignId('user_id')
+          ->constrained(
+              table: 'users', 
+              indexName: 'posts_user_id'
+          );
+});
+```
+
+### Action Constraints (ON DELETE, ON UPDATE)
+
+```php
+// Method chain syntax
+$table->foreignId('user_id')
+      ->constrained()
+      ->onUpdate('cascade')
+      ->onDelete('cascade');
+
+// Expressive syntax
+$table->foreignId('user_id')
+      ->constrained()
+      ->cascadeOnUpdate()
+      ->cascadeOnDelete();
+```
+
+Available actions:
+
+```php
+// Update actions
+$table->cascadeOnUpdate();    // ON UPDATE CASCADE
+$table->restrictOnUpdate();   // ON UPDATE RESTRICT
+$table->nullOnUpdate();       // ON UPDATE SET NULL
+$table->noActionOnUpdate();   // ON UPDATE NO ACTION
+
+// Delete actions
+$table->cascadeOnDelete();    // ON DELETE CASCADE
+$table->restrictOnDelete();   // ON DELETE RESTRICT
+$table->nullOnDelete();       // ON DELETE SET NULL
+$table->noActionOnDelete();   // ON DELETE NO ACTION
+```
+
+### Dropping Foreign Keys
+
+```php
+// Drop with explicit name
+$table->dropForeign('posts_user_id_foreign');
+
+// Drop with column array (auto-generates name)
+$table->dropForeign(['user_id']);
+```
+
+### Toggling Foreign Key Constraints
+
+```php
+// Enable constraints
+Schema::enableForeignKeyConstraints();
+
+// Disable constraints
+Schema::disableForeignKeyConstraints();
+
+// Disable within a callback
+Schema::withoutForeignKeyConstraints(function () {
+    // Constraints disabled within this closure...
+});
+```
+
+## Advanced Migration Features
+
+### Customizing Connection
+
+```php
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+
+return new class extends Migration
+{
+    /**
+     * The database connection that should be used by the migration.
+     *
+     * @var string
+     */
+    protected $connection = 'pgsql';
+
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        // ...
+    }
+};
+```
+
+### Conditional Migrations
+
+To make migrations run only under certain conditions:
+
+```php
+<?php
+
+use App\Models\Flights;
+use Laravel\Pennant\Feature;
+
+/**
+ * Determine if this migration should run.
+ */
+public function shouldRun(): bool
+{
+    return Feature::active(Flights::class);
+}
+```
+
+## Migration Events
+
+Laravel dispatches events during migration operations:
+
+| Event Class | Description |
+|-------------|-------------|
+| `Illuminate\Database\Events\MigrationsStarted` | Batch of migrations about to execute |
+| `Illuminate\Database\Events\MigrationsEnded` | Batch of migrations finished executing |
+| `Illuminate\Database\Events\MigrationStarted` | Single migration about to execute |
+| `Illuminate\Database\Events\MigrationEnded` | Single migration finished executing |
+| `Illuminate\Database\Events\NoPendingMigrations` | No pending migrations found |
+| `Illuminate\Database\Events\SchemaDumped` | Schema dump completed |
+| `Illuminate\Database\Events\SchemaLoaded` | Schema dump loaded |
+
+You can listen for these events to perform actions before or after migrations.
+
+## Best Practices
+
+1. **Atomic Migrations**: Each migration should be focused on a specific change
+   
+2. **Descriptive Names**: Use clear names like `create_users_table`, `add_votes_to_posts_table`, or `change_email_column_in_users_table`
+
+3. **Reversible Migrations**: Always implement the `down()` method properly to reverse changes
+
+4. **Transaction Awareness**: Large structural changes may require toggling foreign key constraints or using transactions
+
+5. **Testing Migrations**: Test migrations both up and down to ensure they work correctly
+
+6. **Squash When Needed**: Use schema dumping for projects with many migrations
+
+7. **Isolation**: Use the `--isolated` flag when deploying to prevent concurrent migration issues
+
+8. **Production Safety**: Always use `--force` in production to confirm potentially destructive operations
+
+9. **Foreign Keys**: Use the fluent syntax for foreign keys and always name them explicitly
+
+10. **Code Organization**: Group related migrations and keep them focused on specific tasks
+
+## Common Migration Patterns
+
+### Creating a Basic Table
+
+```php
+Schema::create('products', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->text('description')->nullable();
+    $table->decimal('price', 8, 2);
+    $table->boolean('is_active')->default(true);
+    $table->timestamps();
+});
+```
+
+### Adding a Pivot Table for Many-to-Many
+
+```php
+Schema::create('product_tag', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('product_id')->constrained()->onDelete('cascade');
+    $table->foreignId('tag_id')->constrained()->onDelete('cascade');
+    $table->timestamps();
+    
+    // Optional: Add a unique constraint
+    $table->unique(['product_id', 'tag_id']);
+});
+```
+
+### Adding Soft Deletes to Existing Table
+
+```php
+Schema::table('products', function (Blueprint $table) {
+    $table->softDeletes();
+});
+```
+
+### Implementing a Versioning System
+
+```php
+Schema::create('document_versions', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('document_id')->constrained()->onDelete('cascade');
+    $table->integer('version_number');
+    $table->text('content');
+    $table->foreignId('created_by')->constrained('users');
+    $table->timestamps();
+    
+    $table->unique(['document_id', 'version_number']);
+});
+```
+
+### Setting Up Full-Text Search
+
+```php
+Schema::create('articles', function (Blueprint $table) {
+    $table->id();
+    $table->string('title');
+    $table->text('content');
+    $table->timestamps();
+    
+    // Add full-text index (MySQL/MariaDB/PostgreSQL)
+    $table->fullText(['title', 'content']);
+});
+```
+
+### Creating a Hierarchical Structure
+
+```php
+Schema::create('categories', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->foreignId('parent_id')->nullable()->constrained('categories')->nullOnDelete();
+    $table->integer('position')->default(0);
+    $table->timestamps();
+});
+```
+
+## Conclusion
+
+Laravel's migration system provides a powerful way to manage database schema changes over time. By following the patterns and practices in this guide, your AI agent can write more effective migrations that safely evolve your database schema in a version-controlled and team-friendly manner.
+
+Remember that migrations should be treated as immutable once they've been shared with your team or deployed to production environments. For new changes, create new migration files rather than modifying existing ones.

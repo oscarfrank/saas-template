@@ -1,0 +1,489 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Laravel 12 Pagination Guide
+
+This comprehensive guide outlines Laravel 12's pagination system to help AI agents write better structured code for handling large datasets. Laravel's pagination is elegantly integrated with the query builder and Eloquent ORM, providing a convenient and user-friendly solution for paginating database records.
+
+## Core Principles
+
+- **Zero Configuration**: Works out of the box with minimal setup
+- **Framework Integration**: Seamlessly integrates with Query Builder and Eloquent ORM
+- **UI Framework Compatibility**: Default support for Tailwind CSS with Bootstrap options
+- **Customizable**: Easily customizable views and behavior
+
+## Basic Pagination Concepts
+
+Laravel offers three primary pagination methods:
+
+1. **Standard Pagination** (`paginate`): Shows numbered pagination links with first/last page awareness
+2. **Simple Pagination** (`simplePaginate`): Shows only "Next" and "Previous" links (more efficient)
+3. **Cursor Pagination** (`cursorPaginate`): Uses cursor-based navigation instead of offset-based (best performance)
+
+## Using Pagination with Query Builder
+
+### Standard Pagination
+
+```php
+use Illuminate\Support\Facades\DB;
+
+// In a controller
+public function index()
+{
+    $users = DB::table('users')->paginate(15); // 15 items per page
+    
+    return view('users.index', ['users' => $users]);
+}
+```
+
+### Simple Pagination
+
+```php
+// More efficient (doesn't count total records)
+$users = DB::table('users')->simplePaginate(15);
+```
+
+## Using Pagination with Eloquent Models
+
+### Standard Pagination
+
+```php
+use App\Models\User;
+
+// Basic pagination
+$users = User::paginate(15);
+
+// With query constraints
+$users = User::where('votes', '>', 100)->paginate(15);
+```
+
+### Simple Pagination
+
+```php
+$users = User::simplePaginate(15);
+```
+
+### Cursor Pagination
+
+```php
+// Must include an "order by" clause
+$users = User::orderBy('id')->cursorPaginate(15);
+```
+
+## Handling Multiple Paginators
+
+For pages with multiple paginated sections, customize the query parameter name:
+
+```php
+// First paginator (uses default 'page' parameter)
+$users = User::paginate(15);
+
+// Second paginator (uses 'posts_page' parameter)
+$posts = Post::paginate(
+    $perPage = 10, 
+    $columns = ['*'], 
+    $pageName = 'posts_page'
+);
+```
+
+## Displaying Pagination Results in Views
+
+### Basic Display
+
+```blade
+<div>
+    @foreach ($users as $user)
+        <div>{{ $user->name }}</div>
+    @endforeach
+</div>
+
+<!-- Pagination Links -->
+{{ $users->links() }}
+```
+
+### Customizing the Link Window
+
+Control how many links appear on each side of the current page:
+
+```blade
+<!-- Display 5 links on each side of the current page -->
+{{ $users->onEachSide(5)->links() }}
+```
+
+## Customizing Pagination URLs
+
+### Setting a Custom Base Path
+
+```php
+$users = User::paginate(15);
+$users->withPath('/admin/users');
+```
+
+### Appending Query Parameters
+
+```php
+// Append a single parameter
+$users = User::paginate(15);
+$users->appends(['sort' => 'votes']);
+
+// Append all current query parameters
+$users = User::paginate(15)->withQueryString();
+
+// Append a URL fragment
+$users = User::paginate(15)->fragment('users');
+```
+
+## Customizing Pagination Views
+
+### Using a Custom View
+
+```blade
+{{ $paginator->links('view.name') }}
+
+<!-- With additional data -->
+{{ $paginator->links('view.name', ['foo' => 'bar']) }}
+```
+
+### Publishing the Pagination Views
+
+```bash
+php artisan vendor:publish --tag=laravel-pagination
+```
+
+This will create pagination views in `resources/views/vendor/pagination` which you can customize.
+
+### Setting Default Views Globally
+
+```php
+// In App\Providers\AppServiceProvider
+public function boot(): void
+{
+    Paginator::defaultView('view-name');
+    Paginator::defaultSimpleView('view-name');
+}
+```
+
+### Using Bootstrap Instead of Tailwind
+
+```php
+// In App\Providers\AppServiceProvider
+use Illuminate\Pagination\Paginator;
+
+public function boot(): void
+{
+    Paginator::useBootstrapFive(); // For Bootstrap 5
+    // OR
+    Paginator::useBootstrapFour(); // For Bootstrap 4
+}
+```
+
+## Cursor Pagination vs. Offset Pagination
+
+### Cursor Pagination Advantages
+
+- Better performance for large datasets (especially with indexed columns)
+- Consistent results even when records are added or removed from the dataset
+- Eliminates the "offset" problem in large datasets
+
+### When to Use Cursor Pagination
+
+- For infinite scrolling UIs
+- For large datasets with frequent updates
+- When performance is critical
+
+### Cursor Pagination Requirements
+
+- Must include an "order by" clause
+- Ordering columns must belong to the target table
+- Ordering must be based on at least one unique column or a unique combination
+- Doesn't support NULL values in ordered columns
+- Limited to "Next/Previous" navigation (no numbered links)
+
+## Manual Pagination
+
+For cases when you need to paginate already-retrieved data:
+
+### Length-Aware Paginator (Standard)
+
+```php
+use Illuminate\Pagination\LengthAwarePaginator;
+
+$data = [...]; // Your array of items
+$perPage = 15;
+$currentPage = LengthAwarePaginator::resolveCurrentPage();
+$currentItems = array_slice($data, ($currentPage - 1) * $perPage, $perPage);
+
+$paginator = new LengthAwarePaginator(
+    $currentItems,
+    count($data),
+    $perPage,
+    $currentPage,
+    [
+        'path' => LengthAwarePaginator::resolveCurrentPath(),
+        'pageName' => 'page'
+    ]
+);
+```
+
+### Simple Paginator
+
+```php
+use Illuminate\Pagination\Paginator;
+
+$data = [...]; // Your array of items
+$perPage = 15;
+$currentPage = Paginator::resolveCurrentPage();
+$currentItems = array_slice($data, ($currentPage - 1) * $perPage, $perPage);
+
+$paginator = new Paginator(
+    $currentItems,
+    $perPage,
+    $currentPage,
+    [
+        'path' => Paginator::resolveCurrentPath(),
+        'pageName' => 'page'
+    ]
+);
+```
+
+## API Pagination and JSON Responses
+
+Paginator instances can be easily converted to JSON:
+
+```php
+// In a controller/route:
+public function index()
+{
+    return User::paginate(15); // Automatically converts to JSON in API routes
+}
+
+// Manual conversion
+$usersJson = User::paginate(15)->toJson();
+```
+
+The JSON output includes:
+
+```json
+{
+  "total": 50,
+  "per_page": 15,
+  "current_page": 1,
+  "last_page": 4,
+  "first_page_url": "http://laravel.app?page=1",
+  "last_page_url": "http://laravel.app?page=4",
+  "next_page_url": "http://laravel.app?page=2",
+  "prev_page_url": null,
+  "path": "http://laravel.app",
+  "from": 1,
+  "to": 15,
+  "data":[
+    {
+      // Record...
+    },
+    {
+      // Record...
+    }
+  ]
+}
+```
+
+## Available Paginator Methods
+
+### Standard and Simple Paginator Methods
+
+| Method | Description |
+|--------|-------------|
+| `$paginator->count()` | Get number of items for the current page |
+| `$paginator->currentPage()` | Get the current page number |
+| `$paginator->firstItem()` | Get the result number of the first item |
+| `$paginator->getOptions()` | Get the paginator options |
+| `$paginator->hasPages()` | Determine if there are enough items to split into multiple pages |
+| `$paginator->hasMorePages()` | Determine if there are more items in the data store |
+| `$paginator->items()` | Get the items for the current page |
+| `$paginator->lastItem()` | Get the result number of the last item |
+| `$paginator->nextPageUrl()` | Get the URL for the next page |
+| `$paginator->onFirstPage()` | Determine if on the first page |
+| `$paginator->perPage()` | Number of items per page |
+| `$paginator->previousPageUrl()` | Get the URL for the previous page |
+| `$paginator->url($page)` | Get the URL for a given page number |
+| `$paginator->getPageName()` | Get the query string variable used to store the page |
+| `$paginator->setPageName($name)` | Set the query string variable used to store the page |
+| `$paginator->through($callback)` | Transform each item using a callback |
+
+### Additional Length-Aware Paginator Methods
+
+| Method | Description |
+|--------|-------------|
+| `$paginator->lastPage()` | Get the page number of the last available page |
+| `$paginator->total()` | Determine the total number of matching items |
+| `$paginator->onLastPage()` | Determine if on the last page |
+
+### Cursor Paginator Methods
+
+| Method | Description |
+|--------|-------------|
+| `$paginator->cursor()` | Get the current cursor instance |
+| `$paginator->getCursorName()` | Get the query string variable used to store the cursor |
+| `$paginator->nextCursor()` | Get the cursor instance for the next set of items |
+| `$paginator->previousCursor()` | Get the cursor instance for the previous set of items |
+| `$paginator->setCursorName()` | Set the query string variable used to store the cursor |
+| `$paginator->url($cursor)` | Get the URL for a given cursor instance |
+
+## Best Practices
+
+1. **Choose the Right Pagination Type**:
+   - Use `paginate()` when you need to show page numbers and total results
+   - Use `simplePaginate()` for better performance when only next/previous links are needed
+   - Use `cursorPaginate()` for the best performance with large datasets, especially for infinite scrolling
+
+2. **Eager Loading for Eloquent**:
+   - When paginating Eloquent models that have relationships, use eager loading to avoid N+1 query problems:
+   ```php
+   $users = User::with('posts')->paginate(15);
+   ```
+
+3. **Consistent Page Size**:
+   - Store page size in a config file or controller property for consistency:
+   ```php
+   protected $perPage = 15;
+   
+   public function index()
+   {
+       return view('users.index', [
+           'users' => User::paginate($this->perPage)
+       ]);
+   }
+   ```
+
+4. **User-Controlled Page Size**:
+   - Allow users to select page size with request validation:
+   ```php
+   $perPage = $request->input('per_page', 15);
+   $perPage = in_array($perPage, [15, 25, 50, 100]) ? $perPage : 15;
+   $users = User::paginate($perPage);
+   ```
+
+5. **Testing Pagination**:
+   - Ensure your tests cover edge cases like empty results, first page, and last page behavior
+
+## Common Patterns
+
+### Paginated API Resource
+
+```php
+namespace App\Http\Controllers\API;
+
+use App\Http\Resources\UserResource;
+use App\Models\User;
+use App\Http\Controllers\Controller;
+
+class UserController extends Controller
+{
+    public function index()
+    {
+        $users = User::paginate(15);
+        
+        return UserResource::collection($users);
+    }
+}
+```
+
+### Filtered and Paginated Results
+
+```php
+namespace App\Http\Controllers;
+
+use App\Models\Product;
+use Illuminate\Http\Request;
+
+class ProductController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Product::query();
+        
+        // Apply filters
+        if ($request->filled('category')) {
+            $query->where('category_id', $request->input('category'));
+        }
+        
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        
+        // Apply sorting
+        $sortField = $request->input('sort', 'created_at');
+        $sortDirection = $request->input('direction', 'desc');
+        $query->orderBy($sortField, $sortDirection);
+        
+        // Paginate results
+        $products = $query->paginate(15)->withQueryString();
+        
+        return view('products.index', compact('products'));
+    }
+}
+```
+
+### Infinite Scroll Implementation
+
+```php
+// Controller
+public function index(Request $request)
+{
+    $posts = Post::latest()->cursorPaginate(10);
+    
+    if ($request->wantsJson()) {
+        return response()->json([
+            'data' => $posts->items(),
+            'next_page_url' => $posts->nextPageUrl()
+        ]);
+    }
+    
+    return view('posts.index', compact('posts'));
+}
+```
+
+```javascript
+// JavaScript for infinite scroll
+let nextPageUrl = '{{ $posts->nextPageUrl() }}';
+let loading = false;
+
+window.addEventListener('scroll', function() {
+    if (loading) return;
+    
+    if (window.scrollY + window.innerHeight >= document.body.offsetHeight - 100) {
+        if (nextPageUrl) {
+            loading = true;
+            loadMoreContent();
+        }
+    }
+});
+
+function loadMoreContent() {
+    fetch(nextPageUrl)
+        .then(response => response.json())
+        .then(data => {
+            // Append items to container
+            const container = document.getElementById('posts-container');
+            data.data.forEach(post => {
+                container.innerHTML += `<div class="post">${post.title}</div>`;
+            });
+            
+            // Update next page URL
+            nextPageUrl = data.next_page_url;
+            loading = false;
+        });
+}
+```
+
+## Conclusion
+
+Laravel's pagination system provides a simple yet powerful way to handle large datasets. By selecting the appropriate pagination method for your specific needs and leveraging the available customization options, you can create efficient, user-friendly interfaces for browsing data collections of any size.
+
+Remember that cursor pagination offers the best performance for large datasets, especially when using infinite scrolling UIs, while the standard pagination is more suitable for traditional page-based navigation where users expect to see page numbers and total results.

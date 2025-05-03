@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+These are the basic rules for this project.
+
+- This project is written in Laravel 12, so use the laravel-12-documentation provided for reference.
+- I am using react next, which is bundled in Laravel 12 to display the frontend.
+- Always write the database queries using eloquent, so we can migrate to MySQL for production, as development is in SQLite.
+- Always show and explain a code you want to write, and request if I agree before you add in Editor.

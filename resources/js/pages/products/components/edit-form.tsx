@@ -168,7 +168,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
                 </div>
 
                 <div className="flex justify-end">
-                    <Button type="submit" disabled={processing}>
+                    <Button type="submit" disabled={processing} className="cursor-pointer">
                         {entity ? 'Update' : 'Create'} {entityName.charAt(0).toUpperCase() + entityName.slice(1)}
                     </Button>
                 </div>

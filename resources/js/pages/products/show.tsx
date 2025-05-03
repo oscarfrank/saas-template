@@ -28,13 +28,13 @@ export default function Show({ product }: ShowProps) {
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
                     <Link href={route('products.index')}>
-                        <Button variant="outline">
+                        <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Products
                         </Button>
                     </Link>
                     <Link href={route('products.edit', product.id)}>
-                        <Button>
+                        <Button className="cursor-pointer">
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Product
                         </Button>

@@ -207,7 +207,7 @@ export default function Index({ products, pagination }: Props) {
                     <div className="flex gap-2">
                     </div>
                     <Link href={route('products.create')}>
-                        <Button>
+                        <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
                             Add Product
                         </Button>

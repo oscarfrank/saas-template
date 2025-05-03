@@ -1,0 +1,1034 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Laravel 12 Database Query Builder Guide
+
+This comprehensive guide outlines Laravel 12's database query builder system to help AI agents write better structured and optimized database queries. The query builder provides a convenient, fluent interface for creating and running database operations without the need to write raw SQL in most cases.
+
+## Core Principles
+
+- **Fluent Interface**: Chain methods together to build complex queries
+- **SQL Injection Protection**: Uses PDO parameter binding for secure queries
+- **Cross-Database Compatibility**: Works with all Laravel supported database systems
+- **Query Component Reusability**: Create reusable query logic with minimal duplication
+
+## Basic Query Structure
+
+Laravel's query builder typically follows this pattern:
+
+```php
+DB::table('table_name')
+    ->select('column1', 'column2')
+    ->where('column', 'operator', 'value')
+    ->orderBy('column')
+    ->get();
+```
+
+## Importing the DB Facade
+
+Always start by importing the DB facade:
+
+```php
+use Illuminate\Support\Facades\DB;
+```
+
+## Query Building Components
+
+### 1. Retrieving Data
+
+#### Basic Retrieval Methods
+
+```php
+// Get all rows from a table
+$users = DB::table('users')->get();
+
+// Get first record
+$user = DB::table('users')->first();
+
+// Find by primary key
+$user = DB::table('users')->find(1);
+
+// Get value of single column
+$email = DB::table('users')->where('id', 1)->value('email');
+
+// Get values of a single column as collection
+$emails = DB::table('users')->pluck('email');
+
+// Get values with custom key
+$emailsByName = DB::table('users')->pluck('email', 'name');
+
+// Throw exception if not found
+$user = DB::table('users')->where('name', 'John')->firstOrFail();
+```
+
+#### Chunking Results for Large Datasets
+
+```php
+// Process 100 records at a time
+DB::table('users')->orderBy('id')->chunk(100, function ($users) {
+    foreach ($users as $user) {
+        // Process user
+    }
+});
+
+// Stop chunking by returning false
+DB::table('users')->orderBy('id')->chunk(100, function ($users) {
+    // Process records
+    return false; // Stop further chunks
+});
+
+// For when updating records during chunk processing
+DB::table('users')->where('active', false)
+    ->chunkById(100, function ($users) {
+        foreach ($users as $user) {
+            DB::table('users')
+                ->where('id', $user->id)
+                ->update(['active' => true]);
+        }
+    });
+
+// Lazy loading with iterators
+DB::table('users')->orderBy('id')->lazy()->each(function ($user) {
+    // Process user
+});
+```
+
+#### Aggregates
+
+```php
+// Count
+$count = DB::table('users')->count();
+
+// Sum
+$sum = DB::table('orders')->sum('price');
+
+// Average
+$avg = DB::table('orders')->avg('price');
+
+// Maximum
+$max = DB::table('orders')->max('price');
+
+// Minimum
+$min = DB::table('orders')->min('price');
+
+// Existence check
+if (DB::table('orders')->where('finalized', 1)->exists()) {
+    // Records exist
+}
+
+if (DB::table('orders')->where('finalized', 1)->doesntExist()) {
+    // No records exist
+}
+```
+
+### 2. Selecting Columns
+
+```php
+// Select specific columns
+$users = DB::table('users')
+    ->select('name', 'email')
+    ->get();
+
+// Select with alias
+$users = DB::table('users')
+    ->select('name', 'email as user_email')
+    ->get();
+
+// Add columns to existing select
+$query = DB::table('users')->select('name');
+$users = $query->addSelect('age')->get();
+
+// Select distinct results
+$users = DB::table('users')->distinct()->get();
+```
+
+### 3. Raw Expressions
+
+```php
+// Raw select expression
+$users = DB::table('users')
+    ->select(DB::raw('count(*) as user_count, status'))
+    ->groupBy('status')
+    ->get();
+
+// Raw select with bindings
+$orders = DB::table('orders')
+    ->selectRaw('price * ? as price_with_tax', [1.0825])
+    ->get();
+
+// Raw where clause
+$orders = DB::table('orders')
+    ->whereRaw('price > IF(state = "TX", ?, 100)', [200])
+    ->get();
+
+// Raw having clause
+$orders = DB::table('orders')
+    ->selectRaw('department, SUM(price) as total_sales')
+    ->groupBy('department')
+    ->havingRaw('SUM(price) > ?', [2500])
+    ->get();
+
+// Raw order by
+$orders = DB::table('orders')
+    ->orderByRaw('updated_at - created_at DESC')
+    ->get();
+
+// Raw group by
+$orders = DB::table('orders')
+    ->selectRaw('city, state')
+    ->groupByRaw('city, state')
+    ->get();
+```
+
+### 4. Join Clauses
+
+```php
+// Inner join
+$users = DB::table('users')
+    ->join('contacts', 'users.id', '=', 'contacts.user_id')
+    ->select('users.*', 'contacts.phone')
+    ->get();
+
+// Multiple joins
+$users = DB::table('users')
+    ->join('contacts', 'users.id', '=', 'contacts.user_id')
+    ->join('orders', 'users.id', '=', 'orders.user_id')
+    ->select('users.*', 'contacts.phone', 'orders.price')
+    ->get();
+
+// Left join
+$users = DB::table('users')
+    ->leftJoin('posts', 'users.id', '=', 'posts.user_id')
+    ->get();
+
+// Right join
+$users = DB::table('users')
+    ->rightJoin('posts', 'users.id', '=', 'posts.user_id')
+    ->get();
+
+// Cross join
+$sizes = DB::table('sizes')
+    ->crossJoin('colors')
+    ->get();
+
+// Advanced join with constraints
+DB::table('users')
+    ->join('contacts', function ($join) {
+        $join->on('users.id', '=', 'contacts.user_id')
+             ->where('contacts.user_id', '>', 5);
+    })
+    ->get();
+
+// Join on a subquery
+$latestPosts = DB::table('posts')
+    ->select('user_id', DB::raw('MAX(created_at) as last_post_created_at'))
+    ->where('is_published', true)
+    ->groupBy('user_id');
+
+$users = DB::table('users')
+    ->joinSub($latestPosts, 'latest_posts', function ($join) {
+        $join->on('users.id', '=', 'latest_posts.user_id');
+    })->get();
+
+// Lateral join (PostgreSQL, MySQL 8.0.14+, SQL Server)
+$latestPosts = DB::table('posts')
+    ->select('id as post_id', 'title as post_title', 'created_at as post_created_at')
+    ->whereColumn('user_id', 'users.id')
+    ->orderBy('created_at', 'desc')
+    ->limit(3);
+
+$users = DB::table('users')
+    ->joinLateral($latestPosts, 'latest_posts')
+    ->get();
+```
+
+### 5. Union Clauses
+
+```php
+// Union
+$first = DB::table('users')
+    ->whereNull('first_name');
+
+$users = DB::table('users')
+    ->whereNull('last_name')
+    ->union($first)
+    ->get();
+
+// Union all (keeps duplicates)
+$first = DB::table('users')
+    ->whereNull('first_name');
+
+$users = DB::table('users')
+    ->whereNull('last_name')
+    ->unionAll($first)
+    ->get();
+```
+
+### 6. Where Clauses
+
+#### Basic Where Clauses
+
+```php
+// Basic where
+$users = DB::table('users')
+    ->where('votes', '=', 100)
+    ->get();
+
+// Shorthand equals
+$users = DB::table('users')
+    ->where('votes', 100)
+    ->get();
+
+// Different operators
+$users = DB::table('users')
+    ->where('votes', '>=', 100)
+    ->get();
+
+$users = DB::table('users')
+    ->where('votes', '<>', 100)
+    ->get();
+
+$users = DB::table('users')
+    ->where('name', 'like', 'T%')
+    ->get();
+
+// Where with AND
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->where('name', 'John')
+    ->get();
+
+// Where with OR
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->orWhere('name', 'John')
+    ->get();
+
+// Where with grouped conditions
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->orWhere(function ($query) {
+        $query->where('name', 'Abigail')
+              ->where('votes', '>', 50);
+    })
+    ->get();
+
+// Where not
+$products = DB::table('products')
+    ->whereNot(function ($query) {
+        $query->where('clearance', true)
+              ->orWhere('price', '<', 10);
+    })
+    ->get();
+```
+
+#### Specialized Where Clauses
+
+```php
+// Where any (multiple columns, same condition)
+$users = DB::table('users')
+    ->where('active', true)
+    ->whereAny([
+        'name',
+        'email',
+        'phone',
+    ], 'like', 'Example%')
+    ->get();
+
+// Where all (requires all columns to match)
+$posts = DB::table('posts')
+    ->where('published', true)
+    ->whereAll([
+        'title',
+        'content',
+    ], 'like', '%Laravel%')
+    ->get();
+
+// Where none (requires no columns to match)
+$posts = DB::table('albums')
+    ->where('published', true)
+    ->whereNone([
+        'title',
+        'lyrics',
+        'tags',
+    ], 'like', '%explicit%')
+    ->get();
+
+// JSON where clause
+$users = DB::table('users')
+    ->where('preferences->dining->meal', 'salad')
+    ->get();
+
+// JSON contains
+$users = DB::table('users')
+    ->whereJsonContains('options->languages', 'en')
+    ->get();
+
+// JSON contains multiple values
+$users = DB::table('users')
+    ->whereJsonContains('options->languages', ['en', 'de'])
+    ->get();
+
+// JSON length
+$users = DB::table('users')
+    ->whereJsonLength('options->languages', 0)
+    ->get();
+
+$users = DB::table('users')
+    ->whereJsonLength('options->languages', '>', 1)
+    ->get();
+
+// LIKE Variants (database-agnostic)
+$users = DB::table('users')
+    ->whereLike('name', '%John%')
+    ->get();
+
+// Case-sensitive LIKE
+$users = DB::table('users')
+    ->whereLike('name', '%John%', caseSensitive: true)
+    ->get();
+
+// OR LIKE
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->orWhereLike('name', '%John%')
+    ->get();
+
+// NOT LIKE
+$users = DB::table('users')
+    ->whereNotLike('name', '%John%')
+    ->get();
+
+// OR NOT LIKE
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->orWhereNotLike('name', '%John%')
+    ->get();
+
+// Where IN
+$users = DB::table('users')
+    ->whereIn('id', [1, 2, 3])
+    ->get();
+
+// Where NOT IN
+$users = DB::table('users')
+    ->whereNotIn('id', [1, 2, 3])
+    ->get();
+
+// Where IN subquery
+$activeUsers = DB::table('users')->select('id')->where('is_active', 1);
+$users = DB::table('comments')
+    ->whereIn('user_id', $activeUsers)
+    ->get();
+
+// Where BETWEEN
+$users = DB::table('users')
+    ->whereBetween('votes', [1, 100])
+    ->get();
+
+// Where NOT BETWEEN
+$users = DB::table('users')
+    ->whereNotBetween('votes', [1, 100])
+    ->get();
+
+// Where BETWEEN columns
+$patients = DB::table('patients')
+    ->whereBetweenColumns('weight', ['minimum_allowed_weight', 'maximum_allowed_weight'])
+    ->get();
+
+// Where NOT BETWEEN columns
+$patients = DB::table('patients')
+    ->whereNotBetweenColumns('weight', ['minimum_allowed_weight', 'maximum_allowed_weight'])
+    ->get();
+
+// Where NULL
+$users = DB::table('users')
+    ->whereNull('updated_at')
+    ->get();
+
+// Where NOT NULL
+$users = DB::table('users')
+    ->whereNotNull('updated_at')
+    ->get();
+
+// Date conditions
+$users = DB::table('users')
+    ->whereDate('created_at', '2023-01-31')
+    ->get();
+
+$users = DB::table('users')
+    ->whereMonth('created_at', '1')
+    ->get();
+
+$users = DB::table('users')
+    ->whereDay('created_at', '31')
+    ->get();
+
+$users = DB::table('users')
+    ->whereYear('created_at', '2023')
+    ->get();
+
+$users = DB::table('users')
+    ->whereTime('created_at', '=', '11:20:45')
+    ->get();
+
+// Time relative conditions
+$invoices = DB::table('invoices')
+    ->wherePast('due_at')
+    ->get();
+
+$invoices = DB::table('invoices')
+    ->whereFuture('due_at')
+    ->get();
+
+$invoices = DB::table('invoices')
+    ->whereToday('due_at')
+    ->get();
+
+$invoices = DB::table('invoices')
+    ->whereBeforeToday('due_at')
+    ->get();
+
+$invoices = DB::table('invoices')
+    ->whereAfterToday('due_at')
+    ->get();
+
+// Column comparison
+$users = DB::table('users')
+    ->whereColumn('first_name', 'last_name')
+    ->get();
+
+$users = DB::table('users')
+    ->whereColumn('updated_at', '>', 'created_at')
+    ->get();
+
+// Multiple column comparisons
+$users = DB::table('users')
+    ->whereColumn([
+        ['first_name', '=', 'last_name'],
+        ['updated_at', '>', 'created_at'],
+    ])->get();
+```
+
+#### Advanced Where Clauses
+
+```php
+// Exists
+$users = DB::table('users')
+    ->whereExists(function ($query) {
+        $query->select(DB::raw(1))
+              ->from('orders')
+              ->whereColumn('orders.user_id', 'users.id');
+    })
+    ->get();
+
+// Using a query object with whereExists
+$orders = DB::table('orders')
+    ->select(DB::raw(1))
+    ->whereColumn('orders.user_id', 'users.id');
+
+$users = DB::table('users')
+    ->whereExists($orders)
+    ->get();
+
+// Subquery where with value comparison
+$users = User::where(function ($query) {
+    $query->select('type')
+          ->from('membership')
+          ->whereColumn('membership.user_id', 'users.id')
+          ->orderByDesc('membership.start_date')
+          ->limit(1);
+}, 'Pro')->get();
+
+// Subquery with column comparison
+$incomes = Income::where('amount', '<', function ($query) {
+    $query->selectRaw('avg(i.amount)')->from('incomes as i');
+})->get();
+
+// Full text search (MariaDB, MySQL, PostgreSQL)
+$users = DB::table('users')
+    ->whereFullText('bio', 'web developer')
+    ->get();
+```
+
+### 7. Ordering, Grouping, Limit & Offset
+
+```php
+// Basic ordering
+$users = DB::table('users')
+    ->orderBy('name', 'desc')
+    ->get();
+
+// Multiple order clauses
+$users = DB::table('users')
+    ->orderBy('name', 'desc')
+    ->orderBy('email', 'asc')
+    ->get();
+
+// Latest/oldest by created_at
+$user = DB::table('users')
+    ->latest()
+    ->first();
+
+$user = DB::table('users')
+    ->oldest()
+    ->first();
+
+// Latest/oldest by specific column
+$user = DB::table('users')
+    ->latest('updated_at')
+    ->first();
+
+// Random ordering
+$randomUser = DB::table('users')
+    ->inRandomOrder()
+    ->first();
+
+// Removing orderings
+$query = DB::table('users')->orderBy('name');
+$unorderedUsers = $query->reorder()->get();
+
+// Reorder with new ordering
+$query = DB::table('users')->orderBy('name');
+$usersOrderedByEmail = $query->reorder('email', 'desc')->get();
+
+// Grouping
+$users = DB::table('users')
+    ->groupBy('account_id')
+    ->having('account_id', '>', 100)
+    ->get();
+
+// Having between
+$report = DB::table('orders')
+    ->selectRaw('count(id) as number_of_orders, customer_id')
+    ->groupBy('customer_id')
+    ->havingBetween('number_of_orders', [5, 15])
+    ->get();
+
+// Multiple group by columns
+$users = DB::table('users')
+    ->groupBy('first_name', 'status')
+    ->having('account_id', '>', 100)
+    ->get();
+
+// Limit and offset
+$users = DB::table('users')->skip(10)->take(5)->get();
+
+// Alternative limit and offset
+$users = DB::table('users')
+    ->offset(10)
+    ->limit(5)
+    ->get();
+```
+
+### 8. Conditional Clauses
+
+```php
+// Conditional where
+$role = $request->input('role');
+
+$users = DB::table('users')
+    ->when($role, function ($query, $role) {
+        $query->where('role_id', $role);
+    })
+    ->get();
+
+// Conditional with else
+$sortByVotes = $request->boolean('sort_by_votes');
+
+$users = DB::table('users')
+    ->when($sortByVotes, function ($query) {
+        $query->orderBy('votes');
+    }, function ($query) {
+        $query->orderBy('name');
+    })
+    ->get();
+```
+
+### 9. Insert Statements
+
+```php
+// Basic insert
+DB::table('users')->insert([
+    'email' => 'example@example.com',
+    'votes' => 0
+]);
+
+// Multiple inserts
+DB::table('users')->insert([
+    ['email' => 'user1@example.com', 'votes' => 0],
+    ['email' => 'user2@example.com', 'votes' => 0]
+]);
+
+// Insert or ignore (skips duplicates)
+DB::table('users')->insertOrIgnore([
+    ['id' => 1, 'email' => 'user1@example.com'],
+    ['id' => 2, 'email' => 'user2@example.com']
+]);
+
+// Insert from subquery
+DB::table('pruned_users')->insertUsing(
+    ['id', 'name', 'email', 'email_verified_at'],
+    DB::table('users')->select(
+        'id', 'name', 'email', 'email_verified_at'
+    )->where('updated_at', '<=', now()->subMonth())
+);
+
+// Insert and get ID
+$id = DB::table('users')->insertGetId(
+    ['email' => 'example@example.com', 'votes' => 0]
+);
+
+// Upsert (insert or update)
+DB::table('flights')->upsert(
+    [
+        ['departure' => 'Oakland', 'destination' => 'San Diego', 'price' => 99],
+        ['departure' => 'Chicago', 'destination' => 'New York', 'price' => 150]
+    ],
+    ['departure', 'destination'], // Unique identifier columns
+    ['price'] // Columns to update if record exists
+);
+```
+
+### 10. Update Statements
+
+```php
+// Basic update
+$affected = DB::table('users')
+    ->where('id', 1)
+    ->update(['votes' => 1]);
+
+// Update or insert
+DB::table('users')
+    ->updateOrInsert(
+        ['email' => 'example@example.com', 'name' => 'John'],
+        ['votes' => 2]
+    );
+
+// Update or insert with conditional attributes
+DB::table('users')->updateOrInsert(
+    ['user_id' => $user_id],
+    fn ($exists) => $exists 
+        ? [
+            'name' => $data['name'],
+            'email' => $data['email']
+          ] 
+        : [
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'marketable' => true
+          ]
+);
+
+// Update JSON column
+$affected = DB::table('users')
+    ->where('id', 1)
+    ->update(['options->enabled' => true]);
+
+// Increment/decrement
+DB::table('users')->increment('votes');
+DB::table('users')->increment('votes', 5);
+DB::table('users')->decrement('votes');
+DB::table('users')->decrement('votes', 5);
+
+// Increment/decrement with additional updates
+DB::table('users')->increment('votes', 1, ['name' => 'John']);
+
+// Increment/decrement multiple columns
+DB::table('users')->incrementEach([
+    'votes' => 5,
+    'balance' => 100
+]);
+```
+
+### 11. Delete Statements
+
+```php
+// Delete all records
+$deleted = DB::table('users')->delete();
+
+// Delete with conditions
+$deleted = DB::table('users')->where('votes', '>', 100)->delete();
+```
+
+### 12. Pessimistic Locking
+
+```php
+// Shared lock
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->sharedLock()
+    ->get();
+
+// For update lock
+$users = DB::table('users')
+    ->where('votes', '>', 100)
+    ->lockForUpdate()
+    ->get();
+
+// Lock within transaction (recommended)
+DB::transaction(function () {
+    $sender = DB::table('users')
+        ->lockForUpdate()
+        ->find(1);
+
+    $receiver = DB::table('users')
+        ->lockForUpdate()
+        ->find(2);
+
+    if ($sender->balance < 100) {
+        throw new \RuntimeException('Balance too low.');
+    }
+
+    DB::table('users')
+        ->where('id', $sender->id)
+        ->update([
+            'balance' => $sender->balance - 100
+        ]);
+
+    DB::table('users')
+        ->where('id', $receiver->id)
+        ->update([
+            'balance' => $receiver->balance + 100
+        ]);
+});
+```
+
+### 13. Reusable Query Components
+
+#### Using the tap() Method
+
+```php
+// Reusable filter object
+namespace App\Scopes;
+
+use Illuminate\Database\Query\Builder;
+
+class DestinationFilter
+{
+    public function __construct(
+        private ?string $destination,
+    ) {
+        //
+    }
+
+    public function __invoke(Builder $query): void
+    {
+        $query->when($this->destination, function (Builder $query) {
+            $query->where('destination', $this->destination);
+        });
+    }
+}
+
+// Using the filter with tap
+use App\Scopes\DestinationFilter;
+use Illuminate\Support\Facades\DB;
+
+$flights = DB::table('flights')
+    ->tap(new DestinationFilter($destination))
+    ->orderByDesc('price')
+    ->get();
+```
+
+#### Using the pipe() Method
+
+```php
+// Reusable pagination object
+namespace App\Scopes;
+
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
+
+class Paginate
+{
+    public function __construct(
+        private string $sortBy = 'timestamp',
+        private string $sortDirection = 'desc',
+        private string $perPage = 25,
+    ) {
+        //
+    }
+
+    public function __invoke(Builder $query): LengthAwarePaginator
+    {
+        return $query->orderBy($this->sortBy, $this->sortDirection)
+            ->paginate($this->perPage, pageName: 'p');
+    }
+}
+
+// Using the paginator with pipe
+$flights = DB::table('flights')
+    ->tap(new DestinationFilter($destination))
+    ->pipe(new Paginate);
+```
+
+### 14. Debugging
+
+```php
+// Dump and die with query and bindings
+DB::table('users')->where('votes', '>', 100)->dd();
+
+// Dump and continue execution
+DB::table('users')->where('votes', '>', 100)->dump();
+
+// Dump raw SQL (with substituted values)
+DB::table('users')->where('votes', '>', 100)->dumpRawSql();
+
+// Dump raw SQL and die
+DB::table('users')->where('votes', '>', 100)->ddRawSql();
+```
+
+## Best Practices for Query Builder Usage
+
+1. **Database Security**:
+   - Always use parameter binding (the default with query builder) to avoid SQL injection
+   - Never allow user input to dictate column names or table names
+   - Be cautious with raw expressions, as they bypass parameter binding
+
+2. **Performance Optimization**:
+   - Use `chunk()` or `lazy()` methods for processing large datasets
+   - Add proper indexes to columns used in where clauses and joins
+   - Use `select()` to retrieve only the needed columns
+   - Be mindful of N+1 query problems (use eager loading with Eloquent)
+
+3. **Maintainability**:
+   - Extract reusable query logic into dedicated classes
+   - Use `when()` for conditional clauses
+   - Implement complex business logic in repository classes
+   - Add comments to explain complex queries
+
+4. **Transaction Management**:
+   - Wrap related operations in transactions
+   - Always use pessimistic locking within transactions
+   - Handle exceptions properly to ensure transactions are rolled back on failure
+
+5. **Readability**:
+   - Format queries with consistent indentation
+   - Break lengthy chains across multiple lines
+   - Use meaningful variable names for query components
+
+## Common Query Patterns
+
+### Paginated Results
+
+```php
+$perPage = 15;
+$page = request()->input('page', 1);
+
+$users = DB::table('users')
+    ->select('id', 'name', 'email', 'created_at')
+    ->where('active', true)
+    ->orderBy('name')
+    ->paginate($perPage, ['*'], 'page', $page);
+
+// In your view
+// $users->links() // If using with Blade
+```
+
+### Search Functionality
+
+```php
+$search = request()->input('search');
+
+$users = DB::table('users')
+    ->when($search, function ($query, $search) {
+        $query->where(function ($query) use ($search) {
+            $query->whereLike('name', "%{$search}%")
+                ->orWhereLike('email', "%{$search}%")
+                ->orWhereLike('phone', "%{$search}%");
+        });
+    })
+    ->paginate(20);
+```
+
+### Filters
+
+```php
+$filters = request()->only(['status', 'role', 'date_range']);
+
+$query = DB::table('users');
+
+// Status filter
+if (isset($filters['status'])) {
+    $query->where('status', $filters['status']);
+}
+
+// Role filter
+if (isset($filters['role'])) {
+    $query->where('role', $filters['role']);
+}
+
+// Date range filter
+if (isset($filters['date_range'])) {
+    [$startDate, $endDate] = explode(' - ', $filters['date_range']);
+    $query->whereBetween('created_at', [$startDate, $endDate]);
+}
+
+$users = $query->paginate(20);
+```
+
+### Statistics and Reports
+
+```php
+$orderStats = DB::table('orders')
+    ->select(
+        DB::raw('COUNT(*) as total_orders'),
+        DB::raw('SUM(amount) as total_amount'),
+        DB::raw('AVG(amount) as average_amount'),
+        DB::raw('DATE(created_at) as date')
+    )
+    ->where('created_at', '>=', now()->subDays(30))
+    ->groupBy('date')
+    ->orderBy('date')
+    ->get();
+```
+
+### Hierarchical Data
+
+```php
+// Get direct reports for a manager
+$directReports = DB::table('employees')
+    ->where('manager_id', $managerId)
+    ->get();
+
+// For more complex hierarchical data, consider using recursive CTEs with
+// raw SQL or specialized packages like staudenmeir/laravel-adjacency-list
+```
+
+### Soft Delete Handling
+
+```php
+// If using custom soft delete implementation with query builder
+$activeUsers = DB::table('users')
+    ->whereNull('deleted_at')
+    ->get();
+
+$deletedUsers = DB::table('users')
+    ->whereNotNull('deleted_at')
+    ->get();
+```
+
+## Comparison with Eloquent ORM
+
+Query Builder is ideal when:
+
+1. You need fine-grained control over SQL queries
+2. You're working with complex queries that are difficult to express with Eloquent
+3. Performance is critical, especially for very large datasets
+4. You're working with tables that don't map well to models
+5. You need to perform database operations without loading models
+
+Eloquent ORM is preferred when:
+
+1. You need object-oriented access to database records
+2. You want model events, observers, and other higher-level features
+3. Relationships are an important part of your data architecture
+4. You want to leverage features like eager loading to avoid N+1 query problems
+
+## Conclusion
+
+Laravel's Query Builder provides a powerful and flexible way to interact with databases without writing raw SQL. By following the patterns and practices in this guide, your AI agent can write cleaner, more efficient, and more maintainable database operations in Laravel 12 applications.
+
+Remember that while the Query Builder provides a great deal of functionality, complex applications often benefit from combining it with Eloquent ORM and occasionally raw SQL expressions for specific needs. Choose the right tool for each situation.

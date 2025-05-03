@@ -1,0 +1,753 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Laravel 12 Application Structure Guide
+
+This guide outlines the structure of a Laravel 12 application to help AI agents write better structured code. Understanding where certain types of code belong is crucial for maintaining a clean, organized Laravel codebase.
+
+## Core Principles
+
+- **Separation of Concerns**: Each component should have a single responsibility
+- **Discoverable Code**: Follow Laravel's conventions for predictable code organization
+- **Reusable Components**: Structure code in a way that promotes reusability
+- **Clear Dependencies**: Make dependencies explicit through proper injection
+
+## Directory Structure Overview
+
+```
+laravel-project/
+├── app/                  # Core application code
+│   ├── Broadcasting/     # Channel broadcasting definitions
+│   ├── Console/          # Custom Artisan commands
+│   ├── Events/           # Event classes
+│   ├── Exceptions/       # Custom exception handlers
+│   ├── Http/             # Controllers, middleware, requests
+│   ├── Jobs/             # Queued and synchronous jobs
+│   ├── Listeners/        # Event listeners
+│   ├── Mail/             # Email related classes
+│   ├── Models/           # Eloquent models
+│   ├── Notifications/    # Notification classes
+│   ├── Policies/         # Authorization policies
+│   ├── Providers/        # Service providers
+│   ├── Rules/            # Custom validation rules
+│   └── Services/         # Custom service classes (not default, but recommended)
+├── bootstrap/            # Framework bootstrap files
+├── config/               # Configuration files
+├── database/             # Migrations, seeds, factories
+├── public/               # Web server document root
+├── resources/            # Views, assets, language files
+├── routes/               # Route definitions
+├── storage/              # Logs, compiled files, caches
+├── tests/                # Test files
+└── vendor/               # Composer dependencies
+```
+
+## Detailed Guide by Directory
+
+### 1. App Directory
+
+The `app` directory contains the core code of your application. Most of your custom code will reside here.
+
+#### Models (`app/Models/`)
+
+- **Purpose**: Represent database tables and their relationships
+- **When to use**: For any data that needs persistence in the database
+- **Best practices**:
+  - Keep models lean, avoid business logic
+  - Define relationships clearly
+  - Use accessors and mutators for data transformation
+  - Place scope queries for common filtering operations
+
+```php
+// Example Model Structure
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Product extends Model
+{
+    protected $fillable = ['name', 'price', 'description', 'category_id'];
+    
+    // Relationships
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+    
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+    
+    // Accessors
+    public function getFormattedPriceAttribute()
+    {
+        return '$' . number_format($this->price, 2);
+    }
+}
+```
+
+#### Controllers (`app/Http/Controllers/`)
+
+- **Purpose**: Handle HTTP requests and return responses
+- **When to use**: To process incoming web requests
+- **Best practices**:
+  - Keep controllers thin
+  - Focus on request validation and delegation to services
+  - Follow RESTful conventions where appropriate
+  - Group related actions in resource controllers
+
+```php
+// Example Controller Structure
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreProductRequest;
+use App\Models\Product;
+use App\Services\ProductService;
+
+class ProductController extends Controller
+{
+    protected $productService;
+    
+    public function __construct(ProductService $productService)
+    {
+        $this->productService = $productService;
+    }
+    
+    public function index()
+    {
+        $products = Product::with('category')->active()->paginate(20);
+        return view('products.index', compact('products'));
+    }
+    
+    public function store(StoreProductRequest $request)
+    {
+        $product = $this->productService->createProduct($request->validated());
+        return redirect()->route('products.show', $product)
+            ->with('success', 'Product created successfully');
+    }
+}
+```
+
+#### Requests (`app/Http/Requests/`)
+
+- **Purpose**: Validate incoming HTTP requests
+- **When to use**: When form validation is needed
+- **Best practices**:
+  - Separate validation logic from controllers
+  - Include clear validation rules
+  - Add custom validation messages when needed
+
+```php
+// Example Request Structure
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreProductRequest extends FormRequest
+{
+    public function authorize()
+    {
+        return true; // Or implement authorization logic
+    }
+    
+    public function rules()
+    {
+        return [
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'description' => 'nullable|string',
+            'category_id' => 'required|exists:categories,id',
+        ];
+    }
+    
+    public function messages()
+    {
+        return [
+            'category_id.exists' => 'The selected category does not exist.',
+        ];
+    }
+}
+```
+
+#### Services (`app/Services/`)
+
+- **Purpose**: Contain business logic separate from controllers
+- **When to use**: For reusable business logic operations
+- **Best practices**:
+  - Focus on a single area of responsibility
+  - Make services injectable for better testing
+  - Move complex logic from controllers to services
+
+```php
+// Example Service Structure
+namespace App\Services;
+
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
+
+class ProductService
+{
+    public function createProduct(array $data)
+    {
+        // Business logic, transactions, etc.
+        return DB::transaction(function () use ($data) {
+            $product = Product::create($data);
+            
+            // Additional operations
+            if (isset($data['tags'])) {
+                $product->tags()->sync($data['tags']);
+            }
+            
+            return $product;
+        });
+    }
+    
+    public function updateInventory(Product $product, int $quantity)
+    {
+        // More business logic
+        // ...
+    }
+}
+```
+
+#### Middleware (`app/Http/Middleware/`)
+
+- **Purpose**: Process requests before/after hitting controllers
+- **When to use**: For cross-cutting concerns like authentication
+- **Best practices**:
+  - Keep middleware focused on a single responsibility
+  - Use for concerns that apply to multiple routes
+  - Avoid complex business logic in middleware
+
+```php
+// Example Middleware Structure
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+
+class EnsureUserHasRole
+{
+    public function handle(Request $request, Closure $next, string $role)
+    {
+        if (!$request->user() || !$request->user()->hasRole($role)) {
+            return redirect()->route('dashboard')
+                ->with('error', 'You do not have permission to access this page.');
+        }
+        
+        return $next($request);
+    }
+}
+```
+
+#### Events (`app/Events/`)
+
+- **Purpose**: Represent something that happened in your application
+- **When to use**: When other parts of your app need to react to an action
+- **Best practices**:
+  - Name events in past tense (e.g., `OrderShipped`)
+  - Keep events small and focused
+  - Use for decoupling components
+
+```php
+// Example Event Structure
+namespace App\Events;
+
+use App\Models\Order;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class OrderShipped
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+    
+    public $order;
+    
+    public function __construct(Order $order)
+    {
+        $this->order = $order;
+    }
+}
+```
+
+#### Listeners (`app/Listeners/`)
+
+- **Purpose**: React to events
+- **When to use**: To perform actions when events occur
+- **Best practices**:
+  - Keep listeners focused on one responsibility
+  - Use queue for longer-running tasks
+  - Think of listeners as event handlers
+
+```php
+// Example Listener Structure
+namespace App\Listeners;
+
+use App\Events\OrderShipped;
+use App\Services\NotificationService;
+
+class SendShipmentNotification
+{
+    protected $notificationService;
+    
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+    
+    public function handle(OrderShipped $event)
+    {
+        $this->notificationService->notifyCustomer(
+            $event->order->customer,
+            'Your order has been shipped!'
+        );
+    }
+}
+```
+
+#### Jobs (`app/Jobs/`)
+
+- **Purpose**: Handle background tasks
+- **When to use**: For time-consuming operations that shouldn't block requests
+- **Best practices**:
+  - Keep jobs focused on one specific task
+  - Make jobs self-contained with all necessary data
+  - Use for long-running processes like sending emails
+
+```php
+// Example Job Structure
+namespace App\Jobs;
+
+use App\Models\Report;
+use App\Services\ReportGenerationService;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+class GenerateMonthlyReport implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    
+    protected $report;
+    
+    public function __construct(Report $report)
+    {
+        $this->report = $report;
+    }
+    
+    public function handle(ReportGenerationService $reportService)
+    {
+        $reportService->generate($this->report);
+    }
+}
+```
+
+#### Policies (`app/Policies/`)
+
+- **Purpose**: Define authorization logic for models
+- **When to use**: To control access to resources
+- **Best practices**:
+  - Create one policy per model
+  - Keep authorization logic separate from business logic
+  - Use for fine-grained access control
+
+```php
+// Example Policy Structure
+namespace App\Policies;
+
+use App\Models\Product;
+use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
+
+class ProductPolicy
+{
+    use HandlesAuthorization;
+    
+    public function viewAny(User $user)
+    {
+        return true;
+    }
+    
+    public function view(User $user, Product $product)
+    {
+        return true;
+    }
+    
+    public function create(User $user)
+    {
+        return $user->hasRole('admin') || $user->hasRole('manager');
+    }
+    
+    public function update(User $user, Product $product)
+    {
+        return $user->hasRole('admin') || $user->id === $product->created_by;
+    }
+    
+    public function delete(User $user, Product $product)
+    {
+        return $user->hasRole('admin');
+    }
+}
+```
+
+### 2. Routes Directory (`routes/`)
+
+- **Purpose**: Define application endpoints
+- **When to use**: To map URLs to controller actions
+- **Best practices**:
+  - Group related routes
+  - Use route names for all routes
+  - Apply middleware at the group level when possible
+  - Keep route files organized by domain
+
+```php
+// Example Routes Structure (routes/web.php)
+use App\Http\Controllers\ProductController;
+use Illuminate\Support\Facades\Route;
+
+// Public routes
+Route::get('/', function () {
+    return view('welcome');
+});
+
+// Auth routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    })->name('dashboard');
+    
+    // Product routes with additional authorization
+    Route::middleware(['can:manage-products'])->group(function () {
+        Route::resource('products', ProductController::class);
+    });
+});
+```
+
+### 3. Resources Directory (`resources/`)
+
+- **Purpose**: Contains views and uncompiled assets
+- **When to use**: For UI components and frontend files
+- **Best practices**:
+  - Organize views by domain or controller
+  - Use Blade components for reusable UI elements
+  - Keep CSS and JS organized in the `js` and `css` directories
+
+#### Views (`resources/views/`)
+
+```blade
+<!-- Example View Structure (resources/views/products/index.blade.php) -->
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="text-xl font-semibold">Products</h2>
+    </x-slot>
+    
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6">
+                    <x-button-link href="{{ route('products.create') }}">
+                        Create New Product
+                    </x-button-link>
+                    
+                    <!-- Table of products -->
+                    <table class="mt-4 w-full">
+                        <!-- Table content -->
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</x-app-layout>
+```
+
+### 4. Database Directory (`database/`)
+
+- **Purpose**: Contains database migrations, seeders, and factories
+- **When to use**: For database schema and test data
+- **Best practices**:
+  - Write clear, descriptive migrations
+  - Use factories for test data
+  - Create seeders for initial data
+
+#### Migrations (`database/migrations/`)
+
+```php
+// Example Migration Structure
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up()
+    {
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->decimal('price', 10, 2);
+            $table->text('description')->nullable();
+            $table->foreignId('category_id')->constrained()->onDelete('cascade');
+            $table->boolean('is_active')->default(true);
+            $table->foreignId('created_by')->constrained('users');
+            $table->timestamps();
+        });
+    }
+    
+    public function down()
+    {
+        Schema::dropIfExists('products');
+    }
+};
+```
+
+#### Factories (`database/factories/`)
+
+```php
+// Example Factory Structure
+namespace Database\Factories;
+
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+class ProductFactory extends Factory
+{
+    protected $model = Product::class;
+    
+    public function definition()
+    {
+        return [
+            'name' => $this->faker->productName,
+            'price' => $this->faker->randomFloat(2, 10, 1000),
+            'description' => $this->faker->paragraph(),
+            'category_id' => Category::factory(),
+            'is_active' => $this->faker->boolean(80),
+            'created_by' => User::factory(),
+        ];
+    }
+    
+    public function inactive()
+    {
+        return $this->state(function (array $attributes) {
+            return [
+                'is_active' => false,
+            ];
+        });
+    }
+}
+```
+
+### 5. Configuration Directory (`config/`)
+
+- **Purpose**: Define application configuration
+- **When to use**: For setting up environment-specific settings
+- **Best practices**:
+  - Keep sensitive data in `.env`
+  - Document configuration options
+  - Group related configurations logically
+
+### 6. Tests Directory (`tests/`)
+
+- **Purpose**: Contains application tests
+- **When to use**: For automated testing
+- **Best practices**:
+  - Write both feature and unit tests
+  - Mirror app directory structure in test directory
+  - Use factories for test data
+
+```php
+// Example Test Structure
+namespace Tests\Feature;
+
+use App\Models\Product;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ProductManagementTest extends TestCase
+{
+    use RefreshDatabase;
+    
+    public function test_user_can_view_products_list()
+    {
+        $user = User::factory()->create();
+        $products = Product::factory()->count(5)->create();
+        
+        $response = $this->actingAs($user)
+            ->get(route('products.index'));
+        
+        $response->assertStatus(200);
+        foreach ($products as $product) {
+            $response->assertSee($product->name);
+        }
+    }
+    
+    public function test_admin_can_create_product()
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $productData = Product::factory()->make()->toArray();
+        
+        $response = $this->actingAs($admin)
+            ->post(route('products.store'), $productData);
+        
+        $response->assertRedirect(route('products.show', 1));
+        $this->assertDatabaseHas('products', [
+            'name' => $productData['name'],
+        ]);
+    }
+}
+```
+
+## Special Directories and Key Concepts
+
+### Service Providers (`app/Providers/`)
+
+- **Purpose**: Bootstrap application components
+- **When to use**: To register services, bind interfaces, or set up events
+- **Best practices**:
+  - Create specialized providers for distinct parts of your application
+  - Use for service container bindings
+  - Handle event registration centrally
+
+```php
+// Example Service Provider Structure
+namespace App\Providers;
+
+use App\Interfaces\PaymentGatewayInterface;
+use App\Services\StripePaymentGateway;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register()
+    {
+        $this->app->bind(PaymentGatewayInterface::class, function ($app) {
+            return new StripePaymentGateway(config('services.stripe.key'));
+        });
+    }
+    
+    public function boot()
+    {
+        // Bootstrap logic
+    }
+}
+```
+
+### Custom Directories
+
+You can create additional directories as needed, such as:
+
+- **Interfaces**: For defining contracts (`app/Interfaces/`)
+- **Repositories**: For data access patterns (`app/Repositories/`)
+- **Actions**: For single-purpose business operations (`app/Actions/`)
+- **DTOs**: For data transfer objects (`app/DTOs/`)
+
+## Best Practices for AI-Generated Code
+
+When writing Laravel code with AI assistance, follow these principles:
+
+1. **Maintain Clear Structure**: Always place files in their appropriate directories
+2. **Follow Laravel Naming Conventions**:
+   - Controller names: `PascalCase` + `Controller` suffix
+   - Model names: Singular `PascalCase`
+   - Table names: Plural `snake_case`
+   - Migration names: Descriptive prefixed with timestamp
+3. **Type Hinting**: Use type declarations for parameters and return types
+4. **Use Feature Flags**: For experimental or in-progress features
+5. **Dependency Injection**: Prefer constructor injection over Facades when possible
+6. **Validation**: Use form requests for complex validation
+7. **Documentation**: Add PHPDoc blocks for classes and methods
+8. **Testing**: Include tests for each component
+9. **Avoid Fat Models/Controllers**: Extract to services/actions
+10. **Clear Error Handling**: Use exceptions and proper error handling
+
+## Common Patterns
+
+### Repository Pattern
+
+```php
+// Interface
+namespace App\Repositories\Interfaces;
+
+interface ProductRepositoryInterface
+{
+    public function all();
+    public function findById($id);
+    public function create(array $data);
+    public function update($id, array $data);
+    public function delete($id);
+}
+
+// Implementation
+namespace App\Repositories;
+
+use App\Models\Product;
+use App\Repositories\Interfaces\ProductRepositoryInterface;
+
+class ProductRepository implements ProductRepositoryInterface
+{
+    public function all()
+    {
+        return Product::all();
+    }
+    
+    public function findById($id)
+    {
+        return Product::findOrFail($id);
+    }
+    
+    // Other methods...
+}
+```
+
+### Action Pattern (Single-Purpose Classes)
+
+```php
+namespace App\Actions;
+
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
+
+class CreateProductAction
+{
+    public function execute(array $data): Product
+    {
+        return DB::transaction(function () use ($data) {
+            $product = Product::create([
+                'name' => $data['name'],
+                'price' => $data['price'],
+                'description' => $data['description'],
+                'category_id' => $data['category_id'],
+                'created_by' => auth()->id(),
+            ]);
+            
+            if (isset($data['tags'])) {
+                $product->tags()->sync($data['tags']);
+            }
+            
+            return $product;
+        });
+    }
+}
+```
+
+## Additional Resources
+
+- [Laravel Documentation](https://laravel.com/docs/12.x)
+- [Laravel Best Practices](https://github.com/alexeymezenin/laravel-best-practices)
+- [Laravel Patterns](https://github.com/pattern-lab/patternlab-php)
+
+## Conclusion
+
+This guide provides a framework for structuring Laravel 12 applications. While Laravel offers flexibility in organization, following these conventions will make your codebase more maintainable, testable, and understandable.
+
+Remember that the ultimate goal is to create clean, organized, and readable code that follows Laravel's intended architecture while remaining adaptable to your specific project needs.

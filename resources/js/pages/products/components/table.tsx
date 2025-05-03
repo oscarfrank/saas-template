@@ -97,6 +97,7 @@ export function Table<TData extends Product, TValue>({
             onPerPageChange={onPerPageChange}
             isLoading={isLoading}
             error={error}
+            tableName="Products"
             onPrint={handlePrint}
             onExport={handleExport}
         />

@@ -107,6 +107,7 @@ interface DataTableProps<TData extends Product, TValue> {
     onPerPageChange?: (perPage: number) => void;
     isLoading?: boolean;
     error?: string;
+    tableName?: string;
     onPrint?: () => Promise<Array<{
         name: string;
         description: string;
@@ -153,6 +154,7 @@ export function DataTable<TData extends Product, TValue>({
     onPerPageChange,
     isLoading = false,
     error,
+    tableName = "Items",
     onPrint,
     onExport,
 }: DataTableProps<TData, TValue>) {
@@ -359,7 +361,7 @@ export function DataTable<TData extends Product, TValue>({
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Products List</title>
+                        <title>${tableName} List</title>
                         <style>
                             @media print {
                                 @page {
@@ -388,7 +390,7 @@ export function DataTable<TData extends Product, TValue>({
                         </style>
                     </head>
                     <body>
-                        <h1>Products List</h1>
+                        <h1>${tableName} List</h1>
                         <table>
                             <thead>
                                 <tr>
@@ -455,7 +457,7 @@ export function DataTable<TData extends Product, TValue>({
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `selected-rows-${new Date().toISOString()}.csv`;
+                a.download = `selected-${tableName.toLowerCase()}-${new Date().toISOString()}.csv`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -465,7 +467,7 @@ export function DataTable<TData extends Product, TValue>({
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `selected-rows-${new Date().toISOString()}.json`;
+                a.download = `selected-${tableName.toLowerCase()}-${new Date().toISOString()}.json`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -660,11 +662,11 @@ export function DataTable<TData extends Product, TValue>({
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleExport('csv')}>
                                 <FileText className="mr-2 h-4 w-4" />
-                                Export All Products as CSV
+                                Export All {tableName} as CSV
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleExport('json')}>
                                 <FileJson className="mr-2 h-4 w-4" />
-                                Export All Products as JSON
+                                Export All {tableName} as JSON
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handlePrint}>

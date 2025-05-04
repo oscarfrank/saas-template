@@ -6,6 +6,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KycVerificationController;
+use App\Http\Controllers\RoleController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -39,6 +40,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('products', ProductController::class);
     Route::post('/products/all', [ProductController::class, 'getAllProducts'])->name('products.all');
     Route::post('/products/export', [ProductController::class, 'export'])->name('products.export');
+
+    // Role and Permission Management
+    Route::get('admin/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::post('admin/roles', [RoleController::class, 'store'])->name('roles.store');
+    Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
 });
 
 require __DIR__.'/settings.php';

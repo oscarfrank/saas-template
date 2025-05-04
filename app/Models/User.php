@@ -14,7 +14,8 @@ use App\Models\Borrow;
 use App\Models\Notification;
 use App\Models\Transaction;
 use App\Models\CustomPackage;
-use App\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use App\Models\LoanPackage;
 use App\Models\BorrowPackage;
 use App\Models\LoanPayment;
@@ -64,6 +65,11 @@ class User extends Authenticatable
     public function role()
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class);
     }
 
     /**

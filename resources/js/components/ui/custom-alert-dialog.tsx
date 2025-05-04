@@ -32,7 +32,7 @@ export function CustomAlertDialog({
             />
             <div className="relative z-50 w-[90%] max-w-md rounded-lg bg-background p-6 shadow-lg">
                 <h2 className="text-lg font-semibold">{title}</h2>
-                <p className="mt-2 text-sm text-muted-foreground whitespace-normal break-words max-w-full">
+                <p className="mt-2 text-sm text-muted-foreground whitespace-pre-line break-words max-w-full">
                     {description}
                 </p>
                 <div className="mt-6 flex justify-end gap-3">

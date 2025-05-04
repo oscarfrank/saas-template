@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KycVerificationController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -46,6 +47,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('admin/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
     Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+
+    // User Management
+    Route::get('admin/users', [UserController::class, 'index'])->name('admin.users.index');
+    Route::get('admin/users/create', [UserController::class, 'create'])->name('admin.users.create');
+    Route::post('admin/users', [UserController::class, 'store'])->name('admin.users.store');
+    Route::get('admin/users/{user}', [UserController::class, 'show'])->name('admin.users.show');
+    Route::get('admin/users/{user}/edit', [UserController::class, 'edit'])->name('admin.users.edit');
+    Route::put('admin/users/{user}', [UserController::class, 'update'])->name('admin.users.update');
+    Route::delete('admin/users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
+    Route::post('admin/users/export', [UserController::class, 'export'])->name('admin.users.export');
 });
 
 require __DIR__.'/settings.php';

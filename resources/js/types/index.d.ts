@@ -41,3 +41,19 @@ export interface User {
     updated_at: string;
     [key: string]: unknown; // This allows for additional properties...
 }
+
+export interface KycVerification {
+    id: number;
+    full_name: string;
+    email: string;
+    status: 'pending' | 'approved' | 'rejected';
+    id_type: string;
+    submitted_at: string;
+    verified_at: string | null;
+    rejection_reason: string | null;
+    documents: Array<{
+        type: string;
+        url: string;
+        uploaded_at: string;
+    }>;
+} 

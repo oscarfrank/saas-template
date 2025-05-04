@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class KycVerification extends Model
 {
@@ -11,7 +12,6 @@ class KycVerification extends Model
         'full_name',
         'date_of_birth',
         'phone_number',
-        'email',
         'address_line_1',
         'address_line_2',
         'city',
@@ -34,4 +34,20 @@ class KycVerification extends Model
         'submitted_at' => 'datetime',
         'verified_at' => 'datetime'
     ];
+
+    /**
+     * Get the user that owns the KYC verification.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the admin who verified the KYC.
+     */
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
+    }
 }

@@ -21,7 +21,6 @@ return new class extends Migration
             
             // Contact Information
             $table->string('phone_number');
-            $table->string('email')->unique();
             
             // Address Information
             $table->string('address_line_1');
@@ -33,7 +32,7 @@ return new class extends Migration
             
             // ID Verification
             $table->enum('id_type', ['passport', 'national_id', 'drivers_license']);
-            $table->string('id_number')->unique();
+            $table->string('id_number');
             $table->string('id_document_front')->comment('File path to front of ID document');
             $table->string('id_document_back')->nullable()->comment('File path to back of ID document if applicable');
             

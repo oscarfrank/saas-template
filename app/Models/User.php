@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'kyc_verified_at',
     ];
 
     /**
@@ -43,6 +44,17 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'kyc_verified_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Check if the user's KYC is verified.
+     *
+     * @return bool
+     */
+    public function isKycVerified(): bool
+    {
+        return $this->kyc_verified_at !== null;
     }
 }

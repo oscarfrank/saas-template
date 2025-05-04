@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -19,11 +19,30 @@ const mainNavItems: NavItem[] = [
         icon: ShoppingBag,
     },
     {
-        title: 'Orders',
-        href: '/orders',
-        icon: ShoppingCart,
+        title: 'KYC',
+        href: '/kyc',
+        icon: FileText,
     },
-    
+    {
+        title: 'Transactions',
+        href: '/transactions',
+        icon: Wallet,
+    },
+    {
+        title: 'Notifications',
+        href: '/notifications',
+        icon: Bell,
+    },
+    {
+        title: 'Loans',
+        href: '/loans',
+        icon: Handshake,
+    },
+    {
+        title: 'Borrows',
+        href: '/borrows',
+        icon: Handshake,
+    },
 ];
 
 const footerNavItems: NavItem[] = [

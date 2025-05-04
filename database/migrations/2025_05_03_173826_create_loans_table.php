@@ -1,0 +1,148 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('loans', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained()->comment('User who applied for the loan');
+            $table->foreignId('package_id')->nullable()->constrained('loan_packages')->nullOnDelete()->comment('Associated loan package if standard');
+            $table->foreignId('custom_package_id')->nullable()->constrained('custom_packages')->nullOnDelete()->comment('Associated custom package if custom');
+            
+            // Basic Loan Information
+            $table->string('reference_number')->unique()->comment('Unique reference number for the loan');
+            $table->text('purpose')->nullable()->comment('Purpose of the loan');
+            
+            // Financial Details
+            $table->decimal('amount', 20, 2)->comment('Loan amount');
+            $table->foreignId('currency_id')->constrained()->comment('Currency of the loan');
+            $table->decimal('interest_rate', 8, 4)->comment('Interest rate at time of approval');
+            $table->enum('interest_type', ['simple', 'compound'])->default('simple');
+            $table->enum('interest_calculation', ['daily', 'weekly', 'monthly', 'yearly'])->default('monthly');
+            $table->enum('interest_payment_frequency', ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'end_of_term'])->default('monthly');
+            
+            // Duration Information
+            $table->integer('duration_days')->comment('Loan duration in days');
+            $table->date('start_date')->nullable()->comment('Actual start date of the loan');
+            $table->date('end_date')->nullable()->comment('Expected end date of the loan');
+            $table->date('actual_end_date')->nullable()->comment('Actual end date if different');
+            
+            // Fees
+            $table->decimal('origination_fee_amount', 15, 2)->default(0)->comment('Actual origination fee amount');
+            $table->decimal('platform_fee_amount', 15, 2)->default(0)->comment('Platform fee amount');
+            $table->decimal('late_payment_fee_fixed', 15, 2)->default(0)->comment('Fixed late payment fee');
+            $table->decimal('late_payment_fee_percentage', 8, 4)->default(0)->comment('Percentage late payment fee');
+            $table->integer('grace_period_days')->default(0)->comment('Grace period for late payments');
+            
+            // Payment Details
+            $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete()->comment('Payment method for disbursement');
+            $table->foreignId('repayment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete()->comment('Payment method for repayments');
+            $table->decimal('monthly_payment_amount', 15, 2)->nullable()->comment('Calculated monthly payment amount');
+            $table->integer('total_payments')->nullable()->comment('Total number of payments');
+            $table->integer('completed_payments')->default(0)->comment('Number of completed payments');
+            
+            // Loan Status
+            $table->enum('status', [
+                'draft',              // Application started but not submitted
+                'pending_approval',   // Submitted, awaiting admin review
+                'approved',           // Approved but not yet disbursed
+                'rejected',           // Application rejected
+                'disbursed',          // Funds disbursed, loan active
+                'active',             // Loan is active and in good standing
+                'in_arrears',         // Loan has missed payments
+                'defaulted',          // Loan is in default
+                'paid',               // Loan fully paid
+                'closed',             // Loan closed for other reasons
+                'cancelled'           // Application cancelled before disbursement
+            ])->default('draft');
+            
+            // Status Timestamps
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('rejected_at')->nullable();
+            $table->timestamp('disbursed_at')->nullable();
+            $table->timestamp('defaulted_at')->nullable();
+            $table->timestamp('paid_at')->nullable();
+            $table->timestamp('closed_at')->nullable();
+            
+            // Approval Information
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('approval_notes')->nullable();
+            $table->text('rejection_reason')->nullable();
+            
+            // Disbursement Details
+            $table->string('disbursement_transaction_id')->nullable()->comment('External transaction ID for disbursement');
+            $table->string('disbursement_status')->nullable()->comment('Status of the disbursement');
+            
+            // Payment Tracking
+            $table->decimal('principal_paid', 20, 2)->default(0)->comment('Amount of principal paid so far');
+            $table->decimal('interest_paid', 20, 2)->default(0)->comment('Amount of interest paid so far');
+            $table->decimal('fees_paid', 20, 2)->default(0)->comment('Amount of fees paid so far');
+            $table->decimal('principal_remaining', 20, 2)->nullable()->comment('Principal amount remaining');
+            $table->decimal('total_amount_due', 20, 2)->nullable()->comment('Total amount due (principal + interest + fees)');
+            $table->decimal('current_balance', 20, 2)->nullable()->comment('Current loan balance');
+            
+            // Delinquency Tracking
+            $table->integer('days_past_due')->default(0)->comment('Number of days past due');
+            $table->date('next_payment_due_date')->nullable()->comment('Date when next payment is due');
+            $table->decimal('next_payment_amount', 15, 2)->nullable()->comment('Amount of next payment due');
+            $table->date('last_payment_date')->nullable()->comment('Date of last payment received');
+            $table->decimal('last_payment_amount', 15, 2)->nullable()->comment('Amount of last payment received');
+            
+            // Early Repayment
+            $table->boolean('allows_early_repayment')->default(true);
+            $table->decimal('early_repayment_fee_percentage', 8, 4)->default(0);
+            $table->boolean('has_early_repayment')->default(false)->comment('Whether loan was repaid early');
+            
+            // Collateral
+            $table->boolean('has_collateral')->default(false);
+            $table->text('collateral_description')->nullable();
+            $table->decimal('collateral_value', 20, 2)->nullable();
+            $table->string('collateral_document')->nullable()->comment('Document proving collateral');
+            
+            // Contract and Documents
+            $table->string('contract_document')->nullable()->comment('Loan agreement document');
+            $table->timestamp('contract_signed_at')->nullable();
+            
+            // Communication
+            $table->text('admin_notes')->nullable()->comment('Internal admin notes');
+            $table->text('user_notes')->nullable()->comment('Notes from user');
+            
+            // Auto-payments
+            $table->boolean('auto_payments_enabled')->default(false);
+            $table->date('auto_payment_start_date')->nullable();
+            
+            // System Fields
+            $table->boolean('is_test_loan')->default(false)->comment('Whether this is a test loan');
+            $table->json('metadata')->nullable()->comment('Additional metadata');
+            
+            // Standard timestamps
+            $table->timestamps();
+            $table->softDeletes();
+            
+            // Indexes
+            $table->index('user_id');
+            $table->index('status');
+            $table->index('start_date');
+            $table->index('end_date');
+            $table->index('reference_number');
+            $table->index('days_past_due');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('loans');
+    }
+};

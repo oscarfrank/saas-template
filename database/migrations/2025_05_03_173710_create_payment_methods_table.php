@@ -82,10 +82,7 @@ return new class extends Migration
             $table->index('is_active');
         });
 
-        // Enforce only one default payment method per user
-        Schema::table('payment_methods', function (Blueprint $table) {
-            $table->unique(['user_id', 'is_default'], 'unique_default_payment_method_per_user');
-        });
+
     }
 
     /**

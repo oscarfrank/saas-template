@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('code', 10)->unique()->comment('ISO currency code (USD, EUR, BTC)');
             $table->string('name', 100)->comment('Full currency name');
             $table->string('symbol', 10)->comment('Currency symbol ($, €, ₿)');
+            $table->boolean('is_default')->default(false)->after('is_active');
+
             
             // Currency Type
             $table->enum('type', ['fiat', 'crypto', 'other'])->default('fiat');

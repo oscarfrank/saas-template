@@ -31,6 +31,11 @@ class DashboardController extends Controller
     {
         return Inertia::render('dashboard/borrower-dashboard');
     }
+
+    public function youtuberDashboard(Request $request)
+    {
+        return Inertia::render('dashboard/youtuber-dashboard');
+    }
     
     
 

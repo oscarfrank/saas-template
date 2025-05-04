@@ -8,6 +8,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KycVerificationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\TransactionController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -22,6 +23,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
     Route::get('dashboard/borrower', [DashboardController::class, 'borrowerDashboard'])->name('borrower-dashboard');
+    Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
 
     // KYC routes
     Route::get('kyc', [KycVerificationController::class, 'show'])->name('kyc.show');
@@ -33,8 +35,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/products/all', [ProductController::class, 'getAllProducts'])->name('products.all');
     Route::post('/products/export', [ProductController::class, 'export'])->name('products.export');
 
-
-
+    // Transaction routes
+    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
+    Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
+    Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
+    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
+    Route::get('/transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
+    Route::put('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
+    Route::delete('/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+    Route::post('/transactions/bulk-delete', [TransactionController::class, 'bulkDelete'])->name('transactions.bulk-delete');
+    Route::post('/transactions/bulk-archive', [TransactionController::class, 'bulkArchive'])->name('transactions.bulk-archive');
+    Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
+    Route::get('/transactions/all', [TransactionController::class, 'getAllTransactions'])->name('transactions.all');
 
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================

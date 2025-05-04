@@ -51,6 +51,15 @@ return new class extends Migration
             'created_at' => now(),
             'updated_at' => now()
         ]);
+
+        DB::table('users')->insert([
+            'name' => 'Oscar Frank',
+            'email' => 'oscar@localhost.com',
+            'password' => Hash::make('password123'),
+            'email_verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
     }
 
     public function down()

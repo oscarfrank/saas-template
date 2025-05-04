@@ -5,6 +5,7 @@ use Inertia\Inertia;
 
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\KycVerificationController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -20,6 +21,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard/admin', [DashboardController::class, 'adminDashboard'])->name('admin-dashboard');
     Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
     Route::get('dashboard/borrower', [DashboardController::class, 'borrowerDashboard'])->name('borrower-dashboard');
+
+    // KYC routes
+    Route::get('kyc', [KycVerificationController::class, 'show'])->name('kyc.show');
+    Route::get('kyc/submit', [KycVerificationController::class, 'create'])->name('kyc.create');
+    Route::post('kyc', [KycVerificationController::class, 'store'])->name('kyc.store');
+
+    // Admin KYC routes
+    // Route::middleware(['auth', 'admin'])->group(function () {
+        Route::get('admin/kyc', [KycVerificationController::class, 'index'])->name('kyc.index');
+        Route::get('admin/kyc/{kycVerification}/edit', [KycVerificationController::class, 'edit'])->name('kyc.edit');
+        Route::put('admin/kyc/{kycVerification}', [KycVerificationController::class, 'update'])->name('kyc.update');
+        Route::get('admin/kyc/{kycVerification}', [KycVerificationController::class, 'show'])->name('admin.kyc.show');
+    // });
 
     // Products routes
     Route::resource('products', ProductController::class);

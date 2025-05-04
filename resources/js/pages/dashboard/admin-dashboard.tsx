@@ -5,7 +5,7 @@ import { Head } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRole } from '@/hooks/use-role';
 import { useGreeting } from '@/hooks/use-greeting';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
     Users, 
@@ -17,8 +17,19 @@ import {
     FileText, 
     Shield, 
     Bell, 
-    HelpCircle 
+    HelpCircle,
+    DollarSign,
+    TrendingUp,
+    AlertCircle,
+    Globe
 } from 'lucide-react';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -32,12 +43,124 @@ export default function Dashboard() {
     const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
 
+    const currencies = [
+        { code: 'USD', symbol: '$', name: 'US Dollar' },
+        { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
+        { code: 'EUR', symbol: '€', name: 'Euro' },
+        { code: 'GBP', symbol: '£', name: 'British Pound' },
+    ];
+
     const quickStats = [
         { title: 'Total Users', value: '2,543', icon: Users, color: 'text-blue-500' },
         { title: 'Active Loans', value: '1,234', icon: Handshake, color: 'text-green-500' },
         { title: 'Pending Applications', value: '89', icon: FileText, color: 'text-yellow-500' },
         { title: 'Support Tickets', value: '45', icon: MessageSquare, color: 'text-red-500' },
     ];
+
+    const loanStats = {
+        USD: [
+            { 
+                title: 'Total Active Loan Amount', 
+                value: '$12,450,000', 
+                icon: DollarSign, 
+                color: 'text-green-500',
+                description: 'Sum of all active loans',
+                trend: '+12.5% from last month'
+            },
+            { 
+                title: 'Total Pending Loan Balance', 
+                value: '$3,250,000', 
+                icon: AlertCircle, 
+                color: 'text-yellow-500',
+                description: 'Sum of all pending loan applications',
+                trend: '+8.2% from last month'
+            },
+            { 
+                title: 'Average Loan Size', 
+                value: '$10,089', 
+                icon: TrendingUp, 
+                color: 'text-blue-500',
+                description: 'Average amount per loan',
+                trend: '+5.3% from last month'
+            },
+            { 
+                title: 'Default Rate', 
+                value: '2.3%', 
+                icon: Shield, 
+                color: 'text-red-500',
+                description: 'Percentage of defaulted loans',
+                trend: '-0.5% from last month'
+            },
+        ],
+        NGN: [
+            { 
+                title: 'Total Active Loan Amount', 
+                value: '₦1,245,000,000', 
+                icon: DollarSign, 
+                color: 'text-green-500',
+                description: 'Sum of all active loans',
+                trend: '+15.2% from last month'
+            },
+            { 
+                title: 'Total Pending Loan Balance', 
+                value: '₦325,000,000', 
+                icon: AlertCircle, 
+                color: 'text-yellow-500',
+                description: 'Sum of all pending loan applications',
+                trend: '+10.8% from last month'
+            },
+            { 
+                title: 'Average Loan Size', 
+                value: '₦1,008,900', 
+                icon: TrendingUp, 
+                color: 'text-blue-500',
+                description: 'Average amount per loan',
+                trend: '+7.3% from last month'
+            },
+            { 
+                title: 'Default Rate', 
+                value: '2.1%', 
+                icon: Shield, 
+                color: 'text-red-500',
+                description: 'Percentage of defaulted loans',
+                trend: '-0.3% from last month'
+            },
+        ],
+        EUR: [
+            { 
+                title: 'Total Active Loan Amount', 
+                value: '€11,250,000', 
+                icon: DollarSign, 
+                color: 'text-green-500',
+                description: 'Sum of all active loans',
+                trend: '+9.5% from last month'
+            },
+            { 
+                title: 'Total Pending Loan Balance', 
+                value: '€2,950,000', 
+                icon: AlertCircle, 
+                color: 'text-yellow-500',
+                description: 'Sum of all pending loan applications',
+                trend: '+6.8% from last month'
+            },
+            { 
+                title: 'Average Loan Size', 
+                value: '€9,125', 
+                icon: TrendingUp, 
+                color: 'text-blue-500',
+                description: 'Average amount per loan',
+                trend: '+4.2% from last month'
+            },
+            { 
+                title: 'Default Rate', 
+                value: '1.8%', 
+                icon: Shield, 
+                color: 'text-red-500',
+                description: 'Percentage of defaulted loans',
+                trend: '-0.4% from last month'
+            },
+        ],
+    };
 
     const adminSections = [
         {
@@ -116,6 +239,44 @@ export default function Dashboard() {
                         </Card>
                     ))}
                 </div>
+
+                {/* Loan Statistics */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Loan Statistics</CardTitle>
+                            <CardDescription>Overview of loan performance and metrics</CardDescription>
+                        </div>
+                        <Select defaultValue="USD">
+                            <SelectTrigger className="w-[180px]">
+                                <Globe className="mr-2 h-4 w-4" />
+                                <SelectValue placeholder="Select currency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {currencies.map((currency) => (
+                                    <SelectItem key={currency.code} value={currency.code}>
+                                        {currency.name} ({currency.symbol})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                            {loanStats.USD.map((stat, index) => (
+                                <div key={index} className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                                        <p className="text-sm text-muted-foreground">{stat.title}</p>
+                                    </div>
+                                    <p className="text-2xl font-bold">{stat.value}</p>
+                                    <p className="text-sm text-muted-foreground">{stat.description}</p>
+                                    <p className="text-xs text-green-500">{stat.trend}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Admin Sections */}
                 <div className="grid gap-6 md:grid-cols-2">

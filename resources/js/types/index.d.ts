@@ -74,4 +74,20 @@ export interface Role {
     created_at: string;
     updated_at: string;
     permissions: Permission[];
+}
+
+export interface PageProps {
+    auth: {
+        user: {
+            id: number;
+            name: string;
+            email: string;
+            roles: string[];
+        };
+    };
+    flash: {
+        message?: string;
+        error?: string;
+        success?: string;
+    };
 } 

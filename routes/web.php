@@ -9,6 +9,7 @@ use App\Http\Controllers\KycVerificationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TicketController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -48,6 +49,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
     Route::get('/transactions/all', [TransactionController::class, 'getAllTransactions'])->name('transactions.all');
 
+    // Ticket routes
+    Route::get('/tickets', [TicketController::class, 'userTickets'])->name('tickets.user');
+    Route::get('/tickets/create', [TicketController::class, 'create'])->name('tickets.create');
+    Route::post('/tickets', [TicketController::class, 'store'])->name('tickets.store');
+    Route::get('/tickets/{ticket}', [TicketController::class, 'userShow'])->name('tickets.user.show');
+    Route::get('/tickets/{ticket}/edit', [TicketController::class, 'edit'])->name('tickets.edit');
+    Route::put('/tickets/{ticket}', [TicketController::class, 'update'])->name('tickets.update');
+    Route::delete('/tickets/{ticket}', [TicketController::class, 'destroy'])->name('tickets.destroy');
+    Route::post('/tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
+    Route::post('/tickets/bulk-delete', [TicketController::class, 'bulkDelete'])->name('tickets.bulk-delete');
+    Route::get('/tickets/export', [TicketController::class, 'export'])->name('tickets.export');
+
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
     // ======================================================================
@@ -82,6 +95,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('users/{user}', [UserController::class, 'update'])->name('admin.users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('users/export', [UserController::class, 'export'])->name('admin.users.export');
+
+        // Ticket routes;
+        Route::get('tickets', [TicketController::class, 'index'])->name('admin.tickets.index');
+        Route::get('tickets/{ticket}', [TicketController::class, 'show'])->name('admin.tickets.show');
 
     });
 

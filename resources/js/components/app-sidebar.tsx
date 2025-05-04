@@ -4,8 +4,11 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog } from 'lucide-react';
 import AppLogo from './app-logo';
+
+import { useAuth } from '@/hooks/use-auth';
+import { useRole } from '@/hooks/use-role';
 
 const mainNavItems: NavItem[] = [
     {
@@ -58,7 +61,21 @@ const footerNavItems: NavItem[] = [
     },
 ];
 
+const adminNavItems: NavItem[] = [
+    {
+        title: 'Admin',
+        href: '/admin/dashboard',
+        icon: UserRoundCog,
+    },
+];
+
+
+
 export function AppSidebar() {
+
+    const { user } = useAuth();
+    const { hasRole } = useRole();
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -79,6 +96,8 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <NavFooter items={footerNavItems} className="mt-auto" />
+                {hasRole(user, 'user') ? '' : <NavFooter items={adminNavItems} className="mt-auto bg-red-900" />}
+                
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

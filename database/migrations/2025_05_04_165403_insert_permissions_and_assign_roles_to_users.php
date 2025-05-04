@@ -1,19 +1,18 @@
 <?php
 
-namespace Database\Seeders;
-
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Models\User;
 
-class PermissionRoleSeeder extends Seeder
+return new class extends Migration
 {
-    /**
-     * Run the database seeds.
+        /**
+     * Run the migrations.
      */
-    public function run(): void
+    public function up(): void
     {
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
@@ -140,5 +139,70 @@ class PermissionRoleSeeder extends Seeder
         $user->givePermissionTo([
             'edit-profile', 'view-profile'
         ]);
+
+        // Assign roles to specific users
+        try {
+            // Find user with ID 1 and assign super-admin role
+            $user1 = User::find(1);
+            if ($user1) {
+                $user1->assignRole('super-admin');
+            }
+
+            // Find user with ID 2 and assign admin role
+            $user2 = User::find(2);
+            if ($user2) {
+                $user2->assignRole('admin');
+            }
+
+            // Find user with ID 3 and assign user role
+            $user3 = User::find(3);
+            if ($user3) {
+                $user3->assignRole('user');
+            }
+        } catch (\Exception $e) {
+            // Log the error but don't fail the migration
+            \Log::error('Error assigning roles to users: ' . $e->getMessage());
+        }
     }
-} 
+
+     /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        // Remove roles from specific users
+        try {
+            $user1 = User::find(1);
+            if ($user1) {
+                $user1->syncRoles([]);
+            }
+
+            $user2 = User::find(2);
+            if ($user2) {
+                $user2->syncRoles([]);
+            }
+
+            $user3 = User::find(3);
+            if ($user3) {
+                $user3->syncRoles([]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error removing roles from users: ' . $e->getMessage());
+        }
+
+        // Get all roles
+        $roles = Role::all();
+        
+        // Remove all permissions from roles and delete roles
+        foreach ($roles as $role) {
+            $role->syncPermissions([]);
+            $role->delete();
+        }
+        
+        // Delete all permissions
+        $permissions = Permission::all();
+        foreach ($permissions as $permission) {
+            $permission->delete();
+        }
+    }
+};

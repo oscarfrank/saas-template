@@ -19,9 +19,19 @@ return new class extends Migration
             'updated_at' => now()
         ]);
 
-        // Premium Client
         DB::table('users')->insert([
             'id' => 2,
+            'name' => 'Oscar Frank',
+            'email' => 'oscar@localhost.com',
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+
+        // Premium Client
+        DB::table('users')->insert([
+            'id' => 3,
             'name' => 'Premium Client',
             'email' => 'premium@example.com',
             'password' => Hash::make('password'),
@@ -32,7 +42,7 @@ return new class extends Migration
 
         // VIP Investor
         DB::table('users')->insert([
-            'id' => 3,
+            'id' => 4,
             'name' => 'VIP Investor',
             'email' => 'vip@example.com',
             'password' => Hash::make('password'),
@@ -43,7 +53,7 @@ return new class extends Migration
 
         // Crypto Client
         DB::table('users')->insert([
-            'id' => 4,
+            'id' => 5,
             'name' => 'Crypto Client',
             'email' => 'crypto@example.com',
             'password' => Hash::make('password'),
@@ -52,14 +62,6 @@ return new class extends Migration
             'updated_at' => now()
         ]);
 
-        DB::table('users')->insert([
-            'name' => 'Oscar Frank',
-            'email' => 'oscar@localhost.com',
-            'password' => Hash::make('password123'),
-            'email_verified_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now()
-        ]);
     }
 
     public function down()

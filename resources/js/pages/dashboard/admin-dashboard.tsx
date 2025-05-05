@@ -185,7 +185,7 @@ export default function Dashboard() {
             title: 'Support & Communication',
             icon: MessageSquare,
             items: [
-                { name: 'Support Tickets', href: '/admin/support' },
+                { name: 'Support Tickets', href: '/admin/tickets' },
                 { name: 'Announcements', href: '/admin/announcements' },
                 { name: 'Messages', href: '/admin/messages' },
             ],

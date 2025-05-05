@@ -12,6 +12,7 @@ use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\OuterPagesController;
 use App\Http\Controllers\Admin\SiteSettingsController;
+use App\Http\Controllers\Admin\ApiSettingsController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -110,6 +111,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Ticket routes;
         Route::get('tickets', [TicketController::class, 'index'])->name('admin.tickets.index');
         Route::get('tickets/{ticket}', [TicketController::class, 'show'])->name('admin.tickets.show');
+
+        // API Settings routes
+        Route::get('/settings/api', [ApiSettingsController::class, 'index'])->name('admin.settings.api');
+        Route::post('/settings/api', [ApiSettingsController::class, 'update'])->name('admin.settings.api.update');
 
     });
 

@@ -2,6 +2,8 @@ import { Head } from '@inertiajs/react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 const faqs = [
     {
@@ -39,9 +41,11 @@ const faqs = [
 ];
 
 export default function FAQ() {
+    const { siteSettings } = usePage<SharedData>().props;
+
     return (
         <>
-            <Head title="Frequently Asked Questions - LendFast" />
+            <Head title={`Frequently Asked Questions - ${siteSettings.site_name}`} />
             <div className="min-h-screen bg-white dark:bg-gray-900">
                 <Header />
                 <main>

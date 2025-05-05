@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/navigation-menu";
 
 export function Header() {
-    const { auth } = usePage<SharedData>().props;
+    const { auth, siteSettings } = usePage<SharedData>().props;
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md dark:bg-gray-900/90 border-b border-gray-100 dark:border-gray-800">
@@ -23,7 +23,7 @@ export function Header() {
                             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-blue-400 rounded-lg blur opacity-20"></div>
                             <DollarSign className="relative h-8 w-8 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">LendFast</span>
+                        <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">{siteSettings.site_name}</span>
                     </div>
                     
                     <NavigationMenu>

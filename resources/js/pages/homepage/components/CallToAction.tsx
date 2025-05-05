@@ -1,7 +1,11 @@
 import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 export function CallToAction() {
+    const { siteSettings } = usePage<SharedData>().props;
+
     return (
         <section className="py-20 bg-blue-600 dark:bg-blue-700">
             <div className="container mx-auto px-6">
@@ -10,7 +14,7 @@ export function CallToAction() {
                         Ready to Get Started?
                     </h2>
                     <p className="text-xl text-blue-100 mb-8">
-                        Join thousands of satisfied customers who have already experienced the LendFast difference.
+                        Join thousands of satisfied customers who have already experienced the {siteSettings.site_name} difference.
                         Apply now and get the financial support you need in no time.
                     </p>
                     <Link href="/register">

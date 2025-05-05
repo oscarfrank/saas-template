@@ -5,26 +5,30 @@ import {
     CarouselNext,
     CarouselPrevious,
 } from "@/components/ui/carousel";
-
-const testimonials = [
-    {
-        quote: "LendFast made getting a business loan incredibly simple. The process was smooth and the rates were competitive.",
-        author: "Sarah Johnson",
-        role: "Small Business Owner"
-    },
-    {
-        quote: "I was impressed by how quickly I got approved. The customer service was exceptional throughout the process.",
-        author: "Michael Chen",
-        role: "Entrepreneur"
-    },
-    {
-        quote: "The flexible repayment options helped me manage my cash flow better. Highly recommended!",
-        author: "Emily Rodriguez",
-        role: "Startup Founder"
-    }
-];
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 export function Testimonials() {
+    const { siteSettings } = usePage<SharedData>().props;
+
+    const testimonials = [
+        {
+            quote: `${siteSettings.site_name} made getting a business loan incredibly simple. The process was smooth and the rates were competitive.`,
+            author: "Sarah Johnson",
+            role: "Small Business Owner"
+        },
+        {
+            quote: "I was impressed by how quickly I got approved. The customer service was exceptional throughout the process.",
+            author: "Michael Chen",
+            role: "Entrepreneur"
+        },
+        {
+            quote: "The flexible repayment options helped me manage my cash flow better. Highly recommended!",
+            author: "Emily Rodriguez",
+            role: "Startup Founder"
+        }
+    ];
+
     return (
         <section className="py-20 bg-gray-50 dark:bg-gray-800">
             <div className="container mx-auto px-6">

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 const currencies = [
     { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
@@ -29,6 +31,7 @@ const durationOptions = [
 ];
 
 export default function Calculator() {
+    const { siteSettings } = usePage<SharedData>().props;
     const [loanAmount, setLoanAmount] = useState(10000);
     const [loanTerm, setLoanTerm] = useState(12);
     const [interestRate, setInterestRate] = useState(5);
@@ -116,7 +119,7 @@ export default function Calculator() {
 
     return (
         <>
-            <Head title="Loan Calculator - LendFast" />
+            <Head title={`Loan Calculator - ${siteSettings.site_name}`} />
             <div className="min-h-screen bg-white dark:bg-gray-900">
                 <Header />
                 <main>
@@ -249,33 +252,35 @@ export default function Calculator() {
                                         </h2>
                                         <div className="space-y-6">
                                             <div>
-                                                <p className="text-gray-600 dark:text-gray-300">Monthly Interest Payment</p>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                                    Monthly Payment
+                                                </h3>
                                                 <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                                                     {formatCurrency(calculateMonthlyPayment())}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-600 dark:text-gray-300">Total Interest</p>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                                    Total Interest
+                                                </h3>
                                                 <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                                                     {formatCurrency(calculateTotalInterest())}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-600 dark:text-gray-300">Principal Due at End</p>
-                                                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                                                    {formatCurrency(loanAmount)}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-600 dark:text-gray-300">Total Amount to be Repaid</p>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                                    Total Payment
+                                                </h3>
                                                 <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                                                     {formatCurrency(calculateTotalPayment())}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-gray-600 dark:text-gray-300">Number of Interest Payments</p>
+                                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                                                    APR
+                                                </h3>
                                                 <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                                                    {duration}
+                                                    {calculateAPR()}%
                                                 </p>
                                             </div>
                                         </div>

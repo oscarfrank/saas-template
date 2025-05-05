@@ -9,6 +9,8 @@ import {
     CarouselPrevious,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 const heroImages = [
     {
@@ -32,6 +34,7 @@ const heroImages = [
 ];
 
 export function Hero() {
+    const { siteSettings } = usePage<SharedData>().props;
     const autoplay = React.useRef(
         Autoplay({ delay: 5000, stopOnInteraction: false })
     );
@@ -43,11 +46,10 @@ export function Hero() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
                     <div className="text-left">
                         <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-6">
-                            Fast, Flexible Loans for Your Financial Needs
+                            {siteSettings.site_title}
                         </h1>
                         <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
-                            Get the financial support you need with our quick approval process and competitive rates. 
-                            Whether you're looking to grow your business or manage personal expenses, we've got you covered.
+                            {siteSettings.site_description}
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4">
                             <Link href="/register">

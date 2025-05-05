@@ -28,6 +28,26 @@ export interface SharedData {
     auth: Auth;
     ziggy: Config & { location: string };
     sidebarOpen: boolean;
+    siteSettings: {
+        site_name: string;
+        site_title: string;
+        site_description: string;
+        site_keywords: string;
+        company_name: string;
+        company_address: string;
+        company_phone: string;
+        company_email: string;
+        company_website: string;
+        facebook_url: string;
+        twitter_url: string;
+        instagram_url: string;
+        linkedin_url: string;
+        youtube_url: string;
+        google_analytics_code: string | null;
+        meta_tags: string;
+        footer_text: string;
+        maintenance_mode: boolean;
+    };
     [key: string]: unknown;
 }
 

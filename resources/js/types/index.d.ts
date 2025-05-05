@@ -91,3 +91,30 @@ export interface PageProps {
         success?: string;
     };
 } 
+
+
+export interface SiteSettings {
+    id: number;
+    site_name: string;
+    site_title: string;
+    site_description: string | null;
+    site_keywords: string | null;
+    site_logo: string | null;
+    site_favicon: string | null;
+    company_name: string;
+    company_address: string;
+    company_phone: string;
+    company_email: string;
+    company_website: string | null;
+    facebook_url: string | null;
+    twitter_url: string | null;
+    instagram_url: string | null;
+    linkedin_url: string | null;
+    youtube_url: string | null;
+    google_analytics_code: string | null;
+    meta_tags: string | null;
+    footer_text: string | null;
+    maintenance_mode: boolean;
+    created_at: string;
+    updated_at: string;
+}

@@ -11,6 +11,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\OuterPagesController;
+use App\Http\Controllers\Admin\SiteSettingsController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -78,7 +79,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Admin routes group
     Route::prefix('admin')->middleware(['except.user'])->group(function () {
 
-        Route::get('dashboard', [DashboardController::class, 'adminDashboard'])->name('admin-dashboard');
+        Route::get('dashboard', [DashboardController::class, 'adminDashboard'])->name('admin.dashboard');
+
+        // Site Settings routes
+        Route::get('settings', [SiteSettingsController::class, 'index'])->name('admin.settings.system');
+        Route::put('settings', [SiteSettingsController::class, 'update'])->name('admin.settings.update');
 
         // KYC routes
         Route::get('kyc', [KycVerificationController::class, 'index'])->name('kyc.index');

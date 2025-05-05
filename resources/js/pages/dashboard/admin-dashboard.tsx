@@ -196,7 +196,7 @@ export default function Dashboard() {
             items: [
                 { name: 'System Settings', href: '/admin/settings' },
                 { name: 'Security', href: '/admin/security' },
-                { name: 'API Management', href: '/admin/api' },
+                { name: 'API Management', href: '/admin/settings/api' },
             ],
         },
     ];

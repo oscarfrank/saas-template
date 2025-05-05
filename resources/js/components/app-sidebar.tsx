@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket } from 'lucide-react';
 import AppLogo from './app-logo';
 
 import { useAuth } from '@/hooks/use-auth';
@@ -45,6 +45,11 @@ const mainNavItems: NavItem[] = [
         title: 'Borrows',
         href: '/borrows',
         icon: Handshake,
+    },
+    {
+        title: 'Tickets',
+        href: '/tickets',
+        icon: Ticket,
     },
 ];
 

@@ -10,10 +10,16 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\OuterPagesController;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
+// Homepage
+Route::get('/', [OuterPagesController::class, 'index'])->name('home');
+Route::get('/faq', [OuterPagesController::class, 'faq'])->name('faq');
+Route::get('/contact', [OuterPagesController::class, 'contact'])->name('contact');
+Route::get('/calculator', [OuterPagesController::class, 'calculator'])->name('calculator');
+Route::get('/privacy', [OuterPagesController::class, 'privacy'])->name('privacy');
+Route::get('/about', [OuterPagesController::class, 'about'])->name('about');
+
 
 Route::middleware(['auth', 'verified'])->group(function () {
 

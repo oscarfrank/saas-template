@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 export default function Contact() {
+    const { siteSettings } = usePage<SharedData>().props;
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -33,7 +36,7 @@ export default function Contact() {
 
     return (
         <>
-            <Head title="Contact Us - LendFast" />
+            <Head title={`Contact Us - ${siteSettings.site_name}`} />
             <div className="min-h-screen bg-white dark:bg-gray-900">
                 <Header />
                 <main>
@@ -57,14 +60,14 @@ export default function Contact() {
                                                     <Mail className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1" />
                                                     <div>
                                                         <h3 className="font-medium text-gray-900 dark:text-white">Email</h3>
-                                                        <p className="text-gray-600 dark:text-gray-300">support@lendfast.com</p>
+                                                        <p className="text-gray-600 dark:text-gray-300">{siteSettings.company_email}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start space-x-4">
                                                     <Phone className="h-6 w-6 text-blue-600 dark:text-blue-400 mt-1" />
                                                     <div>
                                                         <h3 className="font-medium text-gray-900 dark:text-white">Phone</h3>
-                                                        <p className="text-gray-600 dark:text-gray-300">+1 (555) 123-4567</p>
+                                                        <p className="text-gray-600 dark:text-gray-300">{siteSettings.company_phone}</p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start space-x-4">
@@ -72,8 +75,7 @@ export default function Contact() {
                                                     <div>
                                                         <h3 className="font-medium text-gray-900 dark:text-white">Address</h3>
                                                         <p className="text-gray-600 dark:text-gray-300">
-                                                            123 Financial Street<br />
-                                                            New York, NY 10001
+                                                            {siteSettings.company_address}
                                                         </p>
                                                     </div>
                                                 </div>

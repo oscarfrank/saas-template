@@ -2,27 +2,8 @@ import { Head } from '@inertiajs/react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { Building2, Users, Target, Award } from 'lucide-react';
-
-const teamMembers = [
-    {
-        name: "John Smith",
-        role: "CEO & Founder",
-        image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
-        bio: "With over 15 years of experience in the financial industry, John founded LendFast with a vision to make lending more accessible and transparent."
-    },
-    {
-        name: "Sarah Johnson",
-        role: "Chief Operations Officer",
-        image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
-        bio: "Sarah brings extensive experience in financial operations and customer service, ensuring smooth processes and excellent client experiences."
-    },
-    {
-        name: "Michael Chen",
-        role: "Chief Technology Officer",
-        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
-        bio: "Michael leads our technology initiatives, ensuring our platform remains secure, efficient, and user-friendly."
-    }
-];
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 const stats = [
     { number: "10,000+", label: "Happy Customers", icon: Users },
@@ -32,9 +13,32 @@ const stats = [
 ];
 
 export default function About() {
+    const { siteSettings } = usePage<SharedData>().props;
+
+    const teamMembers = [
+        {
+            name: "John Smith",
+            role: "CEO & Founder",
+            image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
+            bio: `With over 15 years of experience in the financial industry, John founded ${siteSettings.site_name} with a vision to make lending more accessible and transparent.`
+        },
+        {
+            name: "Sarah Johnson",
+            role: "Chief Operations Officer",
+            image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
+            bio: "Sarah brings extensive experience in financial operations and customer service, ensuring smooth processes and excellent client experiences."
+        },
+        {
+            name: "Michael Chen",
+            role: "Chief Technology Officer",
+            image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
+            bio: "Michael leads our technology initiatives, ensuring our platform remains secure, efficient, and user-friendly."
+        }
+    ];
+
     return (
         <>
-            <Head title="About Us - LendFast" />
+            <Head title={`About Us - ${siteSettings.site_name}`} />
             <div className="min-h-screen bg-white dark:bg-gray-900">
                 <Header />
                 <main>
@@ -42,10 +46,10 @@ export default function About() {
                         <div className="container mx-auto px-6">
                             <div className="max-w-4xl mx-auto text-center mb-20">
                                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-6">
-                                    About LendFast
+                                    About {siteSettings.site_name}
                                 </h1>
                                 <p className="text-xl text-gray-600 dark:text-gray-300">
-                                    We're revolutionizing the lending industry with transparency, speed, and customer-first service.
+                                    {siteSettings.site_description}
                                 </p>
                             </div>
 
@@ -55,7 +59,7 @@ export default function About() {
                                         Our Story
                                     </h2>
                                     <p className="text-gray-600 dark:text-gray-300 mb-4">
-                                        Founded in 2024, LendFast emerged from a simple observation: traditional lending processes were too slow, complex, and often inaccessible to many who needed financial support.
+                                        Founded in 2024, {siteSettings.site_name} emerged from a simple observation: traditional lending processes were too slow, complex, and often inaccessible to many who needed financial support.
                                     </p>
                                     <p className="text-gray-600 dark:text-gray-300">
                                         We set out to create a lending platform that combines cutting-edge technology with a human touch, making the loan application process faster, more transparent, and more accessible to everyone.
@@ -93,7 +97,7 @@ export default function About() {
                                     Our Team
                                 </h2>
                                 <p className="text-xl text-gray-600 dark:text-gray-300">
-                                    Meet the dedicated professionals behind LendFast
+                                    Meet the dedicated professionals behind {siteSettings.site_name}
                                 </p>
                             </div>
 

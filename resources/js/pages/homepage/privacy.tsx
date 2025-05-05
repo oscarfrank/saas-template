@@ -1,11 +1,15 @@
 import { Head } from '@inertiajs/react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
+import { usePage } from '@inertiajs/react';
+import { type SharedData } from '@/types';
 
 export default function Privacy() {
+    const { siteSettings } = usePage<SharedData>().props;
+
     return (
         <>
-            <Head title="Privacy Policy - LendFast" />
+            <Head title={`Privacy Policy - ${siteSettings.site_name}`} />
             <div className="min-h-screen bg-white dark:bg-gray-900">
                 <Header />
                 <main>
@@ -21,7 +25,7 @@ export default function Privacy() {
                                 <div className="prose dark:prose-invert max-w-none">
                                     <h2>1. Introduction</h2>
                                     <p>
-                                        At LendFast, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our loan services.
+                                        At {siteSettings.site_name}, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our loan services.
                                     </p>
 
                                     <h2>2. Information We Collect</h2>
@@ -95,9 +99,9 @@ export default function Privacy() {
                                         If you have any questions about this Privacy Policy, please contact us at:
                                     </p>
                                     <ul>
-                                        <li>Email: privacy@lendfast.com</li>
-                                        <li>Phone: +1 (555) 123-4567</li>
-                                        <li>Address: 123 Financial Street, New York, NY 10001</li>
+                                        <li>Email: {siteSettings.company_email}</li>
+                                        <li>Phone: {siteSettings.company_phone}</li>
+                                        <li>Address: {siteSettings.company_address}</li>
                                     </ul>
                                 </div>
                             </div>

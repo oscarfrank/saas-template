@@ -8,8 +8,13 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowRight, Clock, Percent, Shield, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
+import { Table } from './components/table';
+import { createColumns } from './components/table-columns';
+import { Plus } from 'lucide-react';
+import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -49,6 +54,7 @@ interface LoanPackage {
 
 interface Props {
     loanPackages: LoanPackage[];
+    user: any;
 }
 
 const getRiskLevelColor = (level: string) => {
@@ -75,10 +81,11 @@ const getInterestTypeColor = (type: string) => {
     }
 };
 
-export default function Browse({ loanPackages }: Props) {
+export default function Browse({ loanPackages, user }: Props) {
     const [selectedPackage, setSelectedPackage] = useState<LoanPackage | null>(null);
     const [isActivating, setIsActivating] = useState(false);
     const [loanAmount, setLoanAmount] = useState<string>('');
+    const [showKycDialog, setShowKycDialog] = useState(false);
 
     const activePackages = loanPackages.filter(pkg => pkg.is_active);
     const featuredPackages = activePackages.filter(pkg => pkg.is_featured);
@@ -98,6 +105,12 @@ export default function Browse({ loanPackages }: Props) {
 
     const handleActivate = async () => {
         if (!selectedPackage) return;
+
+        // Check if user's KYC is verified
+        if (!user.kyc_verified_at) {
+            setShowKycDialog(true);
+            return;
+        }
 
         // Convert formatted amount back to number
         const numericAmount = parseInt(loanAmount.replace(/,/g, ''), 10);
@@ -142,6 +155,16 @@ export default function Browse({ loanPackages }: Props) {
         } catch (error) {
             console.error('Error activating loan package:', error);
             setIsActivating(false);
+        }
+    };
+
+    const handleKycRedirect = () => {
+        // If user has a pending KYC, redirect to KYC status page
+        if (user.kyc_verification?.status === 'pending') {
+            router.visit(route('kyc.show'));
+        } else {
+            // Otherwise, redirect to KYC submission page
+            router.visit(route('kyc.create'));
         }
     };
 
@@ -309,6 +332,28 @@ export default function Browse({ loanPackages }: Props) {
                                 </DialogFooter>
                             </div>
                         )}
+                    </DialogContent>
+                </Dialog>
+
+                {/* KYC Verification Dialog */}
+                <Dialog open={showKycDialog} onOpenChange={setShowKycDialog}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>KYC Verification Required</DialogTitle>
+                            <DialogDescription>
+                                {user.kyc_verification?.status === 'pending' 
+                                    ? 'Your KYC verification is currently pending review. Please check your KYC status.'
+                                    : 'You need to complete your KYC verification before you can activate a loan package. This is required to ensure the security and compliance of our platform.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowKycDialog(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleKycRedirect}>
+                                {user.kyc_verification?.status === 'pending' ? 'Check KYC Status' : 'Complete KYC'}
+                            </Button>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
             </div>

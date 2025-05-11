@@ -60,6 +60,14 @@ class LoanController extends Controller
      */
     public function store(Request $request)
     {
+        // Check if user's KYC is verified
+        if (!auth()->user()->isKycVerified()) {
+            return response()->json([
+                'error' => 'KYC verification required',
+                'message' => 'You need to complete your KYC verification before you can apply for a loan.'
+            ], 403);
+        }
+
         $validated = $request->validate([
             'package_id' => 'nullable|exists:loan_packages,id',
             'custom_package_id' => 'nullable|exists:custom_packages,id',

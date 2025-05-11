@@ -27,8 +27,8 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             TransactionSeeder::class,
             // LoanSeeder::class,
-            AccountEmailTemplateSeeder::class,
             EmailTemplateSeeder::class,
+            LoanEmailTemplateSeeder::class,
         ]);
     }
 }

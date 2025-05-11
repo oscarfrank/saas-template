@@ -74,6 +74,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the KYC verification for the user.
+     */
+    public function kycVerification()
+    {
+        return $this->hasOne(KycVerification::class);
+    }
+
+    /**
      * Check if the user's KYC is verified.
      *
      * @return bool

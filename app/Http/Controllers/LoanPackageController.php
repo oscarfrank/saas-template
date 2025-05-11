@@ -381,8 +381,12 @@ class LoanPackageController extends Controller
             ->orderBy('display_order')
             ->get();
 
+        $user = auth()->user();
+        $user->load('kycVerification');
+
         return Inertia::render('loan-packages/browse', [
-            'loanPackages' => $loanPackages
+            'loanPackages' => $loanPackages,
+            'user' => $user
         ]);
     }
 }

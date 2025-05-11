@@ -119,6 +119,7 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
                 { name: 'All Users', href: '/admin/users' },
                 { name: 'User Roles', href: '/admin/roles' },
                 { name: 'User Activity', href: '/admin/activity' },
+                { name: 'User KYC', href: '/admin/kyc' },
             ],
         },
         {

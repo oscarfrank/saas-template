@@ -17,6 +17,7 @@ use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPackageController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\CurrencyController;
+use App\Http\Controllers\LoanDashboardController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -35,7 +36,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 
     Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
-    Route::get('dashboard/borrower', [DashboardController::class, 'borrowerDashboard'])->name('borrower-dashboard');
+    Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');
     Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
 
     // Route::get('/dashboard/admin', [DashboardController::class, 'adminDashboard'])->name('dashboard.admin');
@@ -119,7 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Admin routes group
     Route::prefix('admin')->middleware(['except.user'])->group(function () {
 
-        Route::get('dashboard', [DashboardController::class, 'adminDashboard'])->name('admin.dashboard');
+        Route::get('dashboard', [LoanDashboardController::class, 'adminDashboard'])->name('admin.dashboard');
 
         // Site Settings routes
         Route::get('settings', [SiteSettingsController::class, 'index'])->name('admin.settings.system');

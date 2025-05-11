@@ -19,6 +19,7 @@ class CurrencySeeder extends Seeder
                 'symbol' => '₦',
                 'decimal_places' => 2,
                 'is_active' => true,
+                'is_default' => true,
             ],
             [
                 'code' => 'USD',
@@ -32,14 +33,14 @@ class CurrencySeeder extends Seeder
                 'name' => 'Euro',
                 'symbol' => '€',
                 'decimal_places' => 2,
-                'is_active' => true,
+                'is_active' => false,
             ],
             [
                 'code' => 'GBP',
                 'name' => 'British Pound',
                 'symbol' => '£',
                 'decimal_places' => 2,
-                'is_active' => true,
+                'is_active' => false,
             ],
         ];
 

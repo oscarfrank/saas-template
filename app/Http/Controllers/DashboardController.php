@@ -33,7 +33,11 @@ class DashboardController extends Controller
         ];
 
         // Get loan statistics for each currency
-        $currencies = Currency::select('id', 'code', 'symbol', 'name')->get();
+        $currencies = Currency::select('id', 'code', 'symbol', 'name')
+            ->where('is_active', true)
+            ->orderBy('is_default', 'desc')
+            ->orderBy('code')
+            ->get();
         $loanStats = [];
 
         foreach ($currencies as $currency) {

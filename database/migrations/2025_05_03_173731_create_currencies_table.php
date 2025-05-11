@@ -39,13 +39,11 @@ return new class extends Migration
             $table->integer('confirmation_blocks')->nullable()->comment('Required confirmations for crypto transactions');
             
             // Status and System Information
-            $table->boolean('is_active')->default(true)->comment('Whether this currency is available for use');
-            $table->boolean('is_loan_available')->default(true)->comment('Available for loan packages');
-            $table->boolean('is_borrow_available')->default(true)->comment('Available for borrow packages');
+            $table->boolean('is_active')->default(true);
             
             // Limits
-            $table->decimal('min_transaction_amount', 20, 10)->nullable()->comment('Minimum transaction amount');
-            $table->decimal('max_transaction_amount', 20, 10)->nullable()->comment('Maximum transaction amount');
+            $table->decimal('min_transaction_amount', 20, 8)->nullable();
+            $table->decimal('max_transaction_amount', 20, 8)->nullable();
             
             // Fees
             $table->decimal('withdrawal_fee_fixed', 20, 10)->nullable()->comment('Fixed fee for withdrawals');

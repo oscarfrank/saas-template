@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\ApiSettingsController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPackageController;
 use App\Http\Controllers\EmailTemplateController;
+use App\Http\Controllers\CurrencyController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -160,6 +161,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Email Templates routes
         Route::resource('email-templates', EmailTemplateController::class);
         Route::put('email-templates/{emailTemplate}/toggle-status', [EmailTemplateController::class, 'toggleStatus'])->name('email-templates.toggle-status');
+
+        // Currency Management
+        Route::resource('currencies', CurrencyController::class);
+        Route::post('/currencies/{currency}/set-default', [CurrencyController::class, 'setDefault'])->name('currencies.set-default');
+        Route::post('/currencies/{currency}/toggle-active', [CurrencyController::class, 'toggleActive'])->name('currencies.toggle-active');
 
     });
 

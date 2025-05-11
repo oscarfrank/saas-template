@@ -28,6 +28,9 @@ Route::get('/calculator', [OuterPagesController::class, 'calculator'])->name('ca
 Route::get('/privacy', [OuterPagesController::class, 'privacy'])->name('privacy');
 Route::get('/about', [OuterPagesController::class, 'about'])->name('about');
 
+// Cron job route for checking completed loans
+Route::get('/cron/check-completed-loans', [App\Http\Controllers\CronController::class, 'checkCompletedLoans'])
+    ->name('cron.check-completed-loans');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 

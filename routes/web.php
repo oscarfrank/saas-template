@@ -13,6 +13,8 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\OuterPagesController;
 use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ApiSettingsController;
+use App\Http\Controllers\LoanController;
+use App\Http\Controllers\LoanPackageController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -69,6 +71,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/tickets/bulk-delete', [TicketController::class, 'bulkDelete'])->name('tickets.bulk-delete');
     Route::get('/tickets/export', [TicketController::class, 'export'])->name('tickets.export');
 
+    // Loan routes
+    Route::put('/loans/{loan}/status', [LoanController::class, 'updateStatus'])->name('loans.update-status');
+    Route::resource('loans', LoanController::class);
+    Route::get('loans.all', [LoanController::class, 'getAllLoans'])->name('loans.all');
+    Route::post('loans.export', [LoanController::class, 'export'])->name('loans.export');
+    Route::post('loans.bulk-delete', [LoanController::class, 'bulkDelete'])->name('loans.bulk-delete');
+    Route::post('loans.bulk-archive', [LoanController::class, 'bulkArchive'])->name('loans.bulk-archive');
+
+    // Loan Documents
+    Route::get('loans/{loan}/documents', [LoanController::class, 'documents'])->name('loans.documents');
+    Route::post('loans/{loan}/documents', [LoanController::class, 'uploadDocument'])->name('loans.documents.upload');
+    Route::delete('loans/{loan}/documents/{document}', [LoanController::class, 'deleteDocument'])->name('loans.documents.delete');
+
+    // Loan Payments
+    Route::post('loans/{loan}/payments', [LoanController::class, 'submitPayment'])->name('loans.payments.submit');
+    Route::post('loans/{loan}/payments/{payment}/approve', [LoanController::class, 'approvePayment'])->name('loans.payments.approve');
+    Route::post('loans/{loan}/payments/{payment}/reject', [LoanController::class, 'rejectPayment'])->name('loans.payments.reject');
+    Route::get('loans/{loan}/payments/{payment}/proof', [LoanController::class, 'downloadPaymentProof'])->name('loans.payments.proof');
+
+    // Loan Notes
+    Route::get('loans/{loan}/notes', [LoanController::class, 'notes'])->name('loans.notes');
+    Route::post('loans/{loan}/notes', [LoanController::class, 'addNote'])->name('loans.notes.add');
+    Route::put('loans/{loan}/notes/{note}', [LoanController::class, 'updateNote'])->name('loans.notes.update');
+    Route::delete('loans/{loan}/notes/{note}', [LoanController::class, 'deleteNote'])->name('loans.notes.delete');
+
+    // Loan Package routes
+    Route::get('loan-packages', [LoanPackageController::class, 'browse'])->name('loan-packages.browse');
+    Route::put('loan-packages/{loanPackage}/status', [LoanPackageController::class, 'updateStatus'])->name('loan-packages.update-status');
+    Route::get('loan-packages.all', [LoanPackageController::class, 'getAllLoans'])->name('loan-packages.all');
+    Route::post('loan-packages.export', [LoanPackageController::class, 'export'])->name('loan-packages.export');
+    Route::post('loan-packages.bulk-delete', [LoanPackageController::class, 'bulkDelete'])->name('loan-packages.bulk-delete');
+    Route::post('loan-packages.bulk-archive', [LoanPackageController::class, 'bulkArchive'])->name('loan-packages.bulk-archive');
+
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
     // ======================================================================
@@ -107,6 +142,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('users/{user}', [UserController::class, 'update'])->name('admin.users.update');
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('admin.users.destroy');
         Route::post('users/export', [UserController::class, 'export'])->name('admin.users.export');
+
+        // Loan Packages routes
+        Route::resource('loan-packages', LoanPackageController::class);
 
         // Ticket routes;
         Route::get('tickets', [TicketController::class, 'index'])->name('admin.tickets.index');

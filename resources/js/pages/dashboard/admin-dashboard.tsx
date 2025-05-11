@@ -177,7 +177,7 @@ export default function Dashboard() {
             icon: Handshake,
             items: [
                 { name: 'Loan Applications', href: '/admin/loans' },
-                { name: 'Loan Packages', href: '/admin/packages' },
+                { name: 'Loan Packages', href: '/admin/loan-packages' },
                 { name: 'Loan History', href: '/admin/loan-history' },
             ],
         },

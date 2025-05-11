@@ -83,7 +83,7 @@ export default function Dashboard() {
             title: 'Get Help',
             description: 'Contact support',
             icon: HelpCircle,
-            href: '/support',
+            href: '/tickets',
         },
     ];
 

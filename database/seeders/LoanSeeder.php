@@ -20,12 +20,13 @@ class LoanSeeder extends Seeder
         }
 
         // Get or create currencies
-        $currencies = Currency::take(3)->get();
+        $currencies = Currency::take(4)->get();
         if ($currencies->isEmpty()) {
             $currencies = collect([
                 ['code' => 'USD', 'name' => 'US Dollar', 'symbol' => '$'],
                 ['code' => 'EUR', 'name' => 'Euro', 'symbol' => '€'],
                 ['code' => 'GBP', 'name' => 'British Pound', 'symbol' => '£'],
+                ['code' => 'NGN', 'name' => 'Nigerian Naira', 'symbol' => '₦'],
             ])->map(function ($currency) {
                 return Currency::create($currency);
             });
@@ -76,7 +77,8 @@ class LoanSeeder extends Seeder
         // Generate 50 loans
         for ($i = 0; $i < 50; $i++) {
             $user = $users->random();
-            $currency = $currencies->random();
+            // Ensure some active loans use NGN
+            $currency = $i < 15 ? $currencies->where('code', 'NGN')->first() : $currencies->random();
             $package = $packages->random();
             
             // Generate random amount between package min and max

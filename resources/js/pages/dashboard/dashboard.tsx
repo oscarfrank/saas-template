@@ -23,7 +23,7 @@ export default function Dashboard() {
             <Head title="Dashboard - Admin" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold">{getGreeting()}, {user.name}</h3>
+                    <h3 className="text-xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
                     <h3>{hasRole(user, 'super-admin') ? 'Super Admin' : ''}</h3>
 
                 </div>

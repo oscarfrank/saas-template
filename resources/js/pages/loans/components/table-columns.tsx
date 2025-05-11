@@ -37,7 +37,9 @@ export type Loan = {
     reference_number: string;
     user: {
         id: number;
-        name: string;
+        first_name: string;
+        last_name: string;
+        email: string;
     };
     amount: number;
     currency: {
@@ -129,10 +131,9 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
     },
     {
         id: "user",
-        accessorKey: "user.name",
+        accessorFn: (row) => `${row.user.first_name} ${row.user.last_name}`,
         header: "Borrower",
         enableSorting: true,
-        enableHiding: true,
     },
     {
         id: "amount",

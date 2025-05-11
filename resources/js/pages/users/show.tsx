@@ -22,7 +22,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type User = {
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     created_at: string;
     updated_at: string;
@@ -51,9 +52,16 @@ export default function Show({ user }: { user: User }) {
                 <div className="grid gap-4 rounded-lg border p-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <h3 className="text-sm font-medium text-gray-500">Name</h3>
-                            <p className="mt-1">{user.name}</p>
+                            <h3 className="text-sm font-medium text-gray-500">First Name</h3>
+                            <p className="mt-1">{user.first_name}</p>
                         </div>
+                        <div>
+                            <h3 className="text-sm font-medium text-gray-500">Last Name</h3>
+                            <p className="mt-1">{user.last_name}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <h3 className="text-sm font-medium text-gray-500">Email</h3>
                             <p className="mt-1">{user.email}</p>

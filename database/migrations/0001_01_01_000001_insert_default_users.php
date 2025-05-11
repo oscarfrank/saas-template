@@ -11,7 +11,8 @@ return new class extends Migration
         // Admin User
         DB::table('users')->insert([
             'id' => 1,
-            'name' => 'Admin User',
+            'first_name' => 'Admin',
+            'last_name' => 'User',
             'email' => 'admin@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
@@ -21,7 +22,8 @@ return new class extends Migration
 
         DB::table('users')->insert([
             'id' => 2,
-            'name' => 'Oscar Frank',
+            'first_name' => 'Oscar',
+            'last_name' => 'Frank',
             'email' => 'oscar@localhost.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
@@ -32,7 +34,8 @@ return new class extends Migration
         // Premium Client
         DB::table('users')->insert([
             'id' => 3,
-            'name' => 'Premium Client',
+            'first_name' => 'Premium',
+            'last_name' => 'Client',
             'email' => 'premium@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
@@ -43,7 +46,8 @@ return new class extends Migration
         // VIP Investor
         DB::table('users')->insert([
             'id' => 4,
-            'name' => 'VIP Investor',
+            'first_name' => 'VIP',
+            'last_name' => 'Investor',
             'email' => 'vip@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
@@ -54,7 +58,8 @@ return new class extends Migration
         // Crypto Client
         DB::table('users')->insert([
             'id' => 5,
-            'name' => 'Crypto Client',
+            'first_name' => 'Crypto',
+            'last_name' => 'Client',
             'email' => 'crypto@example.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),

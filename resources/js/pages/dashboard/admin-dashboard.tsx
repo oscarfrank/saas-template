@@ -18,10 +18,11 @@ import {
     Shield, 
     Bell, 
     HelpCircle,
-    DollarSign,
+    Banknote,
     TrendingUp,
     AlertCircle,
-    Globe
+    Globe,
+    Mail
 } from 'lucide-react';
 import {
     Select,
@@ -30,6 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -38,129 +40,73 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Dashboard() {
+interface QuickStats {
+    total_users: number;
+    active_loans: number;
+    pending_applications: number;
+    support_tickets: number;
+}
+
+interface LoanStats {
+    [currency: string]: {
+        total_active_loan_amount: {
+            value: number;
+            trend: string;
+        };
+        total_pending_loan_balance: {
+            value: number;
+            trend: string;
+        };
+        average_loan_size: {
+            value: number;
+            trend: string;
+        };
+        default_rate: {
+            value: string;
+            trend: string;
+        };
+    };
+}
+
+interface RecentActivity {
+    type: string;
+    title: string;
+    description: string;
+    time: string;
+    user: string;
+}
+
+interface Currency {
+    id: number;
+    code: string;
+    symbol: string;
+    name: string;
+}
+
+interface Props {
+    quickStats: QuickStats;
+    loanStats: LoanStats;
+    recentActivity: RecentActivity[];
+    currencies: Currency[];
+}
+
+export default function Dashboard({ quickStats, loanStats, recentActivity, currencies }: Props) {
     const { user } = useAuth();
     const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
+    const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]?.code || 'USD');
 
-    const currencies = [
-        { code: 'USD', symbol: '$', name: 'US Dollar' },
-        { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-        { code: 'EUR', symbol: '€', name: 'Euro' },
-        { code: 'GBP', symbol: '£', name: 'British Pound' },
+    console.log('Quick Stats', quickStats);
+    console.log('Loan Stats', loanStats);
+    console.log('Recent Activity', recentActivity);
+    
+
+    const quickStatsData = [
+        { title: 'Total Users', value: quickStats.total_users.toLocaleString(), icon: Users, color: 'text-blue-500' },
+        { title: 'Active Loans', value: quickStats.active_loans.toLocaleString(), icon: Handshake, color: 'text-green-500' },
+        { title: 'Pending Applications', value: quickStats.pending_applications.toLocaleString(), icon: FileText, color: 'text-yellow-500' },
+        { title: 'Support Tickets', value: quickStats.support_tickets.toLocaleString(), icon: MessageSquare, color: 'text-red-500' },
     ];
-
-    const quickStats = [
-        { title: 'Total Users', value: '2,543', icon: Users, color: 'text-blue-500' },
-        { title: 'Active Loans', value: '1,234', icon: Handshake, color: 'text-green-500' },
-        { title: 'Pending Applications', value: '89', icon: FileText, color: 'text-yellow-500' },
-        { title: 'Support Tickets', value: '45', icon: MessageSquare, color: 'text-red-500' },
-    ];
-
-    const loanStats = {
-        USD: [
-            { 
-                title: 'Total Active Loan Amount', 
-                value: '$12,450,000', 
-                icon: DollarSign, 
-                color: 'text-green-500',
-                description: 'Sum of all active loans',
-                trend: '+12.5% from last month'
-            },
-            { 
-                title: 'Total Pending Loan Balance', 
-                value: '$3,250,000', 
-                icon: AlertCircle, 
-                color: 'text-yellow-500',
-                description: 'Sum of all pending loan applications',
-                trend: '+8.2% from last month'
-            },
-            { 
-                title: 'Average Loan Size', 
-                value: '$10,089', 
-                icon: TrendingUp, 
-                color: 'text-blue-500',
-                description: 'Average amount per loan',
-                trend: '+5.3% from last month'
-            },
-            { 
-                title: 'Default Rate', 
-                value: '2.3%', 
-                icon: Shield, 
-                color: 'text-red-500',
-                description: 'Percentage of defaulted loans',
-                trend: '-0.5% from last month'
-            },
-        ],
-        NGN: [
-            { 
-                title: 'Total Active Loan Amount', 
-                value: '₦1,245,000,000', 
-                icon: DollarSign, 
-                color: 'text-green-500',
-                description: 'Sum of all active loans',
-                trend: '+15.2% from last month'
-            },
-            { 
-                title: 'Total Pending Loan Balance', 
-                value: '₦325,000,000', 
-                icon: AlertCircle, 
-                color: 'text-yellow-500',
-                description: 'Sum of all pending loan applications',
-                trend: '+10.8% from last month'
-            },
-            { 
-                title: 'Average Loan Size', 
-                value: '₦1,008,900', 
-                icon: TrendingUp, 
-                color: 'text-blue-500',
-                description: 'Average amount per loan',
-                trend: '+7.3% from last month'
-            },
-            { 
-                title: 'Default Rate', 
-                value: '2.1%', 
-                icon: Shield, 
-                color: 'text-red-500',
-                description: 'Percentage of defaulted loans',
-                trend: '-0.3% from last month'
-            },
-        ],
-        EUR: [
-            { 
-                title: 'Total Active Loan Amount', 
-                value: '€11,250,000', 
-                icon: DollarSign, 
-                color: 'text-green-500',
-                description: 'Sum of all active loans',
-                trend: '+9.5% from last month'
-            },
-            { 
-                title: 'Total Pending Loan Balance', 
-                value: '€2,950,000', 
-                icon: AlertCircle, 
-                color: 'text-yellow-500',
-                description: 'Sum of all pending loan applications',
-                trend: '+6.8% from last month'
-            },
-            { 
-                title: 'Average Loan Size', 
-                value: '€9,125', 
-                icon: TrendingUp, 
-                color: 'text-blue-500',
-                description: 'Average amount per loan',
-                trend: '+4.2% from last month'
-            },
-            { 
-                title: 'Default Rate', 
-                value: '1.8%', 
-                icon: Shield, 
-                color: 'text-red-500',
-                description: 'Percentage of defaulted loans',
-                trend: '-0.4% from last month'
-            },
-        ],
-    };
 
     const adminSections = [
         {
@@ -188,6 +134,7 @@ export default function Dashboard() {
                 { name: 'Support Tickets', href: '/admin/tickets' },
                 { name: 'Announcements', href: '/admin/announcements' },
                 { name: 'Messages', href: '/admin/messages' },
+                { name: 'Email Templates', href: '/admin/email-templates' },
             ],
         },
         {
@@ -208,7 +155,7 @@ export default function Dashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-2xl font-semibold">{getGreeting()}, {user.name}</h3>
+                        <h3 className="text-2xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
                         <p className="text-muted-foreground">Welcome to your admin dashboard</p>
                     </div>
                     <div className="flex gap-2">
@@ -225,8 +172,8 @@ export default function Dashboard() {
 
                 {/* Quick Stats */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {quickStats.map((stat, index) => (
-                        <Card key={index}>
+                    {quickStatsData.map((stat, index) => (
+                        <Card key={index} className="cursor-pointer">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">
                                     {stat.title}
@@ -247,8 +194,11 @@ export default function Dashboard() {
                             <CardTitle>Loan Statistics</CardTitle>
                             <CardDescription>Overview of loan performance and metrics</CardDescription>
                         </div>
-                        <Select defaultValue="USD">
-                            <SelectTrigger className="w-[180px]">
+                        <Select 
+                            value={selectedCurrency} 
+                            onValueChange={(value) => setSelectedCurrency(value)}
+                        >
+                            <SelectTrigger className="w-[180px] cursor-pointer">
                                 <Globe className="mr-2 h-4 w-4" />
                                 <SelectValue placeholder="Select currency" />
                             </SelectTrigger>
@@ -263,17 +213,32 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            {loanStats.USD.map((stat, index) => (
-                                <div key={index} className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                                        <p className="text-sm text-muted-foreground">{stat.title}</p>
+                            {Object.entries(loanStats[selectedCurrency] || loanStats.USD).map(([key, stat], index) => {
+                                const currency = currencies.find(c => c.code === selectedCurrency);
+                                const formattedValue = new Intl.NumberFormat('en-US', {
+                                    style: 'currency',
+                                    currency: selectedCurrency,
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                }).format(Number(stat.value));
+
+                                return (
+                                    <div key={index} className="flex flex-col gap-1 cursor-pointer">
+                                        <div className="flex items-center gap-2">
+                                            {key === 'default_rate' ? (
+                                                <AlertCircle className={`h-4 w-4 ${stat.trend.includes('+') ? 'text-green-500' : 'text-red-500'}`} />
+                                            ) : (
+                                                <Banknote className={`h-4 w-4 ${stat.trend.includes('+') ? 'text-green-500' : 'text-red-500'}`} />
+                                            )}
+                                            <p className="text-sm text-muted-foreground">{key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</p>
+                                        </div>
+                                        <p className="text-2xl font-bold">
+                                            {key === 'default_rate' ? stat.value : formattedValue}
+                                        </p>
+                                        <p className="text-xs text-green-500">{stat.trend}</p>
                                     </div>
-                                    <p className="text-2xl font-bold">{stat.value}</p>
-                                    <p className="text-sm text-muted-foreground">{stat.description}</p>
-                                    <p className="text-xs text-green-500">{stat.trend}</p>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
@@ -294,7 +259,7 @@ export default function Dashboard() {
                                         <Button
                                             key={itemIndex}
                                             variant="ghost"
-                                            className="w-full justify-start"
+                                            className="w-full justify-start cursor-pointer"
                                             onClick={() => window.location.href = item.href}
                                         >
                                             {item.name}
@@ -313,20 +278,17 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div className="flex items-center gap-4">
-                                <div className="h-2 w-2 rounded-full bg-green-500" />
-                                <div>
-                                    <p className="text-sm font-medium">New loan application received</p>
-                                    <p className="text-xs text-muted-foreground">2 minutes ago</p>
+                            {recentActivity.map((activity, index) => (
+                                <div key={index} className="flex items-center gap-4 cursor-pointer">
+                                    <div className={`h-2 w-2 rounded-full ${
+                                        activity.type === 'loan_application' ? 'bg-green-500' : 'bg-blue-500'
+                                    }`} />
+                                    <div>
+                                        <p className="text-sm font-medium">{activity.title}</p>
+                                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="h-2 w-2 rounded-full bg-blue-500" />
-                                <div>
-                                    <p className="text-sm font-medium">User registration completed</p>
-                                    <p className="text-xs text-muted-foreground">15 minutes ago</p>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </CardContent>
                 </Card>

@@ -22,7 +22,8 @@ class UserController extends Controller
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%");
             });
         }
@@ -60,14 +61,16 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'role' => ['required', 'string', 'exists:roles,name'],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
@@ -98,13 +101,15 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'role' => ['required', 'string', 'exists:roles,name'],
         ]);
 
         $user->update([
-            'name' => $request->name,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
             'email' => $request->email,
         ]);
 
@@ -238,10 +243,11 @@ class UserController extends Controller
         $users = User::with('roles')->get();
 
         if ($format === 'csv') {
-            $headers = ['Name', 'Email', 'Roles', 'Created At'];
+            $headers = ['First Name', 'Last Name', 'Email', 'Roles', 'Created At'];
             $data = $users->map(function ($user) {
                 return [
-                    'name' => $user->name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
                     'email' => $user->email,
                     'roles' => $user->roles->pluck('name')->join(', '),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s')
@@ -259,7 +265,8 @@ class UserController extends Controller
         if ($format === 'json') {
             $data = $users->map(function ($user) {
                 return [
-                    'name' => $user->name,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
                     'email' => $user->email,
                     'roles' => $user->roles->pluck('name'),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s')

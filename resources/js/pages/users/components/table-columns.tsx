@@ -6,7 +6,8 @@ import { Link } from '@inertiajs/react';
 
 export type User = {
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     created_at: string;
     roles: Array<{
@@ -18,8 +19,12 @@ export const createColumns = (options?: {
     onDelete?: (user: User) => void;
 }): ColumnDef<User>[] => [
     {
-        accessorKey: 'name',
-        header: 'Name',
+        accessorKey: 'first_name',
+        header: 'First Name',
+    },
+    {
+        accessorKey: 'last_name',
+        header: 'Last Name',
     },
     {
         accessorKey: 'email',

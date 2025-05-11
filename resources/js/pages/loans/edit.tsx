@@ -21,7 +21,8 @@ interface Loan {
     reference_number: string;
     user: {
         id: number;
-        name: string;
+        first_name: string;
+        last_name: string;
         email: string;
     };
     amount: number;
@@ -67,7 +68,12 @@ interface Loan {
 
 interface Props {
     loan: Loan;
-    users: Array<{ id: number; name: string; email: string }>;
+    users: Array<{ 
+        id: number; 
+        first_name: string; 
+        last_name: string; 
+        email: string; 
+    }>;
     currencies: Array<{ id: number; code: string; symbol: string }>;
     packages: Array<{ id: number; name: string }>;
     customPackages: Array<{ id: number; name: string }>;
@@ -80,9 +86,11 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             type: 'select' as const, 
             label: 'Borrower', 
             required: true,
-            options: users.map(user => ({ value: user.id.toString(), label: user.name })),
-            optionLabel: 'name',
-            optionValue: 'id'
+            options: users.map(user => ({ 
+                value: user.id.toString(), 
+                label: `${user.first_name} ${user.last_name}` 
+            })),
+            defaultValue: loan.user.id.toString()
         },
         { 
             name: 'package_id', 
@@ -187,8 +195,30 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             type: 'date' as const, 
             label: 'End Date', 
             required: true
+        },
+        { 
+            name: 'status', 
+            type: 'select' as const, 
+            label: 'Status', 
+            required: true,
+            options: [
+                { value: 'draft', label: 'Draft' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'disbursed', label: 'Disbursed' },
+                { value: 'active', label: 'Active' },
+                { value: 'in_arrears', label: 'In Arrears' },
+                { value: 'defaulted', label: 'Defaulted' },
+                { value: 'paid', label: 'Paid' },
+                { value: 'closed', label: 'Closed' },
+                { value: 'cancelled', label: 'Cancelled' }
+            ]
         }
     ];
+
+    // Filter out the current user from the users list if editing
+    const availableUsers = users.filter(user => user.id !== loan.user.id);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -210,6 +240,7 @@ export default function Edit({ loan, users, currencies, packages, customPackages
                     }}
                     processing={false}
                     errors={{}}
+                    availableUsers={availableUsers}
                 />
             </div>
         </AppLayout>

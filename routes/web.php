@@ -37,6 +37,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard/borrower', [DashboardController::class, 'borrowerDashboard'])->name('borrower-dashboard');
     Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
 
+    // Route::get('/dashboard/admin', [DashboardController::class, 'adminDashboard'])->name('dashboard.admin');
+
     // KYC routes
     Route::get('kyc', [KycVerificationController::class, 'show'])->name('kyc.show');
     Route::get('kyc/submit', [KycVerificationController::class, 'create'])->name('kyc.create');

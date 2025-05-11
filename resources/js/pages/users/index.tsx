@@ -13,7 +13,7 @@ import axios from 'axios';
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Admin',
-        href: '/admin',
+        href: '/admin/dashboard',
     },
     {
         title: 'Users',
@@ -240,7 +240,7 @@ export default function Index({ users, pagination }: Props) {
                     onClose={() => setIsDeleteDialogOpen(false)}
                     onConfirm={handleDelete}
                     title="Are you sure?"
-                    description={`This action cannot be undone. This will permanently delete the user "${selectedUser?.name}" and all associated data including:
+                    description={`This action cannot be undone. This will permanently delete the user "${selectedUser?.first_name} ${selectedUser?.last_name}" and all associated data including:
 
 • All transactions (sent, received, created, processed, adjusted, or reviewed)
 • All KYC verifications

@@ -52,7 +52,7 @@ return new class extends Migration
             // Loan Status
             $table->enum('status', [
                 'draft',              // Application started but not submitted
-                'pending_approval',   // Submitted, awaiting admin review
+                'pending',   // Submitted, awaiting admin review
                 'approved',           // Approved but not yet disbursed
                 'rejected',           // Application rejected
                 'disbursed',          // Funds disbursed, loan active

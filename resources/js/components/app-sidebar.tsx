@@ -37,7 +37,12 @@ const mainNavItems: NavItem[] = [
         icon: Bell,
     },
     {
-        title: 'Loans',
+        title: 'Loan Packages',
+        href: '/loan-packages',
+        icon: Handshake,
+    },
+    {
+        title: 'My Loans',
         href: '/loans',
         icon: Handshake,
     },

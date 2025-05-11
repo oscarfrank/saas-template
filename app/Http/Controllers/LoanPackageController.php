@@ -114,7 +114,7 @@ class LoanPackageController extends Controller
 
         $loanPackage = LoanPackage::create($validated);
 
-        return redirect()->route('loan-packages.show', $loanPackage)
+        return redirect()->route('admin.loan-packages.show', $loanPackage)
             ->with('success', 'Loan package created successfully.');
     }
 
@@ -215,7 +215,7 @@ class LoanPackageController extends Controller
             ]);
         }
 
-        return redirect()->route('loan-packages.show', $loanPackage)
+        return redirect()->route('admin.loan-packages.show', $loanPackage)
             ->with('success', 'Loan package updated successfully.');
     }
 
@@ -234,7 +234,7 @@ class LoanPackageController extends Controller
 
         $loanPackage->delete();
 
-        return redirect()->route('loan-packages.index')
+        return redirect()->route('admin.loan-packages.index')
             ->with('success', 'Loan package deleted successfully.');
     }
 

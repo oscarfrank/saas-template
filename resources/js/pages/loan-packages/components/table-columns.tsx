@@ -76,7 +76,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
             const loanPackage = row.original;
             return (
                 <Link 
-                    href={route('loan-packages.show', loanPackage.id)}
+                    href={route('admin.loan-packages.show', loanPackage.id)}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("name")}
@@ -157,7 +157,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
             };
 
             const handleShare = () => {
-                const url = route('loan-packages.show', loanPackage.id);
+                const url = route('admin.loan-packages.show', loanPackage.id);
                 navigator.clipboard.writeText(url);
                 toast.success('Loan Package URL copied to clipboard');
             };
@@ -187,7 +187,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
 
             const handleDelete = () => {
                 setIsDeleting(true);
-                router.delete(route('loan-packages.destroy', loanPackage.id), {
+                router.delete(route('admin.loan-packages.destroy', loanPackage.id), {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
@@ -213,7 +213,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
 
             return (
                 <div className="flex items-center gap-2">
-                    <Link href={route('loan-packages.show', loanPackage.id)}>
+                    <Link href={route('admin.loan-packages.show', loanPackage.id)}>
                         <Button variant="outline" size="icon" className="cursor-pointer">
                             <Eye className="h-4 w-4" />
                         </Button>
@@ -226,7 +226,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild>
-                                <Link href={route('loan-packages.edit', loanPackage.id)} className="cursor-pointer">
+                                <Link href={route('admin.loan-packages.edit', loanPackage.id)} className="cursor-pointer">
                                     <Pencil className="mr-2 h-4 w-4" />
                                     Edit Package
                                 </Link>

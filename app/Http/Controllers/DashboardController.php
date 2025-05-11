@@ -11,6 +11,7 @@ use App\Models\Loan;
 use App\Models\Ticket;
 use App\Models\Currency;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\LoanDashboardController;
 
 class DashboardController extends Controller
 {
@@ -19,6 +20,13 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
+        $user = $request->user();
+        
+        // Check if user has 'user' role or no roles at all
+        if ($user->hasRole('user') || $user->roles->isEmpty()) {
+            return (new LoanDashboardController)->index($request);
+        }
+        
         return Inertia::render('dashboard/dashboard');
     }
 

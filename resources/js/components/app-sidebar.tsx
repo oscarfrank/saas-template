@@ -33,7 +33,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Notifications',
-        href: '/notifications',
+        href: '/activity',
         icon: Bell,
     },
     {

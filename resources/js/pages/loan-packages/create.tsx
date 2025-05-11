@@ -62,7 +62,7 @@ export default function Create({ currencies }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('loan-packages.store'), {
+        post(route('admin.loan-packages.store'), {
             preserveScroll: true,
         });
     };
@@ -352,7 +352,7 @@ export default function Create({ currencies }: Props) {
 
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-semibold">Create Loan Package</h1>
-                    <Link href={route('loan-packages.index')}>
+                    <Link href={route('admin.loan-packages.index')}>
                         <Button variant="outline">Cancel</Button>
                     </Link>
                 </div>

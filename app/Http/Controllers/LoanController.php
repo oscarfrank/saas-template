@@ -31,7 +31,12 @@ class LoanController extends Controller
      */
     public function create()
     {
-        return Inertia::render('loans/create');
+        return Inertia::render('loans/create', [
+            'users' => \App\Models\User::select('id', 'first_name', 'last_name', 'email')->get(),
+            'currencies' => \App\Models\Currency::select('id', 'code', 'symbol')->get(),
+            'packages' => \App\Models\LoanPackage::select('id', 'name')->get(),
+            'customPackages' => \App\Models\CustomPackage::select('id', 'name')->get(),
+        ]);
     }
 
     /**
@@ -99,7 +104,7 @@ class LoanController extends Controller
         
         return Inertia::render('loans/edit', [
             'loan' => $loan,
-            'users' => \App\Models\User::select('id', 'name', 'email')->get(),
+            'users' => \App\Models\User::select('id', 'first_name', 'last_name', 'email')->get(),
             'currencies' => \App\Models\Currency::select('id', 'code', 'symbol')->get(),
             'packages' => \App\Models\LoanPackage::select('id', 'name')->get(),
             'customPackages' => \App\Models\CustomPackage::select('id', 'name')->get(),

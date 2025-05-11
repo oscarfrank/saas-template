@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Admin',
-        href: '/admin',
+        href: '/admin/dashboard',
     },
     {
         title: 'Users',
@@ -28,7 +28,8 @@ type Role = {
 
 type User = {
     id: number;
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     roles: Array<{
         name: string;
@@ -37,7 +38,8 @@ type User = {
 
 export default function Edit({ user, roles }: { user: User; roles: Role[] }) {
     const { data, setData, put, processing, errors } = useForm({
-        name: user.name,
+        first_name: user.first_name,
+        last_name: user.last_name,
         email: user.email,
         password: '',
         password_confirmation: '',
@@ -62,14 +64,25 @@ export default function Edit({ user, roles }: { user: User; roles: Role[] }) {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="first_name">First Name</Label>
                         <Input
-                            id="name"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
+                            id="first_name"
+                            value={data.first_name}
+                            onChange={(e) => setData('first_name', e.target.value)}
                             required
                         />
-                        {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+                        {errors.first_name && <p className="text-sm text-red-500">{errors.first_name}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="last_name">Last Name</Label>
+                        <Input
+                            id="last_name"
+                            value={data.last_name}
+                            onChange={(e) => setData('last_name', e.target.value)}
+                            required
+                        />
+                        {errors.last_name && <p className="text-sm text-red-500">{errors.last_name}</p>}
                     </div>
 
                     <div className="space-y-2">

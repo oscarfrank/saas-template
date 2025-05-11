@@ -28,7 +28,8 @@ type Role = {
 
 export default function Create({ roles }: { roles: Role[] }) {
     const { data, setData, post, processing, errors } = useForm({
-        name: '',
+        first_name: '',
+        last_name: '',
         email: '',
         password: '',
         password_confirmation: '',
@@ -53,14 +54,25 @@ export default function Create({ roles }: { roles: Role[] }) {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="first_name">First Name</Label>
                         <Input
-                            id="name"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
+                            id="first_name"
+                            value={data.first_name}
+                            onChange={(e) => setData('first_name', e.target.value)}
                             required
                         />
-                        {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+                        {errors.first_name && <p className="text-sm text-red-500">{errors.first_name}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="last_name">Last Name</Label>
+                        <Input
+                            id="last_name"
+                            value={data.last_name}
+                            onChange={(e) => setData('last_name', e.target.value)}
+                            required
+                        />
+                        {errors.last_name && <p className="text-sm text-red-500">{errors.last_name}</p>}
                     </div>
 
                     <div className="space-y-2">

@@ -6,7 +6,7 @@ use App\Models\EmailTemplate;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-class EmailTemplateSeeder extends Seeder
+class LoanEmailTemplateSeeder extends Seeder
 {
     /**
      * Run the database seeds.

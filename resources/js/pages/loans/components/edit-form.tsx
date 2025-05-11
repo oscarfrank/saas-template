@@ -36,8 +36,15 @@ interface EditFormProps {
         optionValue?: string;
         min?: number;
         step?: number;
+        defaultValue?: string;
     }[];
     entityName: string;
+    availableUsers?: Array<{ 
+        id: number; 
+        first_name: string; 
+        last_name: string; 
+        email: string; 
+    }>;
 }
 
 interface LoanFormData {
@@ -55,9 +62,10 @@ interface LoanFormData {
     purpose?: string;
     start_date: string;
     end_date: string;
+    status: string;
 }
 
-export function EditForm({ entity, onSubmit, processing, errors, fields, entityName }: EditFormProps) {
+export function EditForm({ entity, onSubmit, processing, errors, fields, entityName, availableUsers }: EditFormProps) {
     const { data, setData, post, put } = useForm<LoanFormData>({
         user_id: entity?.user?.id.toString() ?? '',
         package_id: entity?.package?.id.toString() ?? '',
@@ -72,6 +80,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
         purpose: entity?.purpose ?? '',
         start_date: entity?.start_date ?? '',
         end_date: entity?.end_date ?? '',
+        status: entity?.status ?? 'draft',
     });
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -137,18 +146,26 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
                                     />
                                 ) : field.type === 'select' ? (
                                     <Select
-                                        value={value as string}
+                                        value={field.defaultValue || value as string}
                                         onValueChange={(value) => setData(field.name, value)}
                                     >
                                         <SelectTrigger className="mt-1">
                                             <SelectValue placeholder={`Select ${field.label}`} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {field.options?.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
+                                            {field.name === 'user_id' && availableUsers ? (
+                                                availableUsers.map((user) => (
+                                                    <SelectItem key={user.id} value={user.id.toString()}>
+                                                        {`${user.first_name} ${user.last_name}`}
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                field.options?.map((option) => (
+                                                    <SelectItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </SelectItem>
+                                                ))
+                                            )}
                                         </SelectContent>
                                     </Select>
                                 ) : field.type === 'date' ? (

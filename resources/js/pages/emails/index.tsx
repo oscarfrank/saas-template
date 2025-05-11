@@ -15,6 +15,10 @@ import { Badge } from "@/components/ui/badge";
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
+        title: 'Admin',
+        href: '/admin/dashboard',
+    },
+    {
         title: 'Email Templates',
         href: '/admin/email-templates',
     },

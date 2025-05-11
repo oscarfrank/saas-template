@@ -15,14 +15,29 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function Create() {
+interface Props {
+    users: Array<{ 
+        id: number; 
+        first_name: string; 
+        last_name: string; 
+        email: string; 
+    }>;
+    currencies: Array<{ id: number; code: string; symbol: string }>;
+    packages: Array<{ id: number; name: string }>;
+    customPackages: Array<{ id: number; name: string }>;
+}
+
+export default function Create({ users, currencies, packages, customPackages }: Props) {
     const fields = [
         { 
             name: 'user_id', 
             type: 'select' as const, 
             label: 'Borrower', 
             required: true,
-            options: [], // Will be populated from the backend
+            options: users.map(user => ({ 
+                value: user.id.toString(), 
+                label: `${user.first_name} ${user.last_name}` 
+            })),
             optionLabel: 'name',
             optionValue: 'id'
         },
@@ -31,7 +46,7 @@ export default function Create() {
             type: 'select' as const, 
             label: 'Loan Package', 
             required: true,
-            options: [], // Will be populated from the backend
+            options: packages.map(pkg => ({ value: pkg.id.toString(), label: pkg.name })),
             optionLabel: 'name',
             optionValue: 'id'
         },
@@ -40,7 +55,7 @@ export default function Create() {
             type: 'select' as const, 
             label: 'Custom Package', 
             required: false,
-            options: [], // Will be populated from the backend
+            options: customPackages.map(pkg => ({ value: pkg.id.toString(), label: pkg.name })),
             optionLabel: 'name',
             optionValue: 'id'
         },
@@ -56,7 +71,7 @@ export default function Create() {
             type: 'select' as const, 
             label: 'Currency', 
             required: true,
-            options: [], // Will be populated from the backend
+            options: currencies.map(currency => ({ value: currency.id.toString(), label: `${currency.code} (${currency.symbol})` })),
             optionLabel: 'code',
             optionValue: 'id'
         },
@@ -129,6 +144,25 @@ export default function Create() {
             type: 'date' as const, 
             label: 'End Date', 
             required: true
+        },
+        { 
+            name: 'status', 
+            type: 'select' as const, 
+            label: 'Status', 
+            required: true,
+            options: [
+                { value: 'draft', label: 'Draft' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'disbursed', label: 'Disbursed' },
+                { value: 'active', label: 'Active' },
+                { value: 'in_arrears', label: 'In Arrears' },
+                { value: 'defaulted', label: 'Defaulted' },
+                { value: 'paid', label: 'Paid' },
+                { value: 'closed', label: 'Closed' },
+                { value: 'cancelled', label: 'Cancelled' }
+            ]
         }
     ];
 

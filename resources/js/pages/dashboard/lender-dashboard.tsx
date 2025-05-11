@@ -102,7 +102,7 @@ export default function Dashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="text-2xl font-semibold">{getGreeting()}, {user.name}</h3>
+                        <h3 className="text-2xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
                         <p className="text-muted-foreground">Welcome to your lender dashboard</p>
                     </div>
                     <div className="flex gap-2">

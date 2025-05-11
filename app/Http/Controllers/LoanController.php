@@ -28,6 +28,21 @@ class LoanController extends Controller
     }
 
     /**
+     * Display a listing of the current user's loans.
+     */
+    public function userLoans()
+    {
+        $loans = Loan::with(['user', 'currency', 'package', 'customPackage'])
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->paginate(10);
+
+        return Inertia::render('loans/user-loans', [
+            'loans' => $loans
+        ]);
+    }
+
+    /**
      * Show the form for creating a new resource.
      */
     public function create()

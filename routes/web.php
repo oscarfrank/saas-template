@@ -32,9 +32,7 @@ Route::get('/about', [OuterPagesController::class, 'about'])->name('about');
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // Dashboard routes
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard/dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
     Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');
@@ -79,11 +77,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Loan routes
     Route::put('/loans/{loan}/status', [LoanController::class, 'updateStatus'])->name('loans.update-status');
-    Route::resource('loans', LoanController::class);
+    
     Route::get('loans.all', [LoanController::class, 'getAllLoans'])->name('loans.all');
     Route::post('loans.export', [LoanController::class, 'export'])->name('loans.export');
     Route::post('loans.bulk-delete', [LoanController::class, 'bulkDelete'])->name('loans.bulk-delete');
     Route::post('loans.bulk-archive', [LoanController::class, 'bulkArchive'])->name('loans.bulk-archive');
+
+    // User Loans route
+    Route::get('loans', [LoanController::class, 'userLoans'])->name('user-loans');
 
     // Loan Documents
     Route::get('loans/{loan}/documents', [LoanController::class, 'documents'])->name('loans.documents');
@@ -155,7 +156,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('users/export', [UserController::class, 'export'])->name('admin.users.export');
 
         // Loan Packages routes
-        Route::resource('loan-packages', LoanPackageController::class);
+        Route::resource('loan-packages', LoanPackageController::class)->names('admin.loan-packages');
+
+        // Loan routes
+        Route::resource('loans', LoanController::class);
 
         // Ticket routes;
         Route::get('tickets', [TicketController::class, 'index'])->name('admin.tickets.index');

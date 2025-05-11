@@ -122,12 +122,14 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
             ],
         },
         {
-            title: 'Loan Management',
+            title: 'Loan & Investment Management',
             icon: Handshake,
             items: [
                 { name: 'Loan Applications', href: '/admin/loans' },
                 { name: 'Loan Packages', href: '/admin/loan-packages' },
-                { name: 'Loan History', href: '/admin/loan-history' },
+
+                { name: 'Investment Applications', href: '/admin/investments' },
+                { name: 'Investment Packages', href: '/admin/investment-packages' },
             ],
         },
         {

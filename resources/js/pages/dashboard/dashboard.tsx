@@ -5,10 +5,11 @@ import { Head } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import { useRole } from '@/hooks/use-role';
 import { useGreeting } from '@/hooks/use-greeting';
+import { Link } from '@inertiajs/react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Dashboard - User',
+        title: 'Dashboard',
         href: '/dashboard',
     },
 ];
@@ -20,26 +21,38 @@ export default function Dashboard() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard - Admin" />
+            <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-8">
                     <h3 className="text-xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
-                    <h3>{hasRole(user, 'super-admin') ? 'Super Admin' : ''}</h3>
+                </div>
 
-                </div>
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                </div>
-                <div className="border-sidebar-border/70 dark:border-sidebar-border relative min-h-[100vh] flex-1 overflow-hidden rounded-xl border md:min-h-min">
-                    <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto w-full">
+                    {/* Borrower Dashboard Button */}
+                    <Link 
+                        href="/dashboard/borrower"
+                        className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-blue-500 hover:border-blue-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
+                    >
+                        <div className="text-4xl mb-4">💰</div>
+                        <h2 className="text-2xl font-bold mb-2 text-blue-600 dark:text-blue-400">Borrower Dashboard</h2>
+                        <p className="text-center text-gray-600 dark:text-gray-300">
+                            For individuals and businesses looking to secure funding for their projects and ventures
+                        </p>
+                        <div className="absolute inset-0 rounded-xl bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-200" />
+                    </Link>
+
+                    {/* Lender Dashboard Button */}
+                    <Link 
+                        href="/dashboard/lender"
+                        className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-green-500 hover:border-green-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
+                    >
+                        <div className="text-4xl mb-4">💎</div>
+                        <h2 className="text-2xl font-bold mb-2 text-green-600 dark:text-green-400">Lender Dashboard</h2>
+                        <p className="text-center text-gray-600 dark:text-gray-300">
+                            For investors looking to grow their portfolio and earn returns on their investments
+                        </p>
+                        <div className="absolute inset-0 rounded-xl bg-green-500/0 group-hover:bg-green-500/5 transition-all duration-200" />
+                    </Link>
                 </div>
             </div>
         </AppLayout>

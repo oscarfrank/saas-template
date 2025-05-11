@@ -88,7 +88,7 @@ export default function Index({ loanPackages }: Props) {
 
     const columns = createColumns({
         onDelete: (loanPackage) => {
-            router.delete(route('loan-packages.destroy', loanPackage.id), {
+            router.delete(route('admin.loan-packages.destroy', loanPackage.id), {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
@@ -144,14 +144,14 @@ export default function Index({ loanPackages }: Props) {
                         total: loanPackages.total
                     }}
                     onPageChange={(page) => {
-                        router.get(route('loan-packages.index'), { page }, {
+                        router.get(route('admin.loan-packages.index'), { page }, {
                             preserveState: true,
                             preserveScroll: true,
                             replace: true
                         });
                     }}
                     onSortChange={(sort, direction) => {
-                        router.get(route('loan-packages.index'), { sort, direction }, {
+                        router.get(route('admin.loan-packages.index'), { sort, direction }, {
                             preserveState: true,
                             preserveScroll: true,
                             replace: true
@@ -159,14 +159,14 @@ export default function Index({ loanPackages }: Props) {
                     }}
                     onSearchChange={(search) => {
                         const params = search ? { search } : {};
-                        router.get(route('loan-packages.index'), params, {
+                        router.get(route('admin.loan-packages.index'), params, {
                             preserveState: true,
                             preserveScroll: true,
                             replace: true
                         });
                     }}
                     onPerPageChange={(perPage) => {
-                        router.get(route('loan-packages.index'), { per_page: perPage }, {
+                        router.get(route('admin.loan-packages.index'), { per_page: perPage }, {
                             preserveState: true,
                             preserveScroll: true,
                             replace: true

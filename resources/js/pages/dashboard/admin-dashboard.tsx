@@ -81,6 +81,7 @@ interface Currency {
     code: string;
     symbol: string;
     name: string;
+    is_default: boolean;
 }
 
 interface Props {
@@ -94,7 +95,9 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
     const { user } = useAuth();
     const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
-    const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]?.code || 'USD');
+    const [selectedCurrency, setSelectedCurrency] = useState(
+        currencies.find(c => c.is_default)?.code || currencies[0]?.code
+    );
 
     console.log('Quick Stats', quickStats);
     console.log('Loan Stats', loanStats);
@@ -144,6 +147,7 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
                 { name: 'System Settings', href: '/admin/settings' },
                 { name: 'Security', href: '/admin/security' },
                 { name: 'API Management', href: '/admin/settings/api' },
+                { name: 'Currencies', href: '/admin/currencies' },
             ],
         },
     ];
@@ -213,7 +217,7 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                            {Object.entries(loanStats[selectedCurrency] || loanStats.USD).map(([key, stat], index) => {
+                            {Object.entries(loanStats[selectedCurrency] || loanStats[currencies.find(c => c.is_default)?.code || currencies[0]?.code]).map(([key, stat], index) => {
                                 const currency = currencies.find(c => c.code === selectedCurrency);
                                 const formattedValue = new Intl.NumberFormat('en-US', {
                                     style: 'currency',

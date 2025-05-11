@@ -18,6 +18,7 @@ use App\Http\Controllers\LoanPackageController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\LoanDashboardController;
+use App\Http\Controllers\ActivityController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -109,6 +110,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('loan-packages.bulk-delete', [LoanPackageController::class, 'bulkDelete'])->name('loan-packages.bulk-delete');
     Route::post('loan-packages.bulk-archive', [LoanPackageController::class, 'bulkArchive'])->name('loan-packages.bulk-archive');
 
+    // Activity routes
+    Route::get('/activity', [ActivityController::class, 'user'])->name('activity.user');
+    Route::get('/activity/load-more', [ActivityController::class, 'getUserLoadMore'])->name('activity.user.get-load-more');
+    Route::post('/activity/load-more', [ActivityController::class, 'userLoadMore'])->name('activity.user.load-more');
+
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
     // ======================================================================
@@ -167,6 +173,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('currencies', CurrencyController::class);
         Route::post('/currencies/{currency}/set-default', [CurrencyController::class, 'setDefault'])->name('currencies.set-default');
         Route::post('/currencies/{currency}/toggle-active', [CurrencyController::class, 'toggleActive'])->name('currencies.toggle-active');
+
+        // Activity routes
+        Route::get('/activity', [ActivityController::class, 'index'])->name('admin.activities');
+        Route::get('/activity/load-more', [ActivityController::class, 'getLoadMore'])->name('admin.activities.get-load-more');
+        Route::post('/activity/load-more', [ActivityController::class, 'loadMore'])
+            ->middleware(['web'])
+            ->name('admin.activities.load-more');
 
     });
 

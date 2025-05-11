@@ -35,7 +35,7 @@ class LoanDashboardController extends Controller
                     'id' => $loan->reference_number,
                     'amount' => $loan->currency->symbol . number_format($loan->amount, 2),
                     'status' => ucfirst($loan->status),
-                    'date' => $loan->submitted_at->format('F j, Y'),
+                    'date' => $loan->submitted_at ? $loan->submitted_at->format('F j, Y') : $loan->created_at->format('F j, Y'),
                     'icon' => $this->getStatusIcon($loan->status),
                     'color' => $this->getStatusColor($loan->status),
                 ];
@@ -43,7 +43,7 @@ class LoanDashboardController extends Controller
 
         // Get upcoming payments
         $upcomingPayments = [];
-        if ($currentLoan) {
+        if ($currentLoan && $currentLoan->next_payment_due_date) {
             $upcomingPayments[] = [
                 'date' => $currentLoan->next_payment_due_date->format('F j, Y'),
                 'amount' => $currentLoan->currency->symbol . number_format($currentLoan->next_payment_amount, 2),
@@ -55,7 +55,7 @@ class LoanDashboardController extends Controller
             'currentLoan' => $currentLoan ? [
                 'amount' => $currentLoan->currency->symbol . number_format($currentLoan->amount, 2),
                 'status' => ucfirst($currentLoan->status),
-                'nextPayment' => $currentLoan->next_payment_due_date->format('F j, Y'),
+                'nextPayment' => $currentLoan->next_payment_due_date ? $currentLoan->next_payment_due_date->format('F j, Y') : null,
                 'remainingBalance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
             ] : null,
             'applications' => $recentApplications,

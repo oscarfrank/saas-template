@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ApiSettingsController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPackageController;
+use App\Http\Controllers\EmailTemplateController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -153,6 +154,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // API Settings routes
         Route::get('/settings/api', [ApiSettingsController::class, 'index'])->name('admin.settings.api');
         Route::post('/settings/api', [ApiSettingsController::class, 'update'])->name('admin.settings.api.update');
+
+        // Email Templates routes
+        Route::resource('email-templates', EmailTemplateController::class);
+        Route::put('email-templates/{emailTemplate}/toggle-status', [EmailTemplateController::class, 'toggleStatus'])->name('email-templates.toggle-status');
 
     });
 

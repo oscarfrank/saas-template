@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
 
 class LoanPackageController extends Controller
 {
@@ -353,6 +354,11 @@ class LoanPackageController extends Controller
         ]);
 
         $loanPackage->update($validated);
+
+        Mail::send('emails.loans.loan-status-update', ['status' => 'DONE'], function ($message) {
+            $message->to('oscarminiblog@gmail.com')->subject('Loan Status Update');
+          });
+
 
         if ($request->wantsJson()) {
             return response()->json([

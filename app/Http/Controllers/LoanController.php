@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use App\Models\Transaction;
 use Illuminate\Support\Str;
+use App\Models\User;
 
 class LoanController extends Controller
 {
@@ -64,6 +65,14 @@ class LoanController extends Controller
         $validated['submitted_at'] = now();
 
         $loan = Loan::create($validated);
+
+        // Add Activity
+        activity()->log('Applied for a Loan', [
+            'loan_id' => $loan->id,
+            'user_id' => auth()->id(),
+            'loan_package_id' => $validated['package_id'],
+            'amount' => $validated['amount'],
+        ]);
 
         return redirect()->route('loans.show', $loan)
             ->with('success', 'Loan created successfully.');
@@ -134,6 +143,16 @@ class LoanController extends Controller
         ]);
 
         $loan->update($validated);
+
+        // Add Activity
+        activity()
+        ->withProperties([
+            'loan_id' => $loan->id,
+            'user_id' => auth()->id(),
+            'affected_user_id' => $validated['user_id'],
+            'affected_user_name' => User::find($validated['user_id'])->first_name . ' ' . User::find($validated['user_id'])->last_name
+        ])
+        ->log('Loan status updated to ' . strtoupper($validated['status']));
 
         return redirect()->route('loans.show', $loan)
             ->with('success', 'Loan updated successfully.');

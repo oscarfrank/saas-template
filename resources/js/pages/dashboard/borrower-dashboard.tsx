@@ -32,7 +32,7 @@ interface DashboardProps {
     currentLoan: {
         amount: string;
         status: string;
-        nextPayment: string;
+        nextPayment: string | null;
         remainingBalance: string;
     } | null;
     applications: Array<{
@@ -104,10 +104,12 @@ export default function Dashboard({ currentLoan, applications, upcomingPayments 
                         <p className="text-muted-foreground">Welcome to your borrower dashboard</p>
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                            <Bell className="mr-2 h-4 w-4" />
-                            Notifications
-                        </Button>
+                        <Link href="/activity">
+                            <Button variant="outline" size="sm" className="cursor-pointer">
+                                <Bell className="mr-2 h-4 w-4" />
+                                Notifications
+                            </Button>
+                        </Link>
                     </div>
                 </div>
 

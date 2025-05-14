@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->comment('User who applied for the loan');
             $table->foreignId('package_id')->nullable()->constrained('loan_packages')->nullOnDelete()->comment('Associated loan package if standard');
-            $table->foreignId('custom_package_id')->nullable()->constrained('custom_packages')->nullOnDelete()->comment('Associated custom package if custom');
             
             // Basic Loan Information
             $table->string('reference_number')->unique()->comment('Unique reference number for the loan');
@@ -33,7 +32,6 @@ return new class extends Migration
             $table->integer('duration_days')->comment('Loan duration in days');
             $table->date('start_date')->nullable()->comment('Actual start date of the loan');
             $table->date('end_date')->nullable()->comment('Expected end date of the loan');
-            $table->date('actual_end_date')->nullable()->comment('Actual end date if different');
             
             // Fees
             $table->decimal('origination_fee_amount', 15, 2)->default(0)->comment('Actual origination fee amount');
@@ -45,22 +43,16 @@ return new class extends Migration
             // Payment Details
             $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete()->comment('Payment method for disbursement');
             $table->foreignId('repayment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete()->comment('Payment method for repayments');
-            $table->decimal('monthly_payment_amount', 15, 2)->nullable()->comment('Calculated monthly payment amount');
-            $table->integer('total_payments')->nullable()->comment('Total number of payments');
-            $table->integer('completed_payments')->default(0)->comment('Number of completed payments');
             
             // Loan Status
             $table->enum('status', [
-                'draft',              // Application started but not submitted
                 'pending',   // Submitted, awaiting admin review
                 'approved',           // Approved but not yet disbursed
                 'rejected',           // Application rejected
-                'disbursed',          // Funds disbursed, loan active
                 'active',             // Loan is active and in good standing
                 'in_arrears',         // Loan has missed payments
                 'defaulted',          // Loan is in default
                 'paid',               // Loan fully paid
-                'closed',             // Loan closed for other reasons
                 'cancelled'           // Application cancelled before disbursement
             ])->default('draft');
             
@@ -68,10 +60,8 @@ return new class extends Migration
             $table->timestamp('submitted_at')->nullable();
             $table->timestamp('approved_at')->nullable();
             $table->timestamp('rejected_at')->nullable();
-            $table->timestamp('disbursed_at')->nullable();
             $table->timestamp('defaulted_at')->nullable();
             $table->timestamp('paid_at')->nullable();
-            $table->timestamp('closed_at')->nullable();
             
             // Approval Information
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
@@ -86,12 +76,8 @@ return new class extends Migration
             $table->decimal('principal_paid', 20, 2)->default(0)->comment('Amount of principal paid so far');
             $table->decimal('interest_paid', 20, 2)->default(0)->comment('Amount of interest paid so far');
             $table->decimal('fees_paid', 20, 2)->default(0)->comment('Amount of fees paid so far');
-            $table->decimal('principal_remaining', 20, 2)->nullable()->comment('Principal amount remaining');
-            $table->decimal('total_amount_due', 20, 2)->nullable()->comment('Total amount due (principal + interest + fees)');
-            $table->decimal('current_balance', 20, 2)->nullable()->comment('Current loan balance');
             
             // Delinquency Tracking
-            $table->integer('days_past_due')->default(0)->comment('Number of days past due');
             $table->date('next_payment_due_date')->nullable()->comment('Date when next payment is due');
             $table->decimal('next_payment_amount', 15, 2)->nullable()->comment('Amount of next payment due');
             $table->date('last_payment_date')->nullable()->comment('Date of last payment received');
@@ -110,18 +96,15 @@ return new class extends Migration
             
             // Contract and Documents
             $table->string('contract_document')->nullable()->comment('Loan agreement document');
-            $table->timestamp('contract_signed_at')->nullable();
             
             // Communication
             $table->text('admin_notes')->nullable()->comment('Internal admin notes');
-            $table->text('user_notes')->nullable()->comment('Notes from user');
             
             // Auto-payments
             $table->boolean('auto_payments_enabled')->default(false);
             $table->date('auto_payment_start_date')->nullable();
             
             // System Fields
-            $table->boolean('is_test_loan')->default(false)->comment('Whether this is a test loan');
             $table->json('metadata')->nullable()->comment('Additional metadata');
             
             // Standard timestamps

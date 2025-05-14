@@ -87,7 +87,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('loans.bulk-archive', [LoanController::class, 'bulkArchive'])->name('loans.bulk-archive');
 
     // User Loans route
-    Route::get('loans', [LoanController::class, 'userLoans'])->name('user-loans');
+    Route::get('/loans', [LoanController::class, 'userIndex'])->name('user-loans');
+    Route::get('/loans/{loan}', [LoanController::class, 'userShow'])->name('user-loans.show');
+    Route::get('/loans/{loan}/documents', [LoanController::class, 'userDocuments'])->name('user-loans.documents');
+    Route::get('/loans/{loan}/notes', [LoanController::class, 'userNotes'])->name('user-loans.notes');
+    Route::post('/loans/{loan}/documents', [LoanController::class, 'userUploadDocument'])->name('user-loans.documents.upload');
+    Route::get('/loans/{loan}/documents/{document}', [LoanController::class, 'userDownloadDocument'])->name('user-loans.documents.download');
+    Route::post('/loans/{loan}/payments', [LoanController::class, 'userSubmitPayment'])->name('user-loans.payments.submit');
+    Route::get('/loans/{loan}/payments/{payment}/proof', [LoanController::class, 'userDownloadPaymentProof'])->name('user-loans.payments.download-proof');
+    Route::delete('/loans/{loan}', [LoanController::class, 'userCancel'])->name('user-loans.cancel');
 
     // Loan Documents
     Route::get('loans/{loan}/documents', [LoanController::class, 'documents'])->name('loans.documents');

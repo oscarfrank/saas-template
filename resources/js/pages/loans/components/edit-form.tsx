@@ -80,7 +80,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
         purpose: entity?.purpose ?? '',
         start_date: entity?.start_date ?? '',
         end_date: entity?.end_date ?? '',
-        status: entity?.status ?? 'draft',
+        status: entity?.status ?? 'pending',
     });
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {

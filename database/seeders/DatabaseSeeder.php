@@ -18,9 +18,9 @@ class DatabaseSeeder extends Seeder
         $this->call([
             // UserSeeder::class,
             PaymentMethodSeeder::class,
-            ProductSeeder::class,
-            TransactionSeeder::class,
-            LoanSeeder::class,
+            // ProductSeeder::class,
+            // TransactionSeeder::class,
+            // LoanSeeder::class,
             EmailTemplateSeeder::class,
             LoanEmailTemplateSeeder::class,
         ]);

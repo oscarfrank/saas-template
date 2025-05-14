@@ -88,16 +88,13 @@ interface TableColumnsProps {
 
 const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-        draft: 'bg-gray-500',
-        pending_approval: 'bg-yellow-500',
+        pending: 'bg-yellow-500',
         approved: 'bg-blue-500',
         rejected: 'bg-red-500',
-        disbursed: 'bg-purple-500',
         active: 'bg-green-500',
         in_arrears: 'bg-orange-500',
         defaulted: 'bg-red-600',
         paid: 'bg-green-600',
-        closed: 'bg-gray-600',
         cancelled: 'bg-red-400'
     };
     return colors[status] || 'bg-gray-500';

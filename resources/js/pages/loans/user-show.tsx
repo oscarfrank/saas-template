@@ -1,5 +1,5 @@
 import { PageProps } from '@/types';
-import { Head, useForm, Link, router, usePage } from '@inertiajs/react';
+import { Head, useForm, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, DollarSign } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -101,32 +101,20 @@ interface Props extends PageProps {
         name: string;
         method_type: string;
     }>;
-    auth: {
-        user: {
-            id: number;
-            name: string;
-            email: string;
-            roles: string[];
-        };
-    };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Loans',
+        title: 'My Loans',
         href: '/loans',
     },
     {
-        title: 'View Loan',
+        title: 'Loan Details',
         href: '/loans/view',
     },
 ];
 
-export default function Show({ loan, payment_methods, auth }: Props) {
-    const { data, setData, post, processing } = useForm({
-        content: '',
-    });
-
+export default function UserShow({ loan, payment_methods }: Props) {
     const { data: documentData, setData: setDocumentData, post: postDocument, processing: documentProcessing } = useForm({
         file: null as File | null,
         type: '',
@@ -141,16 +129,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
     });
 
     const [activeTab, setActiveTab] = useState('details');
-
-    const handleAddNote = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(route('loans.notes.add', loan.id), {
-            onSuccess: () => {
-                toast.success('Note added successfully');
-                setData('content', '');
-            },
-        });
-    };
 
     const handleDocumentUpload = (e: React.FormEvent) => {
         e.preventDefault();
@@ -233,19 +211,13 @@ export default function Show({ loan, payment_methods, auth }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`View Loan - ${loan.reference_number}`} />
+            <Head title={`Loan Details - ${loan.reference_number}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('loans.index')}>
+                    <Link href={route('user-loans')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Loans
-                        </Button>
-                    </Link>
-                    <Link href={route('loans.edit', loan.id)}>
-                        <Button className="cursor-pointer">
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Loan
                         </Button>
                     </Link>
                 </div>
@@ -273,7 +245,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                     <TabsList>
                         <TabsTrigger value="details">Details</TabsTrigger>
                         <TabsTrigger value="documents">Documents</TabsTrigger>
-                        <TabsTrigger value="notes">Notes</TabsTrigger>
                         <TabsTrigger value="payments">Payments</TabsTrigger>
                     </TabsList>
 
@@ -307,22 +278,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                     <div>
                                         <p className="text-sm font-medium">Purpose</p>
                                         <p>{loan.purpose || 'N/A'}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Borrower Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <p className="text-sm font-medium">Name</p>
-                                        <p>{loan.user.name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Email</p>
-                                        <p>{loan.user.email}</p>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -395,7 +350,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Loan Documents</CardTitle>
-                                <CardDescription>Upload and manage loan-related documents</CardDescription>
+                                <CardDescription>View and upload loan-related documents</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
@@ -454,8 +409,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                 Type: {document.type.replace('_', ' ').toUpperCase()}
                                                             </p>
                                                             <p className="text-sm text-muted-foreground">
-                                                                Uploaded by {document.uploadedBy?.name || 'Unknown'} on{' '}
-                                                                {format(new Date(document.created_at), 'PPP p')}
+                                                                Uploaded on {format(new Date(document.created_at), 'PPP p')}
                                                             </p>
                                                             {document.description && (
                                                                 <p className="text-sm mt-2">{document.description}</p>
@@ -469,22 +423,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                             >
                                                                 Download
                                                             </Button>
-                                                            <Button
-                                                                variant="destructive"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    if (confirm('Are you sure you want to delete this document?')) {
-                                                                        router.delete(route('loans.documents.delete', [loan.id, document.id]), {
-                                                                            preserveScroll: true,
-                                                                            onSuccess: () => {
-                                                                                toast.success('Document deleted successfully');
-                                                                            },
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                Delete
-                                                            </Button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -492,77 +430,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                             {(!loan.documents || loan.documents.length === 0) && (
                                                 <p className="text-muted-foreground">No documents uploaded yet.</p>
                                             )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="notes">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Loan Notes</CardTitle>
-                                <CardDescription>Add and view notes about this loan</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <form onSubmit={handleAddNote} className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium mb-2">Add Note</label>
-                                            <Textarea
-                                                value={data.content}
-                                                onChange={e => setData('content', e.target.value)}
-                                                placeholder="Enter your note here..."
-                                                rows={4}
-                                                required
-                                            />
-                                        </div>
-                                        <Button type="submit" disabled={processing}>
-                                            Add Note
-                                        </Button>
-                                    </form>
-
-                                    <div className="mt-6">
-                                        <h3 className="text-lg font-medium mb-4">Previous Notes</h3>
-                                        <div className="space-y-4">
-                                            {loan.notes?.map(note => (
-                                                <div key={note.id} className="border rounded-lg p-4">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div>
-                                                            <p className="font-medium">{note.created_by.name}</p>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                {format(new Date(note.created_at), 'PPP p')}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            {note.updated_at !== note.created_at && (
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Edited by {note.updated_by.name} on{' '}
-                                                                    {format(new Date(note.updated_at), 'PPP p')}
-                                                                </p>
-                                                            )}
-                                                            <Button
-                                                                variant="destructive"
-                                                                size="sm"
-                                                                onClick={() => {
-                                                                    if (confirm('Are you sure you want to delete this note?')) {
-                                                                        router.delete(route('loans.notes.delete', [loan.id, note.id]), {
-                                                                            preserveScroll: true,
-                                                                            onSuccess: () => {
-                                                                                toast.success('Note deleted successfully');
-                                                                            },
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                Delete
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <p className="whitespace-pre-wrap">{note.content}</p>
-                                                </div>
-                                            ))}
                                         </div>
                                     </div>
                                 </div>
@@ -650,73 +517,75 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                         </div>
                                     </div>
 
-                                    <div className="mt-6">
-                                        <h3 className="text-lg font-medium mb-4">Make a Payment</h3>
-                                        <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                                            <div>
-                                                <Label htmlFor="payment_method">Payment Method</Label>
-                                                <Select
-                                                    value={paymentData.payment_method_id}
-                                                    onValueChange={(value) => setPaymentData('payment_method_id', value)}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select payment method" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {payment_methods.map((method) => (
-                                                            <SelectItem key={method.id} value={String(method.id)}>
-                                                                {method.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                    {loan.status === 'active' && (
+                                        <div className="mt-6">
+                                            <h3 className="text-lg font-medium mb-4">Make a Payment</h3>
+                                            <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                                                <div>
+                                                    <Label htmlFor="payment_method">Payment Method</Label>
+                                                    <Select
+                                                        value={paymentData.payment_method_id}
+                                                        onValueChange={(value) => setPaymentData('payment_method_id', value)}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select payment method" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {payment_methods.map((method) => (
+                                                                <SelectItem key={method.id} value={String(method.id)}>
+                                                                    {method.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
 
-                                            <div>
-                                                <Label htmlFor="amount">Payment Amount</Label>
-                                                <Input
-                                                    id="amount"
-                                                    type="number"
-                                                    value={paymentData.amount}
-                                                    onChange={(e) => setPaymentData('amount', e.target.value)}
-                                                    min={loan.next_payment_amount}
-                                                    step="0.01"
-                                                    required
-                                                />
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Minimum payment: {formatCurrency(loan.next_payment_amount, loan.currency.code)}
-                                                </p>
-                                            </div>
+                                                <div>
+                                                    <Label htmlFor="amount">Payment Amount</Label>
+                                                    <Input
+                                                        id="amount"
+                                                        type="number"
+                                                        value={paymentData.amount}
+                                                        onChange={(e) => setPaymentData('amount', e.target.value)}
+                                                        min={loan.next_payment_amount}
+                                                        step="0.01"
+                                                        required
+                                                    />
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        Minimum payment: {formatCurrency(loan.next_payment_amount, loan.currency.code)}
+                                                    </p>
+                                                </div>
 
-                                            <div>
-                                                <Label htmlFor="payment_proof">Payment Proof</Label>
-                                                <Input
-                                                    id="payment_proof"
-                                                    type="file"
-                                                    onChange={(e) => setPaymentData('payment_proof', e.target.files?.[0] || null)}
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    required
-                                                />
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Upload receipt, screenshot, or other proof of payment
-                                                </p>
-                                            </div>
+                                                <div>
+                                                    <Label htmlFor="payment_proof">Payment Proof</Label>
+                                                    <Input
+                                                        id="payment_proof"
+                                                        type="file"
+                                                        onChange={(e) => setPaymentData('payment_proof', e.target.files?.[0] || null)}
+                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                        required
+                                                    />
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        Upload receipt, screenshot, or other proof of payment
+                                                    </p>
+                                                </div>
 
-                                            <div>
-                                                <Label htmlFor="notes">Notes</Label>
-                                                <Textarea
-                                                    id="notes"
-                                                    value={paymentData.notes}
-                                                    onChange={(e) => setPaymentData('notes', e.target.value)}
-                                                    placeholder="Add any additional information about your payment"
-                                                />
-                                            </div>
+                                                <div>
+                                                    <Label htmlFor="notes">Notes</Label>
+                                                    <Textarea
+                                                        id="notes"
+                                                        value={paymentData.notes}
+                                                        onChange={(e) => setPaymentData('notes', e.target.value)}
+                                                        placeholder="Add any additional information about your payment"
+                                                    />
+                                                </div>
 
-                                            <Button type="submit" disabled={paymentProcessing}>
-                                                Submit Payment
-                                            </Button>
-                                        </form>
-                                    </div>
+                                                <Button type="submit" disabled={paymentProcessing}>
+                                                    Submit Payment
+                                                </Button>
+                                            </form>
+                                        </div>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

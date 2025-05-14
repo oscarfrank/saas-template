@@ -10,9 +10,15 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Transaction;
 use Illuminate\Support\Str;
 use App\Models\User;
+use App\Models\PaymentMethod;
+use App\Models\LoanDocument;
+use App\Models\LoanPayment;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class LoanController extends Controller
 {
+    use AuthorizesRequests;
+
     /**
      * Display a listing of the resource.
      */
@@ -97,7 +103,7 @@ class LoanController extends Controller
             'amount' => $validated['amount'],
         ]);
 
-        return redirect()->route('loans.show', $loan)
+        return redirect()->route('user-loans.show', $loan)
             ->with('success', 'Loan created successfully.');
     }
 
@@ -151,7 +157,7 @@ class LoanController extends Controller
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'package_id' => 'nullable|exists:loan_packages,id',
-            'custom_package_id' => 'nullable|exists:custom_packages,id',
+            // 'custom_package_id' => 'nullable|exists:custom_packages,id',
             'amount' => 'required|numeric|min:0',
             'currency_id' => 'required|exists:currencies,id',
             'interest_rate' => 'required|numeric|min:0',
@@ -162,7 +168,7 @@ class LoanController extends Controller
             'purpose' => 'nullable|string',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
-            'status' => 'required|in:draft,pending_approval,approved,rejected,disbursed,active,in_arrears,defaulted,paid,closed,cancelled',
+            'status' => 'required|in:pending,approved,rejected,active,in_arrears,defaulted,paid,cancelled',
         ]);
 
         $loan->update($validated);
@@ -539,7 +545,7 @@ class LoanController extends Controller
     public function updateStatus(Request $request, Loan $loan)
     {
         $validated = $request->validate([
-            'status' => 'required|in:draft,pending_approval,approved,rejected,disbursed,active,in_arrears,defaulted,paid,closed,cancelled',
+            'status' => 'required|in:pending,approved,rejected,active,in_arrears,defaulted,paid,cancelled',
         ]);
 
         $loan->update($validated);
@@ -552,5 +558,208 @@ class LoanController extends Controller
         }
 
         return redirect()->back()->with('success', 'Loan status updated successfully.');
+    }
+
+    /**
+     * Display a listing of the user's loans.
+     */
+    public function userIndex()
+    {
+        $loans = auth()->user()->loans()
+            ->with(['currency', 'user'])
+            ->latest()
+            ->paginate(10);
+
+        return Inertia::render('loans/user-loans', [
+            'loans' => $loans,
+        ]);
+    }
+
+    /**
+     * Display the specified loan for the user.
+     */
+    public function userShow(Loan $loan)
+    {
+        // Simple check to ensure user can only view their own loans
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $loan->load([
+            'currency',
+            'user',
+            'documents',
+            'notes' => function ($query) {
+                $query->with(['createdBy', 'updatedBy']);
+            },
+            'payments' => function ($query) {
+                $query->orderBy('due_date', 'desc');
+            },
+        ]);
+
+        return Inertia::render('loans/user-show', [
+            'loan' => $loan,
+            'payment_methods' => PaymentMethod::all(),
+        ]);
+    }
+
+    /**
+     * Display the documents for a specific loan.
+     */
+    public function userDocuments(Loan $loan)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $loan->load('documents');
+
+        return Inertia::render('loans/user-documents', [
+            'loan' => $loan,
+        ]);
+    }
+
+    /**
+     * Display the notes for a specific loan.
+     */
+    public function userNotes(Loan $loan)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $loan->load(['notes' => function ($query) {
+            $query->with(['createdBy', 'updatedBy']);
+        }]);
+
+        return Inertia::render('loans/user-notes', [
+            'loan' => $loan,
+        ]);
+    }
+
+    /**
+     * Upload a document for a loan.
+     */
+    public function userUploadDocument(Request $request, Loan $loan)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'file' => 'required|file|max:10240', // 10MB max
+            'type' => 'required|string',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store('loan-documents');
+
+        $document = $loan->documents()->create([
+            'name' => $file->getClientOriginalName(),
+            'type' => $validated['type'],
+            'file_path' => $path,
+            'file_size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'description' => $validated['description'],
+            'uploaded_by' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Document uploaded successfully.');
+    }
+
+    /**
+     * Download a loan document.
+     */
+    public function userDownloadDocument(Loan $loan, LoanDocument $document)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($document->loan_id !== $loan->id) {
+            abort(404);
+        }
+
+        return Storage::download($document->file_path, $document->name);
+    }
+
+    /**
+     * Submit a payment for a loan.
+     */
+    public function userSubmitPayment(Request $request, Loan $loan)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($loan->status !== 'active') {
+            return back()->with('error', 'Payments can only be made on active loans.');
+        }
+
+        $validated = $request->validate([
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'amount' => 'required|numeric|min:' . $loan->next_payment_amount,
+            'payment_proof' => 'required|file|max:10240', // 10MB max
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $file = $request->file('payment_proof');
+        $path = $file->store('payment-proofs');
+
+        $payment = $loan->payments()->create([
+            'payment_number' => $loan->payments()->count() + 1,
+            'amount' => $validated['amount'],
+            'status' => 'pending',
+            'due_date' => $loan->next_payment_due_date,
+            'payer_name' => auth()->user()->name,
+            'notes' => $validated['notes'],
+            'attachment' => $path,
+        ]);
+
+        return back()->with('success', 'Payment submitted successfully.');
+    }
+
+    /**
+     * Download payment proof.
+     */
+    public function userDownloadPaymentProof(Loan $loan, LoanPayment $payment)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($payment->loan_id !== $loan->id) {
+            abort(404);
+        }
+
+        if (!$payment->attachment) {
+            abort(404);
+        }
+
+        return Storage::download($payment->attachment, 'payment-proof-' . $payment->id);
+    }
+
+    /**
+     * Cancel a loan application.
+     */
+    public function userCancel(Loan $loan)
+    {
+        if ($loan->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($loan->status !== 'pending') {
+            return back()->with('error', 'Only pending loans can be cancelled.');
+        }
+
+        $loan->update([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancelled_by' => auth()->id(),
+        ]);
+
+        return redirect()->route('user-loans')
+            ->with('success', 'Loan application cancelled successfully.');
     }
 }

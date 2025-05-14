@@ -202,16 +202,13 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             label: 'Status', 
             required: true,
             options: [
-                { value: 'draft', label: 'Draft' },
                 { value: 'pending', label: 'Pending' },
                 { value: 'approved', label: 'Approved' },
                 { value: 'rejected', label: 'Rejected' },
-                { value: 'disbursed', label: 'Disbursed' },
                 { value: 'active', label: 'Active' },
                 { value: 'in_arrears', label: 'In Arrears' },
                 { value: 'defaulted', label: 'Defaulted' },
                 { value: 'paid', label: 'Paid' },
-                { value: 'closed', label: 'Closed' },
                 { value: 'cancelled', label: 'Cancelled' }
             ]
         }

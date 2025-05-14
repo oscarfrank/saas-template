@@ -3,7 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Table } from './components/table';
-import { createColumns } from './components/table-columns';
+import { createUserColumns } from './components/user-table-columns';
 import { type Loan } from './components/table-columns';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -134,7 +134,7 @@ export default function UserLoans({ loans }: Props) {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Loan deleted successfully');
+                toast.success('Loan application cancelled successfully');
                 setIsDeleteDialogOpen(false);
                 setSelectedLoan(null);
                 setKey(prev => prev + 1);
@@ -145,12 +145,12 @@ export default function UserLoans({ loans }: Props) {
                     },
                     onError: () => {
                         setIsLoading(false);
-                        toast.error('Failed to refresh data after deletion');
+                        toast.error('Failed to refresh data after cancellation');
                     }
                 });
             },
             onError: () => {
-                toast.error('Failed to delete loan');
+                toast.error('Failed to cancel loan application');
                 setIsLoading(false);
             }
         });
@@ -164,7 +164,7 @@ export default function UserLoans({ loans }: Props) {
         }
     }, [loans.data]);
 
-    const columns = createColumns({
+    const columns = createUserColumns({
         onDelete: handleDeleteClick
     });
 
@@ -206,8 +206,8 @@ export default function UserLoans({ loans }: Props) {
                     isOpen={isDeleteDialogOpen}
                     onClose={() => setIsDeleteDialogOpen(false)}
                     onConfirm={handleDelete}
-                    title="Are you sure?"
-                    description={`This action cannot be undone. This will permanently delete the loan "${selectedLoan?.reference_number}".`}
+                    title="Cancel Loan Application?"
+                    description={`Are you sure you want to cancel your loan application "${selectedLoan?.reference_number}"? This action cannot be undone.`}
                     isLoading={isLoading}
                 />
             </div>

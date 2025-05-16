@@ -171,6 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Loan routes
         Route::resource('loans', LoanController::class);
+        Route::put('loans/{loan}/status', [LoanController::class, 'updateStatus'])->name('loans.update-status');
 
         // Ticket routes;
         Route::get('tickets', [TicketController::class, 'index'])->name('admin.tickets.index');

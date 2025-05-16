@@ -14,6 +14,7 @@ use App\Models\PaymentMethod;
 use App\Models\LoanDocument;
 use App\Models\LoanPayment;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 
 class LoanController extends Controller
 {
@@ -115,6 +116,8 @@ class LoanController extends Controller
         $loan->load([
             'user',
             'currency',
+            'approved_by_user:id,first_name,last_name,email',
+            'payment_method',
             'documents' => function ($query) {
                 $query->with('uploadedBy')
                       ->orderBy('created_at', 'desc');
@@ -540,24 +543,85 @@ class LoanController extends Controller
     }
 
     /**
-     * Update just the status of a loan
+     * Update the loan status
+     *
+     * @param Request $request
+     * @param Loan $loan
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function updateStatus(Request $request, Loan $loan)
     {
-        $validated = $request->validate([
-            'status' => 'required|in:pending,approved,rejected,active,in_arrears,defaulted,paid,cancelled',
+        $request->validate([
+            'status' => ['required', 'string', Rule::in([
+                'pending',
+                'approved',
+                'rejected',
+                'active',
+                'in_arrears',
+                'defaulted',
+                'paid',
+                'cancelled'
+            ])],
+            'approval_notes' => ['nullable', 'string', 'required_if:status,approved'],
+            'rejection_reason' => ['nullable', 'string', 'required_if:status,rejected'],
+            'payment_method_id' => ['nullable', 'exists:payment_methods,id', 'required_if:status,active'],
+            'disbursement_transaction_id' => ['nullable', 'string', 'required_if:status,active'],
+            'start_date' => ['nullable', 'date', 'required_if:status,active'],
+            'end_date' => ['nullable', 'date', 'after:start_date', 'required_if:status,active'],
         ]);
 
-        $loan->update($validated);
+        $oldStatus = $loan->status;
+        $newStatus = $request->status;
 
-        if ($request->wantsJson()) {
-            return response()->json([
-                'message' => 'Loan status updated successfully',
-                'loan' => $loan
-            ]);
+        // Update the status
+        $loan->status = $newStatus;
+
+        // Update the corresponding timestamp and related information
+        switch ($newStatus) {
+            case 'approved':
+                $loan->approved_at = now();
+                $loan->approved_by = auth()->id();
+                $loan->approval_notes = $request->approval_notes;
+                break;
+            case 'rejected':
+                $loan->rejected_at = now();
+                $loan->rejection_reason = $request->rejection_reason;
+                break;
+            case 'active':
+                $loan->start_date = $request->start_date;
+                $loan->end_date = $request->end_date;
+                $loan->payment_method_id = $request->payment_method_id;
+                $loan->disbursement_transaction_id = $request->disbursement_transaction_id;
+                break;
+            case 'defaulted':
+                $loan->defaulted_at = now();
+                break;
+            case 'paid':
+                $loan->paid_at = now();
+                break;
+            case 'cancelled':
+                $loan->rejected_at = now();
+                break;
         }
 
-        return redirect()->back()->with('success', 'Loan status updated successfully.');
+        $loan->save();
+
+        // Log the status change
+        activity()
+            ->performedOn($loan)
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'approval_notes' => $request->approval_notes,
+                'rejection_reason' => $request->rejection_reason,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'disbursement_transaction_id' => $request->disbursement_transaction_id
+            ])
+            ->log('Loan status updated');
+
+        return back()->with('success', 'Loan status updated successfully');
     }
 
     /**
@@ -755,8 +819,7 @@ class LoanController extends Controller
 
         $loan->update([
             'status' => 'cancelled',
-            'cancelled_at' => now(),
-            'cancelled_by' => auth()->id(),
+            'rejected_at' => now(),
         ]);
 
         return redirect()->route('user-loans')

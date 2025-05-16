@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Loan extends Model
 {
@@ -132,6 +133,22 @@ class Loan extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(LoanPayment::class);
+    }
+
+    /**
+     * Get the last payment made for the loan.
+     */
+    public function lastPayment(): HasOne
+    {
+        return $this->hasOne(LoanPayment::class)->latest();
+    }
+
+    /**
+     * Get the pending payments for the loan.
+     */
+    public function pendingPayments(): HasMany
+    {
+        return $this->hasMany(LoanPayment::class)->where('status', 'pending');
     }
 
     /**

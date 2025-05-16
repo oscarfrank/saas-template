@@ -55,6 +55,9 @@ interface LoanPackage {
 interface Props {
     loanPackages: LoanPackage[];
     user: any;
+    loanSettings: {
+        allow_loans_without_kyc: boolean;
+    };
 }
 
 const getRiskLevelColor = (level: string) => {
@@ -81,7 +84,7 @@ const getInterestTypeColor = (type: string) => {
     }
 };
 
-export default function Browse({ loanPackages, user }: Props) {
+export default function Browse({ loanPackages, user, loanSettings }: Props) {
     const [selectedPackage, setSelectedPackage] = useState<LoanPackage | null>(null);
     const [isActivating, setIsActivating] = useState(false);
     const [loanAmount, setLoanAmount] = useState<string>('');
@@ -106,8 +109,8 @@ export default function Browse({ loanPackages, user }: Props) {
     const handleActivate = async () => {
         if (!selectedPackage) return;
 
-        // Check if user's KYC is verified
-        if (!user.kyc_verified_at) {
+        // Check KYC only if loans without KYC are not allowed
+        if (!loanSettings.allow_loans_without_kyc && !user.kyc_verified_at) {
             setShowKycDialog(true);
             return;
         }

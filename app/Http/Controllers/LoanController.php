@@ -67,8 +67,9 @@ class LoanController extends Controller
      */
     public function store(Request $request)
     {
-        // Check if user's KYC is verified
-        if (!auth()->user()->isKycVerified()) {
+        // Check if user's KYC is verified, but only if loans without KYC are not allowed
+        $allowLoansWithoutKyc = \App\Models\LoanSetting::getValue('allow_loans_without_kyc', false);
+        if (!$allowLoansWithoutKyc && !auth()->user()->isKycVerified()) {
             return response()->json([
                 'error' => 'KYC verification required',
                 'message' => 'You need to complete your KYC verification before you can apply for a loan.'

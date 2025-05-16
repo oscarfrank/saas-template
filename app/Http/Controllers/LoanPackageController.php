@@ -384,9 +384,15 @@ class LoanPackageController extends Controller
         $user = auth()->user();
         $user->load('kycVerification');
 
+        // Get the allow_loans_without_kyc setting
+        $allowLoansWithoutKyc = \App\Models\LoanSetting::getValue('allow_loans_without_kyc', false);
+
         return Inertia::render('loan-packages/browse', [
             'loanPackages' => $loanPackages,
-            'user' => $user
+            'user' => $user,
+            'loanSettings' => [
+                'allow_loans_without_kyc' => $allowLoansWithoutKyc
+            ]
         ]);
     }
 }

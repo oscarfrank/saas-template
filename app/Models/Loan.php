@@ -25,6 +25,7 @@ class Loan extends Model
         'status',
         'submitted_at',
         'approved_at',
+        'approved_by',
         'rejected_at',
         'disbursed_at',
         'defaulted_at',
@@ -44,6 +45,8 @@ class Loan extends Model
         'next_payment_amount',
         'last_payment_date',
         'last_payment_amount',
+        'payment_method_id',
+        'disbursement_transaction_id',
     ];
 
     protected $casts = [
@@ -66,6 +69,21 @@ class Loan extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the user that approved the loan.
+     */
+    public function approved_by_user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by')
+            ->select(['id', 'first_name', 'last_name', 'email'])
+            ->withDefault([
+                'id' => null,
+                'first_name' => 'N/A',
+                'last_name' => 'N/A',
+                'email' => 'N/A'
+            ]);
     }
 
     /**
@@ -114,5 +132,13 @@ class Loan extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(LoanPayment::class);
+    }
+
+    /**
+     * Get the payment method for the loan.
+     */
+    public function payment_method(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 }

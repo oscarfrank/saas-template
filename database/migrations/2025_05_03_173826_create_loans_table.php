@@ -54,7 +54,7 @@ return new class extends Migration
                 'defaulted',          // Loan is in default
                 'paid',               // Loan fully paid
                 'cancelled'           // Application cancelled before disbursement
-            ])->default('draft');
+            ])->default('pending');
             
             // Status Timestamps
             $table->timestamp('submitted_at')->nullable();

@@ -148,6 +148,7 @@ export default function Dashboard({ quickStats, loanStats, recentActivity, curre
             icon: Settings,
             items: [
                 { name: 'System Settings', href: '/admin/settings' },
+                { name: 'Loan Settings', href: '/admin/settings/loan' },
                 { name: 'Security', href: '/admin/security' },
                 { name: 'API Management', href: '/admin/settings/api' },
                 { name: 'Currencies', href: '/admin/currencies' },

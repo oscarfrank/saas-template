@@ -13,12 +13,14 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\OuterPagesController;
 use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ApiSettingsController;
+use App\Http\Controllers\Admin\LoanSettingsController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPackageController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\CurrencyController;
 use App\Http\Controllers\LoanDashboardController;
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\LoanPaymentController;
 
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
@@ -103,9 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('loans/{loan}/documents/{document}', [LoanController::class, 'deleteDocument'])->name('loans.documents.delete');
 
     // Loan Payments
-    Route::post('loans/{loan}/payments', [LoanController::class, 'submitPayment'])->name('loans.payments.submit');
-    Route::post('loans/{loan}/payments/{payment}/approve', [LoanController::class, 'approvePayment'])->name('loans.payments.approve');
-    Route::post('loans/{loan}/payments/{payment}/reject', [LoanController::class, 'rejectPayment'])->name('loans.payments.reject');
+    Route::post('/loans/{loan}/payments', [LoanPaymentController::class, 'store'])->name('loans.payments.store');
+    Route::post('/loans/payments/{payment}/approve', [LoanPaymentController::class, 'approve'])->name('loans.payments.approve');
+    Route::post('/loans/payments/{payment}/reject', [LoanPaymentController::class, 'reject'])->name('loans.payments.reject');
+    Route::post('/loans/payments/{payment}/callback', [LoanPaymentController::class, 'handleCallback'])->name('loans.payments.callback');
     Route::get('loans/{loan}/payments/{payment}/proof', [LoanController::class, 'downloadPaymentProof'])->name('loans.payments.proof');
 
     // Loan Notes
@@ -180,6 +183,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // API Settings routes
         Route::get('/settings/api', [ApiSettingsController::class, 'index'])->name('admin.settings.api');
         Route::post('/settings/api', [ApiSettingsController::class, 'update'])->name('admin.settings.api.update');
+
+        // Loan Settings routes
+        Route::get('/settings/loan', [LoanSettingsController::class, 'index'])->name('admin.settings.loan');
+        Route::post('/settings/loan', [LoanSettingsController::class, 'update'])->name('admin.settings.loan.update');
 
         // Email Templates routes
         Route::resource('email-templates', EmailTemplateController::class);

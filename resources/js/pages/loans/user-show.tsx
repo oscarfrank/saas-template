@@ -15,6 +15,8 @@ import { ArrowLeft, FileText, MessageSquare, DollarSign } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PaymentForm from '@/components/PaymentForm';
+import PaymentHistory from '@/components/PaymentHistory';
 
 interface Loan {
     id: number;
@@ -94,13 +96,15 @@ interface Loan {
     }>;
 }
 
+interface PaymentMethod {
+    id: number;
+    name: string;
+    method_type: string;
+}
+
 interface Props extends PageProps {
     loan: Loan;
-    payment_methods: Array<{
-        id: number;
-        name: string;
-        method_type: string;
-    }>;
+    payment_methods: Array<PaymentMethod>;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -129,6 +133,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
     });
 
     const [activeTab, setActiveTab] = useState('details');
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
 
     const handleDocumentUpload = (e: React.FormEvent) => {
         e.preventDefault();
@@ -158,28 +163,14 @@ export default function UserShow({ loan, payment_methods }: Props) {
         });
     };
 
-    const handlePaymentSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const formData = new FormData();
-        formData.append('payment_method_id', paymentData.payment_method_id);
-        formData.append('amount', parseFloat(paymentData.amount).toString());
-        if (paymentData.payment_proof) {
-            formData.append('payment_proof', paymentData.payment_proof);
-        }
-        formData.append('notes', paymentData.notes || '');
-
-        postPayment(route('loans.payments.submit', loan.id), {
+    const handlePaymentSubmit = (formData: FormData) => {
+        router.post(route('loans.payments.store', loan.id), formData, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Payment submitted successfully');
-                setPaymentData({
-                    payment_method_id: '',
-                    amount: '',
-                    payment_proof: null,
-                    notes: '',
-                });
+                setShowPaymentForm(false);
             },
-            onError: (errors: Record<string, string>) => {
+            onError: (errors) => {
                 Object.values(errors).forEach((error) => {
                     toast.error(error);
                 });
@@ -520,75 +511,25 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                     {loan.status === 'active' && (
                                         <div className="mt-6">
                                             <h3 className="text-lg font-medium mb-4">Make a Payment</h3>
-                                            <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                                                <div>
-                                                    <Label htmlFor="payment_method">Payment Method</Label>
-                                                    <Select
-                                                        value={paymentData.payment_method_id}
-                                                        onValueChange={(value) => setPaymentData('payment_method_id', value)}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select payment method" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {payment_methods.map((method) => (
-                                                                <SelectItem key={method.id} value={String(method.id)}>
-                                                                    {method.name}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-
-                                                <div>
-                                                    <Label htmlFor="amount">Payment Amount</Label>
-                                                    <Input
-                                                        id="amount"
-                                                        type="number"
-                                                        value={paymentData.amount}
-                                                        onChange={(e) => setPaymentData('amount', e.target.value)}
-                                                        min={loan.next_payment_amount}
-                                                        step="0.01"
-                                                        required
-                                                    />
-                                                    <p className="text-sm text-muted-foreground mt-1">
-                                                        Minimum payment: {formatCurrency(loan.next_payment_amount, loan.currency.code)}
-                                                    </p>
-                                                </div>
-
-                                                <div>
-                                                    <Label htmlFor="payment_proof">Payment Proof</Label>
-                                                    <Input
-                                                        id="payment_proof"
-                                                        type="file"
-                                                        onChange={(e) => setPaymentData('payment_proof', e.target.files?.[0] || null)}
-                                                        accept=".pdf,.jpg,.jpeg,.png"
-                                                        required
-                                                    />
-                                                    <p className="text-sm text-muted-foreground mt-1">
-                                                        Upload receipt, screenshot, or other proof of payment
-                                                    </p>
-                                                </div>
-
-                                                <div>
-                                                    <Label htmlFor="notes">Notes</Label>
-                                                    <Textarea
-                                                        id="notes"
-                                                        value={paymentData.notes}
-                                                        onChange={(e) => setPaymentData('notes', e.target.value)}
-                                                        placeholder="Add any additional information about your payment"
-                                                    />
-                                                </div>
-
-                                                <Button type="submit" disabled={paymentProcessing}>
-                                                    Submit Payment
-                                                </Button>
-                                            </form>
+                                            <Button
+                                                onClick={() => setShowPaymentForm(!showPaymentForm)}
+                                                className="w-full"
+                                            >
+                                                {showPaymentForm ? 'Cancel Payment' : 'Make Payment'}
+                                            </Button>
                                         </div>
                                     )}
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {showPaymentForm && (
+                            <PaymentForm
+                                loanId={loan.id}
+                                paymentMethods={payment_methods}
+                                onSubmit={handlePaymentSubmit}
+                            />
+                        )}
                     </TabsContent>
                 </Tabs>
             </div>

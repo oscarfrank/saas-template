@@ -22,6 +22,7 @@ return new class extends Migration
             
             // Financial Details
             $table->decimal('amount', 20, 2)->comment('Loan amount');
+            $table->decimal('current_balance', 20, 2)->default(0)->after('total_amount_due')->comment('Current outstanding balance including principal and interest');
             $table->foreignId('currency_id')->constrained()->comment('Currency of the loan');
             $table->decimal('interest_rate', 8, 4)->comment('Interest rate at time of approval');
             $table->enum('interest_type', ['simple', 'compound'])->default('simple');
@@ -70,12 +71,12 @@ return new class extends Migration
             
             // Disbursement Details
             $table->string('disbursement_transaction_id')->nullable()->comment('External transaction ID for disbursement');
-            $table->string('disbursement_status')->nullable()->comment('Status of the disbursement');
             
             // Payment Tracking
             $table->decimal('principal_paid', 20, 2)->default(0)->comment('Amount of principal paid so far');
             $table->decimal('interest_paid', 20, 2)->default(0)->comment('Amount of interest paid so far');
             $table->decimal('fees_paid', 20, 2)->default(0)->comment('Amount of fees paid so far');
+            $table->integer('completed_payments')->default(0)->comment('Number of completed payments');
             
             // Delinquency Tracking
             $table->date('next_payment_due_date')->nullable()->comment('Date when next payment is due');
@@ -86,6 +87,8 @@ return new class extends Migration
             // Early Repayment
             $table->boolean('allows_early_repayment')->default(true);
             $table->decimal('early_repayment_fee_percentage', 8, 4)->default(0);
+            $table->integer('early_repayment_fixed_fee')->default(0);
+            $table->integer('early_repayment_period_days')->default(0);
             $table->boolean('has_early_repayment')->default(false)->comment('Whether loan was repaid early');
             
             // Collateral

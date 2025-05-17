@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, Edit, CheckCircle, XCircle, DollarSign, PlayCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, CheckCircle, XCircle, DollarSign, PlayCircle, Trash2, Image as ImageIcon } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +25,26 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import PaymentForm from '@/components/PaymentForm';
+import PaymentHistory from '@/components/PaymentHistory';
+
+interface Payment {
+    id: number;
+    payment_number: number;
+    amount: number;
+    status: string;
+    due_date: string;
+    payer_name: string;
+    notes?: string;
+    attachment?: string;
+}
 
 interface Loan {
     id: number;
@@ -56,6 +76,7 @@ interface Loan {
     principal_remaining: number;
     total_amount_due: number;
     current_balance: number;
+    current_interest_due: number;
     days_past_due: number;
     next_payment_due_date: string;
     next_payment_amount: number;
@@ -109,25 +130,32 @@ interface Loan {
         created_at: string;
         updated_at: string;
     }>;
-    payments?: Array<{
-        id: number;
-        payment_number: number;
-        amount: number;
-        status: string;
-        due_date: string;
-        payer_name: string;
-        notes?: string;
-        attachment?: string;
-    }>;
+    payments?: Payment[];
+    origination_fee_amount: number;
+    platform_fee_amount: number;
+    late_payment_fee_fixed: number;
+    late_payment_fee_percentage: number;
+    early_repayment_fixed_fee: number;
+    early_repayment_fee_percentage: number;
+    early_repayment_period_days: number;
+    grace_period_days: number;
+    has_collateral: boolean;
+    collateral_description: string;
+    allows_early_repayment: boolean;
+}
+
+interface PaymentMethod {
+    id: number;
+    name: string;
+    method_type: string;
+    is_online: boolean;
+    callback_url?: string;
+    configuration?: Record<string, any>;
 }
 
 interface Props extends PageProps {
     loan: Loan;
-    payment_methods: Array<{
-        id: number;
-        name: string;
-        method_type: string;
-    }>;
+    payment_methods: Array<PaymentMethod>;
     auth: {
         user: {
             id: number;
@@ -150,6 +178,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Show({ loan, payment_methods, auth }: Props) {
+
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
@@ -158,6 +187,13 @@ export default function Show({ loan, payment_methods, auth }: Props) {
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
     const [paymentMethodId, setPaymentMethodId] = useState('');
     const [disbursementTransactionId, setDisbursementTransactionId] = useState('');
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const [paymentActionDialogOpen, setPaymentActionDialogOpen] = useState(false);
+    const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+    const [paymentAction, setPaymentAction] = useState<'approve' | 'reject' | null>(null);
+    const [paymentActionNotes, setPaymentActionNotes] = useState('');
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
     
     const { data, setData, post, processing } = useForm({
         content: '',
@@ -216,28 +252,14 @@ export default function Show({ loan, payment_methods, auth }: Props) {
         });
     };
 
-    const handlePaymentSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const formData = new FormData();
-        formData.append('payment_method_id', paymentData.payment_method_id);
-        formData.append('amount', parseFloat(paymentData.amount).toString());
-        if (paymentData.payment_proof) {
-            formData.append('payment_proof', paymentData.payment_proof);
-        }
-        formData.append('notes', paymentData.notes || '');
-
-        postPayment(route('loans.payments.submit', loan.id), {
+    const handlePaymentSubmit = (formData: FormData) => {
+        router.post(route('loans.payments.store', loan.id), formData, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Payment submitted successfully');
-                setPaymentData({
-                    payment_method_id: '',
-                    amount: '',
-                    payment_proof: null,
-                    notes: '',
-                });
+                setShowPaymentForm(false);
             },
-            onError: (errors: Record<string, string>) => {
+            onError: (errors) => {
                 Object.values(errors).forEach((error) => {
                     toast.error(error);
                 });
@@ -405,6 +427,47 @@ export default function Show({ loan, payment_methods, auth }: Props) {
         });
     };
 
+    const handlePaymentAction = (payment: Payment, action: 'approve' | 'reject') => {
+        setSelectedPayment(payment);
+        setPaymentAction(action);
+        setPaymentActionNotes('');
+        setPaymentActionDialogOpen(true);
+    };
+
+    const confirmPaymentAction = () => {
+        if (!selectedPayment || !paymentAction) return;
+
+        const actionRoute = paymentAction === 'approve' 
+            ? route('loans.payments.approve', [selectedPayment.id])
+            : route('loans.payments.reject', [selectedPayment.id]);
+
+        router.post(actionRoute, {
+            notes: paymentActionNotes,
+            rejection_reason: paymentAction === 'reject' ? paymentActionNotes : undefined,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(`Payment ${paymentAction}d successfully`);
+                setPaymentActionDialogOpen(false);
+                setSelectedPayment(null);
+                setPaymentAction(null);
+                setPaymentActionNotes('');
+            },
+            onError: (errors) => {
+                Object.values(errors).forEach((error) => {
+                    toast.error(error);
+                });
+            },
+        });
+    };
+
+    const handlePreviewImage = (payment: Payment) => {
+        if (payment.attachment) {
+            setPreviewImage(route('loans.payments.download-proof', [loan.id, payment.id]));
+            setPreviewOpen(true);
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`View Loan - ${loan.reference_number}`} />
@@ -434,6 +497,34 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                         </Button>
                     </div>
                 </div>
+
+                {/* Grace Period Alert */}
+                {loan.status === 'active' && loan.grace_period_days > 0 && (
+                    <Card className="border-yellow-500/50 bg-yellow-500/5">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-yellow-700">
+                                        {(() => {
+                                            const referenceDate = loan.last_payment_date ? new Date(loan.last_payment_date) : new Date(loan.start_date);
+                                            const today = new Date();
+                                            const daysSinceReference = Math.floor((today.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24));
+                                            const remainingGraceDays = loan.grace_period_days - daysSinceReference;
+
+                                            if (remainingGraceDays > 0) {
+                                                return `Borrower has ${remainingGraceDays} days remaining in their grace period. After this period, late payment fees will apply.`;
+                                            } else if (remainingGraceDays === 0) {
+                                                return "Today is the last day of the grace period. Late payment fees will apply starting tomorrow.";
+                                            } else {
+                                                return `Grace period ended ${Math.abs(remainingGraceDays)} days ago. Late payment fees now apply.`;
+                                            }
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
                     <AlertDialogContent>
@@ -557,18 +648,69 @@ export default function Show({ loan, payment_methods, auth }: Props) {
 
                 <Card>
                     <CardContent className="p-6">
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Loan ID</p>
-                                <p className="text-lg font-semibold">#{loan.id}</p>
+                        <div className="grid gap-6">
+                            {/* Basic Loan Information */}
+                            <div className="grid gap-4 md:grid-cols-4 border-b pb-6">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Reference Number</p>
+                                    <p className="text-lg font-semibold">{loan.reference_number}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Activation Date</p>
+                                    <p className="text-lg font-semibold">
+                                        {loan.start_date 
+                                            ? format(new Date(loan.start_date), 'PPP')
+                                            : 'Not yet active'}
+                                    </p>
+                                </div>
+                                <div className="bg-primary/5 p-4 rounded-lg">
+                                    <p className="text-sm font-medium text-muted-foreground">Starting Amount</p>
+                                    <p className="text-xl font-bold text-primary">
+                                        {formatCurrency(loan.amount, loan.currency.code)}
+                                    </p>
+                                </div>
+                                <div className="bg-emerald-500/5 p-4 rounded-lg">
+                                    <p className="text-sm font-medium text-emerald-600">Current Balance</p>
+                                    <p className="text-xl font-bold text-emerald-600">
+                                        {formatCurrency(loan.current_balance, loan.currency.code)}
+                                    </p>
+                                    <p className="text-xs text-emerald-600/80 mt-1">
+                                        {loan.current_balance < loan.amount ? 'Remaining' : 'Total'}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Reference Number</p>
-                                <p className="text-lg font-semibold">{loan.reference_number}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Created Date</p>
-                                <p className="text-lg font-semibold">{format(new Date(loan.created_at), 'PPP')}</p>
+
+                            {/* Financial Summary */}
+                            <div className="grid gap-4 md:grid-cols-4">
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <p className="text-sm font-medium text-muted-foreground">Principal Paid</p>
+                                    <p className="text-lg font-semibold">
+                                        {formatCurrency(loan.principal_paid, loan.currency.code)}
+                                    </p>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <p className="text-sm font-medium text-muted-foreground">Interest Paid</p>
+                                    <p className="text-lg font-semibold">
+                                        {formatCurrency(loan.interest_paid, loan.currency.code)}
+                                    </p>
+                                </div>
+                                <div className="bg-muted/50 p-4 rounded-lg">
+                                    <p className="text-sm font-medium text-muted-foreground">Fees Paid</p>
+                                    <p className="text-lg font-semibold">
+                                        {formatCurrency(loan.fees_paid, loan.currency.code)}
+                                    </p>
+                                </div>
+                                <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
+                                    <p className="text-sm font-medium text-primary">Next Payment Due</p>
+                                    <p className="text-xl font-bold text-primary">
+                                        {loan.next_payment_due_date
+                                            ? format(new Date(loan.next_payment_due_date), 'PPP')
+                                            : 'N/A'}
+                                    </p>
+                                    <p className="text-sm text-primary/80 mt-1">
+                                        Amount: {formatCurrency(loan.current_balance + loan.current_interest_due, loan.currency.code)}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -595,126 +737,216 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                             {loan.status.replace('_', ' ').toUpperCase()}
                                         </Badge>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Amount</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.amount, loan.currency.code)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Interest Rate</p>
-                                        <p>{loan.interest_rate}%</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Duration</p>
-                                        <p>{loan.duration_days} days</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-sm font-medium">Current Amount</p>
+                                            <p className="text-lg font-semibold">
+                                                {formatCurrency(loan.current_balance, loan.currency.code)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Starting Amount</p>
+                                            <p className="text-lg font-semibold">
+                                                {formatCurrency(loan.amount, loan.currency.code)}
+                                            </p>
+                                        </div>
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium">Purpose</p>
                                         <p>{loan.purpose || 'N/A'}</p>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-sm font-medium">Interest Rate</p>
+                                            <p className="text-lg font-semibold">{loan.interest_rate}%</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Duration</p>
+                                            <p className="text-lg font-semibold">{loan.duration_days} days</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-sm font-medium">Monthly Payment</p>
+                                            <p className="text-lg font-semibold">
+                                                {formatCurrency(loan.interest_rate * loan.current_balance / 100, loan.currency.code)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Total Payments</p>
+                                            <p className="text-lg font-semibold">{loan.completed_payments}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Current Interest Due</p>
+                                            <p className="text-lg font-semibold">
+                                                {!loan.current_interest_due || isNaN(loan.current_interest_due) || !isFinite(loan.current_interest_due)
+                                                    ? formatCurrency(0, loan.currency.code)
+                                                    : formatCurrency(loan.current_interest_due, loan.currency.code)
+                                                }
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Interest accrued up to today
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Next Payment Due</p>
+                                            <p className="text-lg font-semibold">
+                                                {loan.next_payment_due_date
+                                                    ? format(new Date(loan.next_payment_due_date), 'PPP')
+                                                    : 'N/A'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Amount: {formatCurrency(loan.current_balance + loan.current_interest_due, loan.currency.code)}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </CardContent>
                             </Card>
 
                             <Card>
+                                <CardHeader>
+                                    <CardTitle>Loan Charges & Fees</CardTitle>
+                                    <CardDescription>All applicable charges and fees for this loan</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Grace Period - Moved to top for prominence */}
+                                    {loan.grace_period_days > 0 && (
+                                        <div className="space-y-1 border-b pb-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Grace Period</p>
+                                                <p className="text-sm font-semibold">{loan.grace_period_days} days</p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                During this {loan.grace_period_days}-day period, the borrower can make payments without incurring late fees. After this period, late payment fees will apply.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Late Payment Information */}
+                                    {(loan.late_payment_fee_fixed > 0 || loan.late_payment_fee_percentage > 0) && (
+                                        <div className="space-y-1 border-b pb-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Late Payment Fee</p>
+                                                <p className="text-sm font-semibold">
+                                                    {loan.late_payment_fee_fixed > 0 
+                                                        ? formatCurrency(loan.late_payment_fee_fixed, loan.currency.code)
+                                                        : `${loan.late_payment_fee_percentage}% of payment amount`
+                                                    }
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                This fee will be charged for each payment made after the due date and grace period.
+                                            </p>
+                                            {loan.grace_period_days > 0 && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Note: Borrower has {loan.grace_period_days} days grace period before late fees apply.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Origination Fee */}
+                                    {loan.origination_fee_amount > 0 && (
+                                        <div className="space-y-1 border-b pb-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Origination Fee</p>
+                                                <p className="text-sm font-semibold">
+                                                    {formatCurrency(loan.origination_fee_amount, loan.currency.code)}
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                One-time fee charged when the loan is disbursed. Borrower will receive {formatCurrency(loan.amount - loan.origination_fee_amount, loan.currency.code)} after this fee is deducted.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Platform Fee */}
+                                    {loan.platform_fee_amount > 0 && (
+                                        <div className="space-y-1 border-b pb-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Platform Fee</p>
+                                                <p className="text-sm font-semibold">
+                                                    {formatCurrency(loan.platform_fee_amount, loan.currency.code)}
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Fee charged for using the platform services
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Early Repayment Fees */}
+                                    {loan.allows_early_repayment && (
+                                        <div className="space-y-1 border-b pb-4">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Early Repayment Fee</p>
+                                                <p className="text-sm font-semibold">
+                                                    {loan.early_repayment_fixed_fee > 0 
+                                                        ? formatCurrency(loan.early_repayment_fixed_fee, loan.currency.code)
+                                                        : `${loan.early_repayment_fee_percentage}% of remaining balance`
+                                                    }
+                                                </p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Charged when repaying the loan before the end of the {loan.early_repayment_period_days}-day grace period. After {loan.early_repayment_period_days} days, this fee will no longer apply.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Collateral Information */}
+                                    {loan.has_collateral && (
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <p className="text-sm font-medium">Collateral</p>
+                                                <p className="text-sm font-semibold">Required</p>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                {loan.collateral_description || 'Collateral is required for this loan'}
+                                            </p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card className="md:col-span-2">
                                 <CardHeader>
                                     <CardTitle>Borrower Information</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div>
-                                        <p className="text-sm font-medium">Name</p>
-                                        <p>{`${loan.user.first_name} ${loan.user.last_name}`}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Email</p>
-                                        <p>{loan.user.email}</p>
-                                    </div>
-                                    {loan.approved_at && (
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-sm font-medium">Approved By</p>
-                                            <p>
-                                                {loan.approved_by_user?.first_name && loan.approved_by_user?.last_name
-                                                    ? `${loan.approved_by_user.first_name} ${loan.approved_by_user.last_name}`
-                                                    : 'N/A'}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {format(new Date(loan.approved_at), 'PPP')}
-                                            </p>
+                                            <p className="text-sm font-medium">Name</p>
+                                            <p>{`${loan.user.first_name} ${loan.user.last_name}`}</p>
                                         </div>
-                                    )}
-                                    {loan.status === 'active' && (
-                                        <>
+                                        <div>
+                                            <p className="text-sm font-medium">Email</p>
+                                            <p>{loan.user.email}</p>
+                                        </div>
+                                        {loan.approved_at && (
                                             <div>
-                                                <p className="text-sm font-medium">Disbursement Transaction ID</p>
-                                                <p>{loan.disbursement_transaction_id || 'N/A'}</p>
+                                                <p className="text-sm font-medium">Approved By</p>
+                                                <p>
+                                                    {loan.approved_by_user?.first_name && loan.approved_by_user?.last_name
+                                                        ? `${loan.approved_by_user.first_name} ${loan.approved_by_user.last_name}`
+                                                        : 'N/A'}
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {format(new Date(loan.approved_at), 'PPP')}
+                                                </p>
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-medium">Payment Method</p>
-                                                <p>{loan.payment_method?.name || 'N/A'}</p>
-                                            </div>
-                                        </>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Payment Information</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <p className="text-sm font-medium">Monthly Payment</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.monthly_payment_amount, loan.currency.code)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Total Payments</p>
-                                        <p>{loan.total_payments}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Completed Payments</p>
-                                        <p>{loan.completed_payments}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Next Payment Due</p>
-                                        <p>
-                                            {loan.next_payment_due_date
-                                                ? format(new Date(loan.next_payment_due_date), 'PPP')
-                                                : 'N/A'}
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Financial Summary</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <p className="text-sm font-medium">Principal Paid</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.principal_paid, loan.currency.code)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Interest Paid</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.interest_paid, loan.currency.code)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Fees Paid</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.fees_paid, loan.currency.code)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Current Balance</p>
-                                        <p className="text-lg font-semibold">
-                                            {formatCurrency(loan.current_balance, loan.currency.code)}
-                                        </p>
+                                        )}
+                                        {loan.status === 'active' && (
+                                            <>
+                                                <div>
+                                                    <p className="text-sm font-medium">Disbursement Transaction ID</p>
+                                                    <p>{loan.disbursement_transaction_id || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">Payment Method</p>
+                                                    <p>{loan.payment_method?.name || 'N/A'}</p>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -917,7 +1149,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                     : 'N/A'}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                                Amount: {formatCurrency(loan.next_payment_amount, loan.currency.code)}
+                                                Amount: {formatCurrency(loan.current_balance + loan.current_interest_due, loan.currency.code)}
                                             </p>
                                         </div>
                                         <div>
@@ -946,7 +1178,9 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                     Amount: {formatCurrency(payment.amount, loan.currency.code)}
                                                                 </p>
                                                                 <p className="text-sm text-muted-foreground">
-                                                                    Due Date: {format(new Date(payment.due_date), 'PPP')}
+                                                                    Due Date: {payment.due_date && !isNaN(new Date(payment.due_date).getTime())
+                                                                        ? format(new Date(payment.due_date), 'PPP')
+                                                                        : 'N/A'}
                                                                 </p>
                                                                 <p className="text-sm text-muted-foreground">
                                                                     Status: <Badge className={getStatusColor(payment.status)}>
@@ -959,17 +1193,50 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            {payment.attachment && (
-                                                                <div className="flex gap-2">
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => window.open(route('loans.payments.download-proof', [loan.id, payment.id]), '_blank')}
-                                                                    >
-                                                                        View Proof
-                                                                    </Button>
-                                                                </div>
-                                                            )}
+                                                            <div className="flex gap-2">
+                                                                {payment.attachment && (
+                                                                    <div className="flex flex-col items-center gap-2">
+                                                                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                                                                            <img
+                                                                                src={route('loans.payments.download-proof', [loan.id, payment.id])}
+                                                                                alt="Payment Proof"
+                                                                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                                onClick={() => handlePreviewImage(payment)}
+                                                                            />
+                                                                        </div>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handlePreviewImage(payment)}
+                                                                            className="flex items-center gap-2"
+                                                                        >
+                                                                            <ImageIcon className="h-4 w-4" />
+                                                                            View Full
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+                                                                {payment.status === 'pending' && (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="default"
+                                                                            size="sm"
+                                                                            className="bg-green-600 hover:bg-green-700"
+                                                                            onClick={() => handlePaymentAction(payment, 'approve')}
+                                                                        >
+                                                                            <CheckCircle className="h-4 w-4 mr-1" />
+                                                                            Approve
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="destructive"
+                                                                            size="sm"
+                                                                            onClick={() => handlePaymentAction(payment, 'reject')}
+                                                                        >
+                                                                            <XCircle className="h-4 w-4 mr-1" />
+                                                                            Reject
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </CardContent>
                                                 </Card>
@@ -979,79 +1246,81 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                             )}
                                         </div>
                                     </div>
-
-                                    <div className="mt-6">
-                                        <h3 className="text-lg font-medium mb-4">Make a Payment</h3>
-                                        <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                                            <div>
-                                                <Label htmlFor="payment_method">Payment Method</Label>
-                                                <Select
-                                                    value={paymentData.payment_method_id}
-                                                    onValueChange={(value) => setPaymentData('payment_method_id', value)}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select payment method" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {payment_methods.map((method) => (
-                                                            <SelectItem key={method.id} value={String(method.id)}>
-                                                                {method.name}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <div>
-                                                <Label htmlFor="amount">Payment Amount</Label>
-                                                <Input
-                                                    id="amount"
-                                                    type="number"
-                                                    value={paymentData.amount}
-                                                    onChange={(e) => setPaymentData('amount', e.target.value)}
-                                                    min={loan.next_payment_amount}
-                                                    step="0.01"
-                                                    required
-                                                />
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Minimum payment: {formatCurrency(loan.next_payment_amount, loan.currency.code)}
-                                                </p>
-                                            </div>
-
-                                            <div>
-                                                <Label htmlFor="payment_proof">Payment Proof</Label>
-                                                <Input
-                                                    id="payment_proof"
-                                                    type="file"
-                                                    onChange={(e) => setPaymentData('payment_proof', e.target.files?.[0] || null)}
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    required
-                                                />
-                                                <p className="text-sm text-muted-foreground mt-1">
-                                                    Upload receipt, screenshot, or other proof of payment
-                                                </p>
-                                            </div>
-
-                                            <div>
-                                                <Label htmlFor="notes">Notes</Label>
-                                                <Textarea
-                                                    id="notes"
-                                                    value={paymentData.notes}
-                                                    onChange={(e) => setPaymentData('notes', e.target.value)}
-                                                    placeholder="Add any additional information about your payment"
-                                                />
-                                            </div>
-
-                                            <Button type="submit" disabled={paymentProcessing}>
-                                                Submit Payment
-                                            </Button>
-                                        </form>
-                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
                     </TabsContent>
                 </Tabs>
+
+                {/* Payment Action Dialog */}
+                <AlertDialog open={paymentActionDialogOpen} onOpenChange={setPaymentActionDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                {paymentAction === 'approve' ? 'Approve Payment' : 'Reject Payment'}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {paymentAction === 'approve' 
+                                    ? 'Are you sure you want to approve this payment?'
+                                    : 'Are you sure you want to reject this payment?'}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        
+                        <div className="mt-4">
+                            <Label htmlFor="action_notes">
+                                {paymentAction === 'approve' ? 'Approval Notes' : 'Reason for Rejection'}
+                            </Label>
+                            <Textarea
+                                id="action_notes"
+                                value={paymentActionNotes}
+                                onChange={(e) => setPaymentActionNotes(e.target.value)}
+                                placeholder={paymentAction === 'approve' 
+                                    ? 'Enter any notes about the approval...'
+                                    : 'Enter the reason for rejection...'}
+                                className="mt-1"
+                                required
+                            />
+                        </div>
+                        
+                        <AlertDialogFooter>
+                            <AlertDialogCancel onClick={() => {
+                                setPaymentActionDialogOpen(false);
+                                setSelectedPayment(null);
+                                setPaymentAction(null);
+                                setPaymentActionNotes('');
+                            }}>
+                                Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={confirmPaymentAction}
+                                className={paymentAction === 'approve' 
+                                    ? 'bg-green-600 hover:bg-green-700'
+                                    : 'bg-red-600 hover:bg-red-700'}
+                                disabled={!paymentActionNotes.trim()}
+                            >
+                                {paymentAction === 'approve' ? 'Approve Payment' : 'Reject Payment'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Image Preview Dialog */}
+                <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                    <DialogContent className="max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>Payment Proof</DialogTitle>
+                        </DialogHeader>
+                        {previewImage && (
+                            <div className="relative w-full h-[600px]">
+                                <img
+                                    src={previewImage}
+                                    alt="Payment Proof"
+                                    className="w-full h-full object-contain"
+                                />
+                            </div>
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

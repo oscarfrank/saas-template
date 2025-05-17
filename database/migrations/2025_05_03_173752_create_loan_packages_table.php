@@ -40,15 +40,22 @@ return new class extends Migration
              $table->enum('interest_payment_frequency', ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', 'end_of_term'])->default('monthly');
              
              // Additional Fees
+             $table->boolean('has_origination_fee')->default(false);
+             $table->enum('origination_fee_type', ['fixed', 'percentage'])->default('percentage')->comment('Type of origination fee');
              $table->decimal('origination_fee_fixed', 15, 2)->default(0)->comment('Fixed origination fee');
              $table->decimal('origination_fee_percentage', 8, 4)->default(0)->comment('Percentage origination fee');
+
+             $table->enum('late_payment_fee_type', ['fixed', 'percentage'])->default('percentage')->comment('Type of late payment fee');
              $table->decimal('late_payment_fee_fixed', 15, 2)->default(0)->comment('Fixed late payment fee');
              $table->decimal('late_payment_fee_percentage', 8, 4)->default(0)->comment('Percentage late payment fee');
              $table->integer('grace_period_days')->default(0)->comment('Grace period for late payments before penalties');
              
              // Early Repayment
              $table->boolean('allows_early_repayment')->default(true);
-             $table->decimal('early_repayment_fee_percentage', 8, 4)->default(0);
+             $table->enum('early_repayment_type', ['fixed', 'percentage'])->default('percentage')->comment('Type of early repayment fee');
+             $table->decimal('early_repayment_fee_fixed', 15, 2)->default(0)->comment('Fixed early repayment fee');
+             $table->decimal('early_repayment_fee_percentage', 8, 4)->default(0)->comment('Percentage early repayment fee');
+             $table->integer('early_repayment_period_days')->default(0)->comment('Period for early repayment fee');
              
              // Collateral Requirements
              $table->boolean('requires_collateral')->default(false);

@@ -53,7 +53,7 @@ class LoanDashboardController extends Controller
 
         return Inertia::render('dashboard/borrower-dashboard', [
             'currentLoan' => $currentLoan ? [
-                'amount' => $currentLoan->currency->symbol . number_format($currentLoan->amount, 2),
+                'current_balance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
                 'status' => ucfirst($currentLoan->status),
                 'nextPayment' => $currentLoan->next_payment_due_date ? $currentLoan->next_payment_due_date->format('F j, Y') : null,
                 'remainingBalance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
@@ -83,22 +83,22 @@ class LoanDashboardController extends Controller
 
         foreach ($currencies as $currency) {
             $loanStats[$currency->code] = [
-                'total_active_loan_amount' => [
+                'total_active_loan_balance' => [
                     'value' => Loan::where('status', 'active')
                         ->where('currency_id', $currency->id)
-                        ->sum('amount'),
+                        ->sum('current_balance'),
                     'trend' => $this->calculateTrend('active_loans', $currency->id),
                 ],
                 'total_pending_loan_balance' => [
                     'value' => Loan::where('status', 'pending')
                         ->where('currency_id', $currency->id)
-                        ->sum('amount'),
+                        ->sum('current_balance'),
                     'trend' => $this->calculateTrend('pending_loans', $currency->id),
                 ],
-                'average_loan_size' => [
+                'average_loan_balance' => [
                     'value' => Loan::where('currency_id', $currency->id)
-                        ->avg('amount'),
-                    'trend' => $this->calculateTrend('average_loan_size', $currency->id),
+                        ->avg('current_balance'),
+                    'trend' => $this->calculateTrend('average_loan_balance', $currency->id),
                 ],
                 'default_rate' => [
                     'value' => $this->calculateDefaultRate($currency->id),
@@ -125,14 +125,14 @@ class LoanDashboardController extends Controller
             ->where('currency_id', $currencyId)
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
-            ->sum('amount');
+            ->sum('current_balance');
 
         // Get last month's value
         $lastMonth = DB::table('loans')
             ->where('currency_id', $currencyId)
             ->whereMonth('created_at', now()->subMonth()->month)
             ->whereYear('created_at', now()->subMonth()->year)
-            ->sum('amount');
+            ->sum('current_balance');
 
         if ($lastMonth === 0) {
             return '+0%';

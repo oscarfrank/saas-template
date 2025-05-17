@@ -30,7 +30,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 interface DashboardProps {
     currentLoan: {
-        amount: string;
+        current_balance: string;
         status: string;
         nextPayment: string | null;
         remainingBalance: string;
@@ -122,8 +122,8 @@ export default function Dashboard({ currentLoan, applications, upcomingPayments 
                         <CardContent>
                             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                                 <div className="flex flex-col gap-1">
-                                    <p className="text-sm text-muted-foreground">Loan Amount</p>
-                                    <p className="text-2xl font-bold">{currentLoan.amount}</p>
+                                    <p className="text-sm text-muted-foreground">Current Balance</p>
+                                    <p className="text-2xl font-bold">{currentLoan.current_balance}</p>
                                 </div>
                                 <div className="flex flex-col gap-1">
                                     <p className="text-sm text-muted-foreground">Status</p>

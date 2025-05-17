@@ -27,7 +27,7 @@ return new class extends Migration
         DB::table('loan_settings')->insert([
             [
                 'key' => 'allow_loans_without_kyc',
-                'value' => 'false',
+                'value' => 'true',
                 'type' => 'boolean',
                 'group' => 'borrower',
                 'description' => 'Allow users to activate loans without completing KYC verification',

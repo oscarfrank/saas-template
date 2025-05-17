@@ -89,11 +89,57 @@ class LoanController extends Controller
             'purpose' => 'nullable|string',
         ]);
 
+        // Get the loan package if package_id is provided
+        $package = null;
+        if ($validated['package_id']) {
+            $package = \App\Models\LoanPackage::findOrFail($validated['package_id']);
+        }
+
         // Add user_id from authenticated user
         $validated['user_id'] = auth()->id();
         $validated['reference_number'] = 'LOAN-' . strtoupper(Str::random(8));
         $validated['status'] = 'pending';
         $validated['submitted_at'] = now();
+
+        // Add package-specific fields if package exists
+        if ($package) {
+            // Origination fee
+            $validated['origination_fee_amount'] = $package->origination_fee_type === 'fixed' 
+                ? $package->origination_fee_fixed 
+                : ($validated['amount'] * $package->origination_fee_percentage / 100);
+
+            // Late payment fee
+            if ($package->late_payment_fee_type === 'fixed') {
+                $validated['late_payment_fee_fixed'] = $package->late_payment_fee_fixed;
+                $validated['late_payment_fee_percentage'] = 0;
+            } else {
+                $validated['late_payment_fee_fixed'] = 0;
+                $validated['late_payment_fee_percentage'] = $package->late_payment_fee_percentage;
+            }
+
+            // Grace period
+            $validated['grace_period_days'] = $package->grace_period_days;
+
+            // Early repayment settings
+            $validated['allows_early_repayment'] = $package->allows_early_repayment;
+            if ($package->allows_early_repayment) {
+                if ($package->early_repayment_type === 'fixed') {
+                    $validated['early_repayment_fixed_fee'] = $package->early_repayment_fee_fixed;
+                    $validated['early_repayment_fee_percentage'] = 0;
+                } else {
+                    $validated['early_repayment_fixed_fee'] = 0;
+                    $validated['early_repayment_fee_percentage'] = $package->early_repayment_fee_percentage;
+                }
+                $validated['early_repayment_period_days'] = $package->early_repayment_period_days;
+            } else {
+                $validated['early_repayment_fixed_fee'] = 0;
+                $validated['early_repayment_fee_percentage'] = 0;
+                $validated['early_repayment_period_days'] = 0;
+            }
+
+            // Set has_early_repayment to false initially
+            $validated['has_early_repayment'] = false;
+        }
 
         $loan = Loan::create($validated);
 
@@ -126,6 +172,9 @@ class LoanController extends Controller
             'notes' => function ($query) {
                 $query->with(['createdBy', 'updatedBy'])
                       ->orderBy('created_at', 'desc');
+            },
+            'payments' => function ($query) {
+                $query->orderBy('due_date', 'desc');
             }
         ]);
         
@@ -593,6 +642,8 @@ class LoanController extends Controller
                 $loan->end_date = $request->end_date;
                 $loan->payment_method_id = $request->payment_method_id;
                 $loan->disbursement_transaction_id = $request->disbursement_transaction_id;
+                // Set current_balance equal to amount when loan is activated
+                $loan->current_balance = $loan->amount;
                 break;
             case 'defaulted':
                 $loan->defaulted_at = now();

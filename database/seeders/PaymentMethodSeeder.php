@@ -32,6 +32,7 @@ class PaymentMethodSeeder extends Seeder
                 'method_type' => 'bank_account',
                 'is_active' => true,
                 'is_default' => true,
+                'is_online' => false,
                 'user_id' => $user->id,
             ],
             [
@@ -39,6 +40,7 @@ class PaymentMethodSeeder extends Seeder
                 'method_type' => 'credit_card',
                 'is_active' => true,
                 'is_default' => false,
+                'is_online' => true,
                 'user_id' => $user->id,
             ],
             [
@@ -46,6 +48,7 @@ class PaymentMethodSeeder extends Seeder
                 'method_type' => 'payment_gateway',
                 'is_active' => true,
                 'is_default' => false,
+                'is_online' => true,
                 'user_id' => $user->id,
             ],
             [
@@ -60,6 +63,7 @@ class PaymentMethodSeeder extends Seeder
                 'method_type' => 'payment_gateway',
                 'is_active' => true,
                 'is_default' => false,
+                'is_online' => false,
                 'user_id' => $user->id,
             ],
         ];

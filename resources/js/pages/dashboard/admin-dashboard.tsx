@@ -49,7 +49,7 @@ interface QuickStats {
 
 interface LoanStats {
     [currency: string]: {
-        total_active_loan_amount: {
+        total_active_loan_balance: {
             value: number;
             trend: string;
         };
@@ -57,7 +57,7 @@ interface LoanStats {
             value: number;
             trend: string;
         };
-        average_loan_size: {
+        average_loan_balance: {
             value: number;
             trend: string;
         };

@@ -15,6 +15,7 @@ class LoanPackage extends Model
         'name',
         'code',
         'description',
+        'created_by',
         'user_type',
         'min_amount',
         'max_amount',
@@ -27,13 +28,19 @@ class LoanPackage extends Model
         'interest_type',
         'interest_calculation',
         'interest_payment_frequency',
+        'has_origination_fee',
+        'origination_fee_type',
         'origination_fee_fixed',
         'origination_fee_percentage',
+        'late_payment_fee_type',
         'late_payment_fee_fixed',
         'late_payment_fee_percentage',
         'grace_period_days',
         'allows_early_repayment',
+        'early_repayment_type',
+        'early_repayment_fee_fixed',
         'early_repayment_fee_percentage',
+        'early_repayment_period_days',
         'requires_collateral',
         'collateral_percentage',
         'collateral_requirements',
@@ -52,8 +59,7 @@ class LoanPackage extends Model
         'display_order',
         'is_featured',
         'terms_document',
-        'contract_template',
-        'created_by',
+        'contract_template'
     ];
 
     protected $casts = [

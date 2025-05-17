@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
 
 class Transaction extends Model
 {
@@ -131,5 +132,51 @@ class Transaction extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * Create a new transaction with the given data
+     *
+     * @param array $data Transaction data
+     * @param array $options Additional options
+     * @return Transaction
+     */
+    public static function createTransaction(array $data, array $options = []): Transaction
+    {
+        // Generate a unique reference number if not provided
+        if (!isset($data['reference_number'])) {
+            $data['reference_number'] = 'TRX-' . strtoupper(Str::random(10));
+        }
+
+        // Set default status if not provided
+        if (!isset($data['status'])) {
+            $data['status'] = 'pending';
+        }
+
+        // Calculate net amount if not provided
+        if (!isset($data['net_amount']) && isset($data['amount'])) {
+            $data['net_amount'] = $data['amount'];
+            if (isset($data['fee_amount'])) {
+                $data['net_amount'] -= $data['fee_amount'];
+            }
+            if (isset($data['tax_amount'])) {
+                $data['net_amount'] -= $data['tax_amount'];
+            }
+        }
+
+        // Set created_by if not provided and user is authenticated
+        if (!isset($data['created_by']) && auth()->check()) {
+            $data['created_by'] = auth()->id();
+        }
+
+        // Create the transaction
+        $transaction = static::create($data);
+
+        // Handle any post-creation logic
+        if (isset($options['after_create']) && is_callable($options['after_create'])) {
+            $options['after_create']($transaction);
+        }
+
+        return $transaction;
     }
 }

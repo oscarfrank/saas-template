@@ -157,6 +157,20 @@ class LoanController extends Controller
             'amount' => $validated['amount'],
         ]);
 
+        // Create transaction record
+        $transaction = Transaction::createTransaction([
+            'user_id' => auth()->id(),
+            'transaction_type' => 'loan_disbursement',
+            'amount' => $validated['amount'],
+            'currency_id' => $validated['currency_id'],
+            'fee_amount' => $validated['origination_fee_amount'],
+            'tax_amount' => 0,
+            'loan_id' => $loan->id
+        ]);
+
+        // Send Email NOW
+
+
         return redirect()->route('user-loans.show', $loan)
             ->with('success', 'Loan created successfully.');
 
@@ -628,7 +642,7 @@ class LoanController extends Controller
     {
 
         $this->authorizeLevel(AccessLevel::MANAGE);
-        
+
         $request->validate([
             'status' => ['required', 'string', Rule::in([
                 'pending',
@@ -700,6 +714,7 @@ class LoanController extends Controller
                 'disbursement_transaction_id' => $request->disbursement_transaction_id
             ])
             ->log('Loan status updated');
+
 
         return back()->with('success', 'Loan status updated successfully');
     }

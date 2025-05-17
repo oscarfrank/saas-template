@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('loan_id')->constrained()->onDelete('cascade');
             $table->foreignId('payment_method_id')->constrained()->onDelete('restrict');
             $table->string('reference_number')->unique();
-            $table->integer('payment_number')->comment('Sequential payment number in schedule');
+            $table->integer('payment_number')->unsigned()->comment('Sequential payment number in schedule');
             $table->decimal('amount', 20, 2);
             $table->decimal('interest_amount', 20, 2)->default(0);
             $table->decimal('principal_amount', 20, 2)->default(0);
@@ -22,10 +22,8 @@ return new class extends Migration
             $table->decimal('early_payment_fee_amount', 20, 2)->default(0);
             $table->decimal('additional_amount', 20, 2)->default(0);
             $table->foreignId('currency_id')->constrained();
-            $table->date('due_date')->comment('Date payment is due');
-            $table->time('due_time')->nullable()->comment('Time payment is due if applicable');
-            $table->date('payment_date');
-            $table->time('payment_time')->nullable();
+            $table->timestamp('due_at')->comment('Date and time payment is due');
+            $table->timestamp('payment_at')->comment('Date and time payment was made');
             $table->integer('days_late')->default(0);
             $table->boolean('is_overdue')->default(false);
             $table->enum('status', [
@@ -80,9 +78,9 @@ return new class extends Migration
             // Indexes
             $table->index('loan_id');
             $table->index('status');
-            $table->index('payment_date');
+            $table->index('payment_at');
             $table->index('reference_number');
-            $table->index('due_date');
+            $table->index('due_at');
             $table->index('is_overdue');
             $table->index('transaction_id');
             $table->index(['loan_id', 'payment_number']);

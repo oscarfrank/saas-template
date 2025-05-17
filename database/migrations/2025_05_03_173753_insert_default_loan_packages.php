@@ -35,21 +35,38 @@ return new class extends Migration
 
         // Standard Loan - 3 Months
         DB::table('loan_packages')->insert([
-            'name' => 'Standard Loan - 3 Months',
-            'code' => 'SL-3M',
-            'description' => 'Medium-term loan with competitive interest for 3 months duration',
+            'name' => 'Standard Loan - 1 Months with Fees',
+            'code' => 'SL-11M',
+            'description' => 'Short-term loan with competitive interest for 1 months duration with fees',
             'user_type' => 'lender',
             'min_amount' => 50000,
             'max_amount' => 2500000,
             'currency_id' => 4, // NGN
-            'min_duration_days' => 90,
-            'max_duration_days' => 90,
+            'min_duration_days' => 30,
+            'max_duration_days' => 30,
             'has_fixed_duration' => true,
-            'fixed_duration_days' => 90,
-            'interest_rate' => 8.0,
+            'fixed_duration_days' => 30,
+            'interest_rate' => 4.0,
             'interest_type' => 'simple',
             'interest_calculation' => 'monthly',
             'interest_payment_frequency' => 'monthly',
+
+            'has_origination_fee' => true,
+            'origination_fee_type' => 'percentage',
+            'origination_fee_fixed' => 0,
+            'origination_fee_percentage' => 0.05,
+
+            'late_payment_fee_type' => 'percentage',
+            'late_payment_fee_fixed' => 0,
+            'late_payment_fee_percentage' => 0.05,
+            'grace_period_days' => 7,
+
+            'allows_early_repayment' => true,
+            'early_repayment_type' => 'fixed',
+            'early_repayment_fee_fixed' => 1000,
+            'early_repayment_fee_percentage' => 0.05,
+            'early_repayment_period_days' => 14,
+
             'min_kyc_level' => 2,
             'risk_level' => 'medium',
             'is_active' => true,

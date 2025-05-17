@@ -13,27 +13,34 @@ class LoanPayment extends Model
     protected $fillable = [
         'loan_id',
         'payment_method_id',
-        'reference_number',
         'amount',
-        'interest_amount',
-        'principal_amount',
-        'fees_amount',
-        'payment_date',
+        'additional_amount',
+        'currency_id',
+        'due_at',
+        'payment_at',
+        'days_late',
+        'is_overdue',
         'status',
+        'reference_number',
+        'transaction_id',
         'notes',
+        'metadata',
+        'payment_number',
+        'payment_date',
+        'due_date',
         'proof_file',
         'approved_by',
         'approved_at',
-        'rejection_reason'
+        'rejection_reason',
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
-        'approved_at' => 'datetime',
         'amount' => 'decimal:2',
-        'interest_amount' => 'decimal:2',
-        'principal_amount' => 'decimal:2',
-        'fees_amount' => 'decimal:2'
+        'additional_amount' => 'decimal:2',
+        'is_overdue' => 'boolean',
+        'metadata' => 'array',
+        'due_at' => 'datetime',
+        'payment_at' => 'datetime',
     ];
 
     /**
@@ -68,6 +75,7 @@ class LoanPayment extends Model
         $loan = $this->loan;
         $interestDue = $this->calculateInterestDue($loan);
         
+        // If payment amount is less than or equal to interest due, apply all to interest
         if ($this->amount <= $interestDue) {
             return [
                 'interest_amount' => $this->amount,
@@ -76,9 +84,11 @@ class LoanPayment extends Model
             ];
         }
 
+        // Calculate remaining amount after interest
         $remainingAmount = $this->amount - $interestDue;
         $feesDue = $this->calculateFeesDue($loan);
 
+        // If remaining amount is less than or equal to fees, apply remaining to fees
         if ($remainingAmount <= $feesDue) {
             return [
                 'interest_amount' => $interestDue,
@@ -87,6 +97,7 @@ class LoanPayment extends Model
             ];
         }
 
+        // Apply remaining amount to principal
         return [
             'interest_amount' => $interestDue,
             'fees_amount' => $feesDue,
@@ -104,9 +115,10 @@ class LoanPayment extends Model
         
         // Calculate based on loan's interest type and calculation method
         if ($loan->interest_type === 'simple') {
+            // Simple interest: Principal * Rate * Time
             return $loan->principal_remaining * ($loan->interest_rate / 100) * ($days / 365);
         } else {
-            // Compound interest calculation
+            // Compound interest: Principal * (1 + Rate)^Time - Principal
             return $loan->principal_remaining * (pow(1 + ($loan->interest_rate / 100), $days / 365) - 1);
         }
     }
@@ -116,7 +128,14 @@ class LoanPayment extends Model
      */
     private function calculateFeesDue(Loan $loan): float
     {
-        // Implement fee calculation logic based on loan terms
-        return 0; // Placeholder
+        // Calculate late payment fees if applicable
+        $daysPastDue = $this->payment_date->diffInDays($loan->next_payment_due_date);
+        if ($daysPastDue > $loan->grace_period_days) {
+            $lateFee = $loan->late_payment_fee_fixed;
+            $lateFee += $loan->principal_remaining * ($loan->late_payment_fee_percentage / 100);
+            return $lateFee;
+        }
+        
+        return 0;
     }
 }

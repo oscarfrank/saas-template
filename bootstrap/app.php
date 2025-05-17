@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'except.user' => \App\Http\Middleware\ExceptUser::class,
+            'level' => \App\Http\Middleware\RequireLevel::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -19,21 +19,22 @@ return new class extends Migration
 
         // Create roles
         $roles = [
-            'super-admin',
-            'admin',
-            'manager',
-            'loan-officer',
-            'investment-officer',
-            'support',
-            'lender',
-            'borrower',
-            'user',
+            ['name' => 'super-admin', 'level' => 90],
+            ['name' => 'admin', 'level' => 80],
+            ['name' => 'manager', 'level' => 50],
+            ['name' => 'loan-officer', 'level' => 30],
+            ['name' => 'investment-officer', 'level' => 30],
+            ['name' => 'support', 'level' => 20],
+            ['name' => 'lender', 'level' => 5],
+            ['name' => 'borrower', 'level' => 5],
+            ['name' => 'user', 'level' => 1],
         ];
 
         foreach ($roles as $role) {
             Role::create([
-                'name' => $role,
-                'guard_name' => 'web'
+                'name' => $role['name'],
+                'guard_name' => 'web',
+                'level' => $role['level']
             ]);
         }
 

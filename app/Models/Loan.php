@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Loan extends Model
 {
+
     protected $fillable = [
         'user_id',
         'package_id',
@@ -65,8 +66,8 @@ class Loan extends Model
     protected $appends = ['current_interest_due', 'principal_remaining'];
 
     protected $casts = [
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
@@ -74,8 +75,8 @@ class Loan extends Model
         'defaulted_at' => 'datetime',
         'paid_at' => 'datetime',
         'closed_at' => 'datetime',
-        'next_payment_due_date' => 'datetime',
-        'last_payment_date' => 'datetime',
+        'next_payment_due_date' => 'date',
+        'last_payment_date' => 'date',
     ];
 
     /**
@@ -213,7 +214,7 @@ class Loan extends Model
     {
         try {
             if (!$value) {
-                return $this->calculateNextPaymentDueDate()->format('Y-m-d H:i:s');
+                return $this->calculateNextPaymentDueDate();
             }
             return $value;
         } catch (\Exception $e) {

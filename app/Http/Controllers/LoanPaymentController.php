@@ -158,12 +158,51 @@ class LoanPaymentController extends Controller
             // Get the loan from the payment relationship
             $loan = $payment->loan;
             
+            // Calculate days since loan start
+            $startDate = new \DateTime($loan->start_date);
+            $currentDate = new \DateTime();
+            $daysSinceStart = $currentDate->diff($startDate)->days;
+            
+            // Calculate if we're in grace period
+            $isInGracePeriod = $daysSinceStart <= $loan->grace_period_days;
+            
+            // Calculate if this is an early repayment
+            $isEarlyRepayment = $daysSinceStart < $loan->early_repayment_period_days;
+            
+            // Calculate fixed fees that need to be paid
+            $fixedFees = $loan->fees_amount;  // This should only include fixed fees that are part of the loan
+
+            // Calculate dynamic fees based on current conditions
+            $latePaymentFee = 0;
+            if (!$isInGracePeriod && $daysSinceStart > $loan->duration_days) {
+                if ($loan->late_payment_fee_fixed > 0) {
+                    $latePaymentFee = $loan->late_payment_fee_fixed;
+                } elseif ($loan->late_payment_fee_percentage > 0) {
+                    $latePaymentFee = $loan->current_balance * ($loan->late_payment_fee_percentage / 100);
+                }
+            }
+
+            $earlyRepaymentFee = 0;
+            if ($isEarlyRepayment && $loan->allows_early_repayment) {
+                if ($loan->early_repayment_fixed_fee > 0) {
+                    $earlyRepaymentFee = $loan->early_repayment_fixed_fee;
+                } elseif ($loan->early_repayment_fee_percentage > 0) {
+                    $earlyRepaymentFee = $loan->current_balance * ($loan->early_repayment_fee_percentage / 100);
+                }
+            }
+
+            // Log the fee calculations for transparency
+            Log::info('Fee calculations:', [
+                'loan_id' => $loan->id,
+                'fixed_fees' => $fixedFees,
+                'late_payment_fee' => $latePaymentFee,
+                'early_repayment_fee' => $earlyRepaymentFee,
+                'fees_paid' => $loan->fees_paid
+            ]);
+
             // Calculate interest due from last payment date to current date
             $lastPaymentDate = $loan->last_payment_date ?? $loan->start_date;
-            $currentInterestDue = $loan->current_interest_due; // Use the loan's current_interest_due instead of calculating it
-            
-            // Calculate remaining fees (if any)
-            $remainingFees = $loan->fees_amount - $loan->fees_paid;
+            $currentInterestDue = $loan->currentInterestDue();
             
             // Start with the full payment amount
             $remainingPayment = $payment->amount;
@@ -172,41 +211,48 @@ class LoanPaymentController extends Controller
             $feesAmount = 0;
             $interestAmount = 0;
             $principalAmount = 0;
+            $lateFeesAmount = 0;
+            $earlyRepaymentFeesAmount = 0;
 
             // Log the initial state
             Log::info('Payment allocation starting:', [
                 'payment_id' => $payment->id,
                 'payment_amount' => $payment->amount,
                 'current_interest_due' => $currentInterestDue,
-                'remaining_fees' => $remainingFees,
+                'fixed_fees' => $fixedFees,
+                'late_payment_fee' => $latePaymentFee,
+                'early_repayment_fee' => $earlyRepaymentFee,
                 'principal_remaining' => $loan->principal_remaining,
-                'last_payment_date' => $lastPaymentDate,
-                'loan_start_date' => $loan->start_date
+                'days_since_start' => $daysSinceStart,
+                'is_in_grace_period' => $isInGracePeriod,
+                'is_early_repayment' => $isEarlyRepayment
             ]);
 
-            // 1. First, pay any remaining fees
-            if ($remainingFees > 0) {
-                $feesAmount = min($remainingPayment, $remainingFees);
+            // 1. First, pay any late payment fees
+            if ($latePaymentFee > 0) {
+                $lateFeesAmount = min($remainingPayment, $latePaymentFee);
+                $remainingPayment -= $lateFeesAmount;
+            }
+
+            // 2. Then, pay any early repayment fees
+            if ($earlyRepaymentFee > 0) {
+                $earlyRepaymentFeesAmount = min($remainingPayment, $earlyRepaymentFee);
+                $remainingPayment -= $earlyRepaymentFeesAmount;
+            }
+
+            // 3. Then, pay any fixed fees
+            if ($fixedFees > 0) {
+                $feesAmount = min($remainingPayment, $fixedFees);
                 $remainingPayment -= $feesAmount;
             }
 
-            // 2. Then, pay any interest due
+            // 4. Then, pay any interest due
             if ($remainingPayment > 0 && $currentInterestDue > 0) {
                 $interestAmount = min($remainingPayment, $currentInterestDue);
                 $remainingPayment -= $interestAmount;
-
-                // Log if payment doesn't cover all interest
-                if ($interestAmount < $currentInterestDue) {
-                    Log::warning('Payment does not cover all interest due:', [
-                        'payment_id' => $payment->id,
-                        'interest_paid' => $interestAmount,
-                        'interest_due' => $currentInterestDue,
-                        'remaining_interest' => $currentInterestDue - $interestAmount
-                    ]);
-                }
             }
 
-            // 3. Finally, apply remaining amount to principal
+            // 5. Finally, apply remaining amount to principal
             if ($remainingPayment > 0) {
                 $principalAmount = $remainingPayment;
             }
@@ -215,19 +261,22 @@ class LoanPaymentController extends Controller
             Log::info('Payment allocation completed:', [
                 'payment_id' => $payment->id,
                 'total_payment' => $payment->amount,
+                'late_fees_amount' => $lateFeesAmount,
+                'early_repayment_fees_amount' => $earlyRepaymentFeesAmount,
                 'fees_amount' => $feesAmount,
                 'interest_amount' => $interestAmount,
                 'principal_amount' => $principalAmount,
-                'remaining_payment' => $remainingPayment,
-                'interest_coverage' => $currentInterestDue > 0 ? ($interestAmount / $currentInterestDue) * 100 : 0
+                'remaining_payment' => $remainingPayment
             ]);
 
-            // First, update the payment record with the split amounts
+            // Update the payment record with the split amounts
             $payment->update([
                 'status' => 'completed',
                 'interest_amount' => $interestAmount,
                 'principal_amount' => $principalAmount,
-                'fees_amount' => $feesAmount,
+                'fees_amount' => $feesAmount + $lateFeesAmount + $earlyRepaymentFeesAmount,
+                'late_fee_amount' => $lateFeesAmount,
+                'early_payment_fee_amount' => $earlyRepaymentFeesAmount,
                 'notes' => $request->notes,
                 'approved_by' => auth()->id(),
                 'approved_at' => now(),
@@ -236,7 +285,7 @@ class LoanPaymentController extends Controller
             // Calculate new loan balances
             $newPrincipalPaid = $loan->principal_paid + $principalAmount;
             $newInterestPaid = $loan->interest_paid + $interestAmount;
-            $newFeesPaid = $loan->fees_paid + $feesAmount;
+            $newFeesPaid = $loan->fees_paid + $feesAmount + $lateFeesAmount + $earlyRepaymentFeesAmount;
             $newPrincipalRemaining = $loan->amount - $newPrincipalPaid;
 
             // Calculate next payment due date
@@ -251,7 +300,7 @@ class LoanPaymentController extends Controller
                 'interest_paid' => $newInterestPaid,
                 'fees_paid' => $newFeesPaid,
                 'principal_remaining' => $newPrincipalRemaining,
-                'current_balance' => $newPrincipalRemaining, // This should only reflect the principal amount
+                'current_balance' => $newPrincipalRemaining,
                 'completed_payments' => $loan->completed_payments + 1,
                 'last_payment_date' => now(),
                 'last_payment_amount' => $payment->amount,
@@ -291,7 +340,7 @@ class LoanPaymentController extends Controller
         }
 
         // Calculate interest due for the next period
-        $interestDue = $this->calculateInterestDue($loan, $nextPaymentDate);
+        $interestDue = $loan->currentInterestDue();
         
         // Calculate remaining principal
         $remainingPrincipal = $loan->amount - $loan->principal_paid;
@@ -303,59 +352,6 @@ class LoanPaymentController extends Controller
 
         // Otherwise, return the regular payment amount
         return $loan->monthly_payment_amount;
-    }
-
-    /**
-     * Calculate interest due up to a specific date.
-     */
-    private function calculateInterestDue(Loan $loan, \DateTime $endDate, \DateTime $startDate = null): float
-    {
-        // Validate required fields
-        if (!$loan->start_date || !$loan->interest_rate || !$loan->duration_days || $loan->duration_days <= 0) {
-            Log::warning('Invalid loan parameters for interest calculation:', [
-                'loan_id' => $loan->id,
-                'start_date' => $loan->start_date,
-                'interest_rate' => $loan->interest_rate,
-                'duration_days' => $loan->duration_days
-            ]);
-            return 0;
-        }
-
-        // Use provided start date or default to loan start date
-        $startDate = $startDate ?? new \DateTime($loan->start_date);
-        $days = $endDate->diff($startDate)->days;
-        
-        // Calculate daily interest rate
-        $dailyRate = ($loan->interest_rate / $loan->duration_days);
-        
-        // Calculate interest on current balance
-        return $loan->current_balance * ($dailyRate / 100) * $days;
-    }
-
-    /**
-     * Reject a pending payment.
-     */
-    public function reject(Request $request, LoanPayment $payment)
-    {
-        $request->validate([
-            'rejection_reason' => 'required|string'
-        ]);
-
-        if ($payment->status !== 'pending') {
-            throw ValidationException::withMessages([
-                'payment' => 'Only pending payments can be rejected.'
-            ]);
-        }
-
-        $payment->update([
-            'status' => 'rejected',
-            'rejection_reason' => $request->rejection_reason
-        ]);
-
-        return response()->json([
-            'message' => 'Payment rejected successfully.',
-            'payment' => $payment->fresh()
-        ]);
     }
 
     /**
@@ -449,5 +445,31 @@ class LoanPaymentController extends Controller
 
             return response()->json(['message' => 'Payment failed'], 400);
         }
+    }
+
+    /**
+     * Reject a pending payment.
+     */
+    public function reject(Request $request, LoanPayment $payment)
+    {
+        $request->validate([
+            'rejection_reason' => 'required|string'
+        ]);
+
+        if ($payment->status !== 'pending') {
+            throw ValidationException::withMessages([
+                'payment' => 'Only pending payments can be rejected.'
+            ]);
+        }
+
+        $payment->update([
+            'status' => 'rejected',
+            'rejection_reason' => $request->rejection_reason
+        ]);
+
+        return response()->json([
+            'message' => 'Payment rejected successfully.',
+            'payment' => $payment->fresh()
+        ]);
     }
 }

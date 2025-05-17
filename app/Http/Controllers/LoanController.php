@@ -174,7 +174,8 @@ class LoanController extends Controller
                       ->orderBy('created_at', 'desc');
             },
             'payments' => function ($query) {
-                $query->orderBy('due_date', 'desc');
+                $query->with('payment_method')
+                      ->orderBy('due_date', 'desc');
             }
         ]);
         
@@ -709,13 +710,16 @@ class LoanController extends Controller
                 $query->with(['createdBy', 'updatedBy']);
             },
             'payments' => function ($query) {
-                $query->orderBy('due_date', 'desc');
+                $query->with('payment_method')
+                      ->orderBy('due_date', 'desc');
             },
         ]);
 
         return Inertia::render('loans/user-show', [
             'loan' => $loan,
-            'payment_methods' => PaymentMethod::all(),
+            'payment_methods' => PaymentMethod::where('is_active', true)
+                ->select('id', 'name', 'method_type', 'is_online')
+                ->get(),
         ]);
     }
 

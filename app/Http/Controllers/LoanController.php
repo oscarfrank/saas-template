@@ -16,9 +16,13 @@ use App\Models\LoanPayment;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
 
+use App\Traits\LevelBasedAuthorization;
+use App\Helpers\AccessLevel;
+
 class LoanController extends Controller
 {
     use AuthorizesRequests;
+    use LevelBasedAuthorization;
 
     /**
      * Display a listing of the resource.
@@ -54,6 +58,7 @@ class LoanController extends Controller
      */
     public function create()
     {
+
         return Inertia::render('loans/create', [
             'users' => \App\Models\User::select('id', 'first_name', 'last_name', 'email')->get(),
             'currencies' => \App\Models\Currency::select('id', 'code', 'symbol')->get(),
@@ -67,6 +72,7 @@ class LoanController extends Controller
      */
     public function store(Request $request)
     {
+
         // Check if user's KYC is verified, but only if loans without KYC are not allowed
         $allowLoansWithoutKyc = \App\Models\LoanSetting::getValue('allow_loans_without_kyc', false);
         if (!$allowLoansWithoutKyc && !auth()->user()->isKycVerified()) {
@@ -153,6 +159,8 @@ class LoanController extends Controller
 
         return redirect()->route('user-loans.show', $loan)
             ->with('success', 'Loan created successfully.');
+
+
     }
 
     /**
@@ -160,6 +168,8 @@ class LoanController extends Controller
      */
     public function show(Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
+
         $loan->load([
             'user',
             'currency',
@@ -192,6 +202,7 @@ class LoanController extends Controller
      */
     public function edit(Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
         $loan->load(['user', 'currency', 'package', 'customPackage']);
         
         return Inertia::render('loans/edit', [
@@ -208,10 +219,11 @@ class LoanController extends Controller
      */
     public function update(Request $request, Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
+
         $validated = $request->validate([
             'user_id' => 'required|exists:users,id',
             'package_id' => 'nullable|exists:loan_packages,id',
-            // 'custom_package_id' => 'nullable|exists:custom_packages,id',
             'amount' => 'required|numeric|min:0',
             'currency_id' => 'required|exists:currencies,id',
             'interest_rate' => 'required|numeric|min:0',
@@ -246,6 +258,7 @@ class LoanController extends Controller
      */
     public function destroy(Loan $loan)
     {
+        
         $loan->delete();
 
         return redirect()->route('loans.index')
@@ -301,7 +314,9 @@ class LoanController extends Controller
      * Bulk delete loans
      */
     public function bulkDelete(Request $request)
-    {
+    {   
+        $this->authorizeLevel(AccessLevel::MANAGE);
+
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:loans,id'
@@ -346,6 +361,7 @@ class LoanController extends Controller
      */
     public function uploadDocument(Request $request, Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
         $validated = $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
             'type' => 'required|string',
@@ -373,6 +389,7 @@ class LoanController extends Controller
      */
     public function deleteDocument(Loan $loan, $documentId)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
         $document = $loan->documents()->findOrFail($documentId);
         
         // Delete the file from storage
@@ -391,6 +408,8 @@ class LoanController extends Controller
      */
     public function notes(Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::USER, $loan);
+
         $loan->load(['notes.user']);
         
         return Inertia::render('loans/notes', [
@@ -403,6 +422,8 @@ class LoanController extends Controller
      */
     public function addNote(Request $request, Loan $loan)
     {
+        $this->authorizeLevel(AccessLevel::EDIT);
+
         $validated = $request->validate([
             'content' => 'required|string',
         ]);
@@ -421,16 +442,14 @@ class LoanController extends Controller
      */
     public function updateNote(Request $request, Loan $loan, $noteId)
     {
+        $this->authorizeLevel(AccessLevel::EDIT);
+
         $validated = $request->validate([
             'content' => 'required|string',
         ]);
 
         $note = $loan->notes()->findOrFail($noteId);
         
-        // Check if user has permission to edit this note
-        if ($note->created_by !== auth()->id() && !auth()->user()->isAdmin()) {
-            return redirect()->back()->with('error', 'You do not have permission to edit this note.');
-        }
 
         $note->update([
             'content' => $validated['content'],
@@ -471,6 +490,8 @@ class LoanController extends Controller
      */
     public function submitPayment(Request $request, Loan $loan)
     {
+
+        $this->authorizeLevel(AccessLevel::USER, $loan);
         $validated = $request->validate([
             'payment_method_id' => ['required', 'exists:payment_methods,id'],
             'amount' => [
@@ -515,6 +536,8 @@ class LoanController extends Controller
      */
     public function approvePayment(Request $request, Loan $loan, $paymentId)
     {
+        $this->authorizeLevel(AccessLevel::MANAGE);
+
         $payment = $loan->payments()->findOrFail($paymentId);
 
         if ($payment->status !== 'pending') {
@@ -560,6 +583,7 @@ class LoanController extends Controller
      */
     public function rejectPayment(Request $request, Loan $loan, $paymentId)
     {
+        $this->authorizeLevel(AccessLevel::MANAGE);
         $validated = $request->validate([
             'rejection_reason' => 'required|string',
         ]);
@@ -602,6 +626,9 @@ class LoanController extends Controller
      */
     public function updateStatus(Request $request, Loan $loan)
     {
+
+        $this->authorizeLevel(AccessLevel::MANAGE);
+        
         $request->validate([
             'status' => ['required', 'string', Rule::in([
                 'pending',
@@ -697,10 +724,7 @@ class LoanController extends Controller
      */
     public function userShow(Loan $loan)
     {
-        // Simple check to ensure user can only view their own loans
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load([
             'currency',
@@ -728,9 +752,7 @@ class LoanController extends Controller
      */
     public function userDocuments(Loan $loan)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load('documents');
 
@@ -744,9 +766,7 @@ class LoanController extends Controller
      */
     public function userNotes(Loan $loan)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load(['notes' => function ($query) {
             $query->with(['createdBy', 'updatedBy']);
@@ -762,9 +782,7 @@ class LoanController extends Controller
      */
     public function userUploadDocument(Request $request, Loan $loan)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $validated = $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
@@ -793,9 +811,7 @@ class LoanController extends Controller
      */
     public function userDownloadDocument(Loan $loan, LoanDocument $document)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         if ($document->loan_id !== $loan->id) {
             abort(404);
@@ -809,9 +825,7 @@ class LoanController extends Controller
      */
     public function userSubmitPayment(Request $request, Loan $loan)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         if ($loan->status !== 'active') {
             return back()->with('error', 'Payments can only be made on active loans.');
@@ -845,9 +859,7 @@ class LoanController extends Controller
      */
     public function userDownloadPaymentProof(Loan $loan, LoanPayment $payment)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         if ($payment->loan_id !== $loan->id) {
             abort(404);
@@ -865,9 +877,7 @@ class LoanController extends Controller
      */
     public function userCancel(Loan $loan)
     {
-        if ($loan->user_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeLevel(AccessLevel::USER, $loan);
 
         if ($loan->status !== 'pending') {
             return back()->with('error', 'Only pending loans can be cancelled.');

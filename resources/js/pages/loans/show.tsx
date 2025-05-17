@@ -729,7 +729,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Activation Date</p>
                                     <p className="text-lg font-semibold">
-                                        {loan.start_date 
+                                        {loan.start_date && !isNaN(new Date(loan.start_date).getTime())
                                             ? format(new Date(loan.start_date), 'PPP')
                                             : 'Not yet active'}
                                     </p>
@@ -774,7 +774,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                 <div className="bg-primary/10 p-4 rounded-lg border-2 border-primary/20">
                                     <p className="text-sm font-medium text-primary">Next Payment Due</p>
                                     <p className="text-xl font-bold text-primary">
-                                        {loan.next_payment_due_date
+                                        {loan.next_payment_due_date && !isNaN(new Date(loan.next_payment_due_date).getTime())
                                             ? format(new Date(loan.next_payment_due_date), 'PPP')
                                             : 'N/A'}
                                     </p>
@@ -862,7 +862,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                         <div>
                                             <p className="text-sm font-medium">Next Payment Due</p>
                                             <p className="text-lg font-semibold">
-                                                {loan.next_payment_due_date
+                                                {loan.next_payment_due_date && !isNaN(new Date(loan.next_payment_due_date).getTime())
                                                     ? format(new Date(loan.next_payment_due_date), 'PPP')
                                                     : 'N/A'}
                                             </p>
@@ -960,19 +960,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                             </div>
                                             <p className="text-xs text-muted-foreground">
                                                 Charged when repaying the loan before the end of the {loan.early_repayment_period_days}-day grace period. After {loan.early_repayment_period_days} days, this fee will no longer apply.
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {/* Collateral Information */}
-                                    {loan.has_collateral && (
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between items-center">
-                                                <p className="text-sm font-medium">Collateral</p>
-                                                <p className="text-sm font-semibold">Required</p>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                {loan.collateral_description || 'Collateral is required for this loan'}
                                             </p>
                                         </div>
                                     )}
@@ -1215,7 +1202,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                         <div>
                                             <p className="text-sm font-medium">Next Payment Due</p>
                                             <p className="text-lg font-semibold">
-                                                {loan.next_payment_due_date
+                                                {loan.next_payment_due_date && !isNaN(new Date(loan.next_payment_due_date).getTime())
                                                     ? format(new Date(loan.next_payment_due_date), 'PPP')
                                                     : 'N/A'}
                                             </p>
@@ -1226,7 +1213,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                         <div>
                                             <p className="text-sm font-medium">Last Payment</p>
                                             <p className="text-lg font-semibold">
-                                                {loan.last_payment_date
+                                                {loan.last_payment_date && !isNaN(new Date(loan.last_payment_date).getTime())
                                                     ? format(new Date(loan.last_payment_date), 'PPP')
                                                     : 'N/A'}
                                             </p>

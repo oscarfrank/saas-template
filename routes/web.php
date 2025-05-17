@@ -22,6 +22,10 @@ use App\Http\Controllers\LoanDashboardController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\LoanPaymentController;
 
+
+use App\Traits\LevelBasedAuthorization;
+use App\Helpers\AccessLevel;
+
 // Homepage
 Route::get('/', [OuterPagesController::class, 'index'])->name('home');
 Route::get('/faq', [OuterPagesController::class, 'faq'])->name('faq');
@@ -90,6 +94,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // User Loans route
     Route::get('/loans', [LoanController::class, 'userIndex'])->name('user-loans');
+    Route::post('/loans', [LoanController::class, 'store'])->name('user-loans.store');
     Route::get('/loans/{loan}', [LoanController::class, 'userShow'])->name('user-loans.show');
     Route::get('/loans/{loan}/documents', [LoanController::class, 'userDocuments'])->name('user-loans.documents');
     Route::get('/loans/{loan}/notes', [LoanController::class, 'userNotes'])->name('user-loans.notes');

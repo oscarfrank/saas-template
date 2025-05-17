@@ -76,6 +76,15 @@ const adminNavItems: NavItem[] = [
         title: 'Admin',
         href: '/admin/dashboard',
         icon: UserRoundCog,
+        className: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md',
+        roles: ['superadmin', 'admin', 'manager']
+    },
+    {
+        title: 'Ticket Support',
+        href: '/admin/tickets',
+        icon: Ticket,
+        className: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md',
+        roles: ['support']
     },
 ];
 
@@ -105,8 +114,8 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-                {hasRole(user, 'user') ? '' : <NavFooter items={adminNavItems} className="mt-auto bg-red-900" />}
+                {/* <NavFooter items={footerNavItems} className="mt-auto" /> */}
+                {hasRole(user, 'user') ? '' : <NavFooter items={adminNavItems} className="mt-auto" />}
                 
                 <NavUser />
             </SidebarFooter>

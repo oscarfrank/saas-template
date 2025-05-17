@@ -35,11 +35,13 @@ interface Props {
         created_at: string;
         last_reply_at: string | null;
         user: {
-            name: string;
+            first_name: string;
+            last_name: string;
             email: string;
         };
         assignedTo: {
-            name: string;
+            first_name: string;
+            last_name: string;
             email: string;
         } | null;
         replies: Array<{
@@ -48,7 +50,8 @@ interface Props {
             is_internal: boolean;
             created_at: string;
             user: {
-                name: string;
+                first_name: string;
+                last_name: string;
                 email: string;
             };
         }>;
@@ -279,12 +282,12 @@ export default function Show({ ticket }: Props) {
 
                                 <div>
                                     <h3 className="font-medium">Created By</h3>
-                                    <p className="text-muted-foreground">{ticket.user.name}</p>
+                                    <p className="text-muted-foreground">{ticket.user.first_name} {ticket.user.last_name}</p>
                                 </div>
 
                                 <div>
                                     <h3 className="font-medium">Assigned To</h3>
-                                    <p className="text-muted-foreground">{ticket.assignedTo?.name || 'Unassigned'}</p>
+                                    <p className="text-muted-foreground">{ticket.assignedTo?.first_name} {ticket.assignedTo?.last_name || 'Unassigned'}</p>
                                 </div>
 
                                 <div>
@@ -329,11 +332,11 @@ export default function Show({ ticket }: Props) {
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                                                             <span className="text-sm font-medium text-primary">
-                                                                {reply.user.name.charAt(0).toUpperCase()}
+                                                                {reply.user.first_name.charAt(0).toUpperCase()}
                                                             </span>
                                                         </div>
                                                         <div>
-                                                            <p className="font-medium">{reply.user.name}</p>
+                                                            <p className="font-medium">{reply.user.first_name} {reply.user.last_name}</p>
                                                             <p className="text-sm text-muted-foreground">{formatDate(reply.created_at)}</p>
                                                         </div>
                                                     </div>
@@ -353,7 +356,7 @@ export default function Show({ ticket }: Props) {
                             </div>
 
                             <div id="reply-form" className="border-t pt-6 mt-4">
-                                {ticket.status !== 'resolved' ? (
+                                {ticket.status !== 'resolved' && ticket.status !== 'closed' ? (
                                     <>
                                         <h3 className="text-lg font-medium mb-4">Add a Reply</h3>
                                         <form onSubmit={handleReply} className="space-y-4">
@@ -392,7 +395,7 @@ export default function Show({ ticket }: Props) {
                                     </>
                                 ) : (
                                     <div className="text-center py-8">
-                                        <p className="text-muted-foreground">This ticket has been resolved. Reopen the ticket to add more replies.</p>
+                                        <p className="text-muted-foreground">This ticket has been {ticket.status}. Reopen the ticket to add more replies.</p>
                                     </div>
                                 )}
                             </div>

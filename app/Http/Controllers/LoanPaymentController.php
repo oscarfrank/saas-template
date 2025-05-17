@@ -91,7 +91,7 @@ class LoanPaymentController extends Controller
                     ->with('success', 'Payment submitted successfully');
             }
 
-            return redirect()->route('loans.show', $loan)
+            return redirect()->route('user-loans.show', $loan)
                 ->with('success', 'Payment submitted successfully');
 
         } catch (\Exception $e) {

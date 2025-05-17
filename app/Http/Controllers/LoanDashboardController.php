@@ -45,7 +45,9 @@ class LoanDashboardController extends Controller
         $upcomingPayments = [];
         if ($currentLoan && $currentLoan->next_payment_due_date) {
             $upcomingPayments[] = [
-                'date' => $currentLoan->next_payment_due_date->format('F j, Y'),
+                'date' => $currentLoan->next_payment_due_date instanceof \Carbon\Carbon 
+                    ? $currentLoan->next_payment_due_date->format('F j, Y')
+                    : \Carbon\Carbon::parse($currentLoan->next_payment_due_date)->format('F j, Y'),
                 'amount' => $currentLoan->currency->symbol . number_format($currentLoan->next_payment_amount, 2),
                 'days_remaining' => now()->diffInDays($currentLoan->next_payment_due_date),
             ];
@@ -55,7 +57,11 @@ class LoanDashboardController extends Controller
             'currentLoan' => $currentLoan ? [
                 'current_balance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
                 'status' => ucfirst($currentLoan->status),
-                'nextPayment' => $currentLoan->next_payment_due_date ? $currentLoan->next_payment_due_date->format('F j, Y') : null,
+                'nextPayment' => $currentLoan->next_payment_due_date 
+                    ? ($currentLoan->next_payment_due_date instanceof \Carbon\Carbon 
+                        ? $currentLoan->next_payment_due_date->format('F j, Y')
+                        : \Carbon\Carbon::parse($currentLoan->next_payment_due_date)->format('F j, Y'))
+                    : null,
                 'remainingBalance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
             ] : null,
             'applications' => $recentApplications,

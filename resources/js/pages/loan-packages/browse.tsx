@@ -130,7 +130,7 @@ export default function Browse({ loanPackages, user, loanSettings }: Props) {
 
         setIsActivating(true);
         try {
-            await router.post(route('loans.store'), {
+            router.post(route('user-loans.store'), {
                 package_id: selectedPackage.id,
                 amount: numericAmount,
                 duration_days: selectedPackage.min_duration_days,

@@ -57,7 +57,7 @@ export default function Create() {
             <Head title="Create Ticket" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('tickets.index')}>
+                    <Link href={route('tickets.user')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Tickets

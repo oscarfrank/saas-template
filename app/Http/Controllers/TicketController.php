@@ -8,10 +8,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Traits\LevelBasedAuthorization;
+use App\Helpers\AccessLevel;
 
 class TicketController extends Controller
 {
     use AuthorizesRequests;
+    use LevelBasedAuthorization;
 
     public function index(Request $request)
     {
@@ -64,13 +67,14 @@ class TicketController extends Controller
             'status' => 'open',
         ]);
 
-        return redirect()->route('admin.tickets.show', $ticket)
+        return redirect()->route('tickets.user.show', $ticket)
             ->with('success', 'Ticket created successfully.');
     }
 
     public function show(Ticket $ticket)
     {
-        $this->authorize('view', $ticket);
+        // $this->authorize('view', $ticket);
+        $this->authorizeLevel(AccessLevel::USER, $ticket);
 
         $ticket->load(['user', 'assignedTo', 'replies.user']);
 
@@ -81,7 +85,7 @@ class TicketController extends Controller
 
     public function edit(Ticket $ticket)
     {
-        $this->authorize('update', $ticket);
+        $this->authorizeLevel(AccessLevel::VIEW, $ticket);
 
         return Inertia::render('tickets/edit', [
             'ticket' => $ticket,
@@ -90,7 +94,8 @@ class TicketController extends Controller
 
     public function update(Request $request, Ticket $ticket)
     {
-        $this->authorize('update', $ticket);
+        // $this->authorize('update', $ticket);
+        $this->authorizeLevel(AccessLevel::USER, $ticket);
 
         // If only status is being updated
         if ($request->has('status') && count($request->all()) === 1) {
@@ -122,7 +127,7 @@ class TicketController extends Controller
 
     public function destroy(Ticket $ticket)
     {
-        $this->authorize('delete', $ticket);
+        $this->authorizeLevel(AccessLevel::MANAGE);
 
         $ticket->delete();
 
@@ -132,7 +137,7 @@ class TicketController extends Controller
 
     public function reply(Request $request, Ticket $ticket)
     {
-        $this->authorize('view', $ticket);
+        $this->authorizeLevel(AccessLevel::USER, $ticket);
 
         $validated = $request->validate([
             'message' => 'required|string',
@@ -146,7 +151,13 @@ class TicketController extends Controller
 
         $ticket->update(['last_reply_at' => now()]);
 
-        return redirect()->route('admin.tickets.show', $ticket)
+        // Redirect based on user level
+        if ($this->hasLevel(AccessLevel::SUPPORT)) {
+            return redirect()->route('admin.tickets.show', $ticket)
+                ->with('success', 'Reply added successfully.');
+        }
+
+        return redirect()->route('tickets.user.show', $ticket)
             ->with('success', 'Reply added successfully.');
     }
 
@@ -214,11 +225,7 @@ class TicketController extends Controller
 
     public function userShow(Ticket $ticket)
     {
-        // Ensure the ticket belongs to the authenticated user
-        if ($ticket->user_id !== auth()->id()) {
-            // abort(403, 'Unauthorized action.');
-            return redirect()->route('tickets.user');
-        }
+        $this->authorizeLevel(AccessLevel::USER, $ticket);
 
         $ticket->load(['user', 'assignedTo', 'replies.user']);
 

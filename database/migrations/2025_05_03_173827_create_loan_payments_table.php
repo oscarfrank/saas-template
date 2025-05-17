@@ -34,6 +34,7 @@ return new class extends Migration
                 'completed',    // Payment successfully completed
                 'failed',       // Payment attempt failed
                 'cancelled',    // Payment was cancelled
+                'rejected',     // Payment was rejected
                 'waived',       // Payment was waived by admin
                 'partial'       // Partial payment received
             ])->default('scheduled');

@@ -20,15 +20,16 @@ interface PaymentMethod {
 
 interface PaymentFormProps {
     loanId: number;
-    paymentMethods: PaymentMethod[];
-    onSubmit: (data: FormData) => void;
+    paymentMethods: Array<PaymentMethod>;
+    onSubmit: (formData: FormData) => void;
+    initialAmount?: string;
 }
 
-export default function PaymentForm({ loanId, paymentMethods, onSubmit }: PaymentFormProps) {
+export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialAmount }: PaymentFormProps) {
     const [file, setFile] = useState<File | null>(null);
     const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
     const { data, setData, post, processing, errors, reset } = useForm({
-        amount: '',
+        amount: initialAmount || '',
         payment_method_id: '',
         reference_number: '',
         payment_date: format(new Date(), 'yyyy-MM-dd'),
@@ -106,6 +107,10 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit }: Paymen
         }
     };
 
+    const handleAmountChange = (value: string) => {
+        setData('amount', value);
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -126,7 +131,7 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit }: Paymen
                                 type="number"
                                 step="0.01"
                                 value={data.amount}
-                                onChange={e => setData('amount', e.target.value)}
+                                onChange={(e) => handleAmountChange(e.target.value)}
                                 required
                             />
                             {errors.amount && (
@@ -140,13 +145,13 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit }: Paymen
                             <Label htmlFor="payment_method">Payment Method</Label>
                             <Select
                                 value={data.payment_method_id}
-                                onValueChange={value => setData('payment_method_id', value)}
+                                onValueChange={(value) => setData('payment_method_id', value)}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="mt-1">
                                     <SelectValue placeholder="Select payment method" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {paymentMethods.map(method => (
+                                    {paymentMethods.map((method) => (
                                         <SelectItem key={method.id} value={method.id.toString()}>
                                             {method.name}
                                         </SelectItem>
@@ -201,7 +206,7 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit }: Paymen
                                 <Textarea
                                     id="notes"
                                     value={data.notes}
-                                    onChange={e => setData('notes', e.target.value)}
+                                    onChange={(e) => setData('notes', e.target.value)}
                                 />
                                 {errors.notes && (
                                     <Alert variant="destructive">

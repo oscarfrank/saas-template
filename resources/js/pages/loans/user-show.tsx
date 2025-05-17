@@ -103,16 +103,7 @@ interface Loan {
         created_at: string;
         updated_at: string;
     }>;
-    payments?: Array<{
-        id: number;
-        payment_number: number;
-        amount: number;
-        status: string;
-        due_date: string;
-        payer_name: string;
-        notes?: string;
-        attachment?: string;
-    }>;
+    payments?: Payment[];
 }
 
 interface PaymentMethod {
@@ -122,6 +113,40 @@ interface PaymentMethod {
     is_online: boolean;
     callback_url?: string;
     configuration?: Record<string, any>;
+}
+
+interface PaymentBreakdown {
+    total_payment: number;
+    late_fees_amount: number;
+    early_repayment_fees_amount: number;
+    fees_amount: number;
+    interest_amount: number;
+    principal_amount: number;
+    remaining_payment: number;
+}
+
+interface Payment {
+    id: number;
+    payment_number: number;
+    amount: number;
+    status: string;
+    due_date: string;
+    payment_at?: string;
+    approved_at?: string;
+    payer_name: string;
+    notes?: string;
+    attachment?: string;
+    payment_method?: {
+        id: number;
+        name: string;
+        method_type: string;
+    };
+    late_fees_amount?: number;
+    early_repayment_fees_amount?: number;
+    fees_amount?: number;
+    interest_amount?: number;
+    principal_amount?: number;
+    remaining_payment?: number;
 }
 
 interface Props extends PageProps {
@@ -170,6 +195,10 @@ export default function UserShow({ loan, payment_methods }: Props) {
     const [previewOpen, setPreviewOpen] = useState(false);
     const paymentsTabRef = useRef<HTMLDivElement>(null);
     const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+    const [paymentBreakdownOpen, setPaymentBreakdownOpen] = useState(false);
+    const [selectedPaymentBreakdown, setSelectedPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
+    const [paymentAmount, setPaymentAmount] = useState<string>('');
+    const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown | null>(null);
 
     const handleDocumentUpload = (e: React.FormEvent) => {
         e.preventDefault();
@@ -258,6 +287,127 @@ export default function UserShow({ loan, payment_methods }: Props) {
         setTimeout(() => {
             paymentsTabRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
+    };
+
+    const handleShowPaymentBreakdown = (payment: any) => {
+        setSelectedPaymentBreakdown({
+            total_payment: payment.amount,
+            late_fees_amount: payment.late_fees_amount || 0,
+            early_repayment_fees_amount: payment.early_repayment_fees_amount || 0,
+            fees_amount: payment.fees_amount || 0,
+            interest_amount: payment.interest_amount || 0,
+            principal_amount: payment.principal_amount || 0,
+            remaining_payment: payment.remaining_payment || 0
+        });
+        setPaymentBreakdownOpen(true);
+    };
+
+    const calculatePaymentBreakdown = (amount: number) => {
+        // Calculate days since loan start
+        const startDate = new Date(loan.start_date);
+        const currentDate = new Date();
+        const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Calculate if we're in grace period
+        const isInGracePeriod = daysSinceStart <= loan.grace_period_days;
+        
+        // Calculate if this is an early repayment
+        const isEarlyRepayment = daysSinceStart < loan.early_repayment_period_days;
+        
+        // Calculate late payment fee
+        let lateFeesAmount = 0;
+        if (!isInGracePeriod && loan.days_past_due > 0) {
+            if (loan.late_payment_fee_fixed > 0) {
+                lateFeesAmount = loan.late_payment_fee_fixed;
+            } else if (loan.late_payment_fee_percentage > 0) {
+                lateFeesAmount = loan.current_balance * (loan.late_payment_fee_percentage / 100);
+            }
+        }
+
+        // Calculate early repayment fee
+        let earlyRepaymentFeesAmount = 0;
+        if (isEarlyRepayment && loan.allows_early_repayment) {
+            if (loan.early_repayment_fixed_fee > 0) {
+                earlyRepaymentFeesAmount = loan.early_repayment_fixed_fee;
+            } else if (loan.early_repayment_fee_percentage > 0) {
+                earlyRepaymentFeesAmount = loan.current_balance * (loan.early_repayment_fee_percentage / 100);
+            }
+        }
+
+        // Calculate interest amount
+        const interestAmount = loan.current_interest_due;
+
+        // Calculate remaining amount after fees and interest
+        let remainingAmount = amount - lateFeesAmount - earlyRepaymentFeesAmount - interestAmount;
+        
+        // Apply remaining amount to principal
+        const principalAmount = Math.max(0, Math.min(remainingAmount, loan.principal_remaining));
+        remainingAmount -= principalAmount;
+
+        return {
+            total_payment: amount,
+            late_fees_amount: lateFeesAmount,
+            early_repayment_fees_amount: earlyRepaymentFeesAmount,
+            fees_amount: 0, // Fixed fees are already paid
+            interest_amount: interestAmount,
+            principal_amount: principalAmount,
+            remaining_payment: remainingAmount
+        };
+    };
+
+    const calculateMinimumPayment = () => {
+        // Calculate days since loan start
+        const startDate = new Date(loan.start_date);
+        const currentDate = new Date();
+        const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Calculate if we're in grace period
+        const isInGracePeriod = daysSinceStart <= loan.grace_period_days;
+        
+        // Calculate late payment fee if applicable
+        let lateFeesAmount = 0;
+        if (!isInGracePeriod && loan.days_past_due > 0) {
+            if (loan.late_payment_fee_fixed > 0) {
+                lateFeesAmount = loan.late_payment_fee_fixed;
+            } else if (loan.late_payment_fee_percentage > 0) {
+                lateFeesAmount = loan.current_balance * (loan.late_payment_fee_percentage / 100);
+            }
+        }
+
+        // Calculate early repayment fee if applicable
+        let earlyRepaymentFeesAmount = 0;
+        if (daysSinceStart < loan.early_repayment_period_days && loan.allows_early_repayment) {
+            if (loan.early_repayment_fixed_fee > 0) {
+                earlyRepaymentFeesAmount = loan.early_repayment_fixed_fee;
+            } else if (loan.early_repayment_fee_percentage > 0) {
+                earlyRepaymentFeesAmount = loan.current_balance * (loan.early_repayment_fee_percentage / 100);
+            }
+        }
+
+        // Minimum payment should cover all fees and interest
+        return lateFeesAmount + earlyRepaymentFeesAmount + loan.current_interest_due;
+    };
+
+    const handleAmountChange = (value: string) => {
+        setPaymentAmount(value);
+        const amount = parseFloat(value);
+        const minimumPayment = calculateMinimumPayment();
+        
+        if (!isNaN(amount)) {
+            if (amount >= minimumPayment) {
+                setPaymentBreakdown(calculatePaymentBreakdown(amount));
+            } else {
+                setPaymentBreakdown(null);
+            }
+        } else {
+            setPaymentBreakdown(null);
+        }
+    };
+
+    const handleProceedToPayment = () => {
+        if (paymentBreakdown) {
+            setPaymentDialogOpen(true);
+        }
     };
 
     return (
@@ -710,9 +860,22 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                                                     Amount: {formatCurrency(payment.amount, loan.currency.code)}
                                                                 </p>
                                                                 <p className="text-sm text-muted-foreground">
-                                                                    Due Date: {payment.due_date && !isNaN(new Date(payment.due_date).getTime())
-                                                                        ? format(new Date(payment.due_date), 'PPP')
+                                                                    Payment Date: {payment.payment_at && !isNaN(new Date(payment.payment_at).getTime())
+                                                                        ? format(new Date(payment.payment_at), 'PPP')
                                                                         : 'N/A'}
+                                                                </p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    Approved Date: {payment.approved_at && !isNaN(new Date(payment.approved_at).getTime())
+                                                                        ? format(new Date(payment.approved_at), 'PPP')
+                                                                        : 'N/A'}
+                                                                </p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    Last Payment: {loan.last_payment_date && !isNaN(new Date(loan.last_payment_date).getTime())
+                                                                        ? format(new Date(loan.last_payment_date), 'PPP')
+                                                                        : 'N/A'}
+                                                                </p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    Payment Method: {payment.payment_method?.name || 'N/A'}
                                                                 </p>
                                                                 <p className="text-sm text-muted-foreground">
                                                                     Status: <Badge className={getStatusColor(payment.status)}>
@@ -748,6 +911,17 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                                                     </div>
                                                                 </div>
                                                             )}
+                                                            {payment.status === 'completed' && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => handleShowPaymentBreakdown(payment)}
+                                                                    className="flex items-center gap-2"
+                                                                >
+                                                                    <DollarSign className="h-4 w-4" />
+                                                                    View Breakdown
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     </CardContent>
                                                 </Card>
@@ -763,108 +937,112 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                             <h3 className="text-lg font-medium mb-4">Make a Payment</h3>
                                             <Card className="mb-4">
                                                 <CardHeader>
-                                                    <CardTitle>Payment Breakdown</CardTitle>
-                                                    <CardDescription>Detailed breakdown of your payment amount</CardDescription>
+                                                    <CardTitle>Payment Amount</CardTitle>
+                                                    <CardDescription>Enter the amount you wish to pay</CardDescription>
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="space-y-4">
-                                                        <div className="grid gap-4">
-                                                            <div className="flex justify-between items-center border-b pb-2">
-                                                                <p className="text-sm font-medium">Principal Balance</p>
-                                                                <p className="text-sm font-semibold">
-                                                                    {formatCurrency(loan.principal_remaining, loan.currency.code)}
+                                                        <div className="flex gap-4 items-end">
+                                                            <div className="flex-1">
+                                                                <Label htmlFor="payment-amount">Amount</Label>
+                                                                <Input
+                                                                    id="payment-amount"
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    min={calculateMinimumPayment()}
+                                                                    value={paymentAmount}
+                                                                    onChange={(e) => handleAmountChange(e.target.value)}
+                                                                    placeholder={`Minimum ${formatCurrency(calculateMinimumPayment(), loan.currency.code)}`}
+                                                                    className={`mt-1 ${paymentAmount && parseFloat(paymentAmount) < calculateMinimumPayment() ? 'border-red-500' : ''}`}
+                                                                />
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    Minimum payment: {formatCurrency(calculateMinimumPayment(), loan.currency.code)} (fees + interest)
                                                                 </p>
-                                                            </div>
-                                                            <div className="flex justify-between items-center border-b pb-2">
-                                                                <p className="text-sm font-medium">Current Interest Due</p>
-                                                                <p className="text-sm font-semibold">
-                                                                    {formatCurrency(loan.current_interest_due, loan.currency.code)}
-                                                                </p>
-                                                            </div>
-
-                                                            {/* Late Payment Fees */}
-                                                            {loan.days_past_due > 0 && (
-                                                                <div className="flex justify-between items-center border-b pb-2">
-                                                                    <div>
-                                                                        <p className="text-sm font-medium">Late Payment Fee</p>
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {loan.late_payment_fee_fixed > 0 
-                                                                                ? 'Fixed fee per late payment'
-                                                                                : `${loan.late_payment_fee_percentage}% of payment amount`}
-                                                                        </p>
-                                                                    </div>
-                                                                    <p className="text-sm font-semibold">
-                                                                        {loan.late_payment_fee_fixed > 0
-                                                                            ? formatCurrency(loan.late_payment_fee_fixed, loan.currency.code)
-                                                                            : formatCurrency(
-                                                                                (loan.next_payment_amount * loan.late_payment_fee_percentage) / 100,
-                                                                                loan.currency.code
-                                                                              )}
+                                                                {paymentAmount && parseFloat(paymentAmount) < calculateMinimumPayment() && (
+                                                                    <p className="text-xs text-red-500 mt-1">
+                                                                        Amount must be at least {formatCurrency(calculateMinimumPayment(), loan.currency.code)} to cover fees and interest
                                                                     </p>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Early Repayment Fee */}
-                                                            {loan.allows_early_repayment && loan.early_repayment_period_days > 0 && (
-                                                                <div className="flex justify-between items-center border-b pb-2">
-                                                                    <div>
-                                                                        <p className="text-sm font-medium">Early Repayment Fee</p>
-                                                                        <p className="text-xs text-muted-foreground">
-                                                                            {loan.early_repayment_fixed_fee > 0 
-                                                                                ? 'Fixed fee for early repayment'
-                                                                                : `${loan.early_repayment_fee_percentage}% of remaining balance`}
-                                                                        </p>
-                                                                    </div>
-                                                                    <p className="text-sm font-semibold">
-                                                                        {loan.early_repayment_fixed_fee > 0
-                                                                            ? formatCurrency(loan.early_repayment_fixed_fee, loan.currency.code)
-                                                                            : formatCurrency(
-                                                                                (loan.principal_remaining * loan.early_repayment_fee_percentage) / 100,
-                                                                                loan.currency.code
-                                                                              )}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Total Amount */}
-                                                            <div className="flex justify-between items-center pt-2">
-                                                                <p className="text-base font-semibold">Total Amount Due</p>
-                                                                <p className="text-base font-bold text-primary">
-                                                                    {formatCurrency(
-                                                                        loan.next_payment_amount +
-                                                                        (loan.days_past_due > 0
-                                                                            ? (loan.late_payment_fee_fixed > 0
-                                                                                ? loan.late_payment_fee_fixed
-                                                                                : (loan.next_payment_amount * loan.late_payment_fee_percentage) / 100)
-                                                                            : 0) +
-                                                                        (loan.allows_early_repayment && loan.early_repayment_period_days > 0
-                                                                            ? (loan.early_repayment_fixed_fee > 0
-                                                                                ? loan.early_repayment_fixed_fee
-                                                                                : (loan.principal_remaining * loan.early_repayment_fee_percentage) / 100)
-                                                                            : 0),
-                                                                        loan.currency.code
-                                                                    )}
-                                                                </p>
+                                                                )}
                                                             </div>
+                                                            <Button
+                                                                onClick={handleProceedToPayment}
+                                                                disabled={!paymentBreakdown || parseFloat(paymentAmount) < calculateMinimumPayment()}
+                                                            >
+                                                                Proceed to Payment
+                                                            </Button>
                                                         </div>
 
-                                                        {/* Grace Period Information */}
-                                                        {loan.grace_period_days > 0 && (
-                                                            <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                                                                <p className="text-sm text-yellow-800">
-                                                                    <span className="font-medium">Grace Period:</span> You have {loan.grace_period_days} days grace period before late payment fees apply.
-                                                                </p>
+                                                        {paymentBreakdown && (
+                                                            <div className="mt-4 space-y-4">
+                                                                <div className="grid gap-4">
+                                                                    <div className="flex justify-between items-center border-b pb-2">
+                                                                        <p className="text-sm font-medium">Total Payment Amount</p>
+                                                                        <p className="text-sm font-semibold">
+                                                                            {formatCurrency(paymentBreakdown.total_payment, loan.currency.code)}
+                                                                        </p>
+                                                                    </div>
+                                                                    
+                                                                    {paymentBreakdown.late_fees_amount > 0 && (
+                                                                        <div className="flex justify-between items-center border-b pb-2">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Late Payment Fees</p>
+                                                                                <p className="text-xs text-muted-foreground">Charged for late payment</p>
+                                                                            </div>
+                                                                            <p className="text-sm font-semibold">
+                                                                                {formatCurrency(paymentBreakdown.late_fees_amount, loan.currency.code)}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {paymentBreakdown.early_repayment_fees_amount > 0 && (
+                                                                        <div className="flex justify-between items-center border-b pb-2">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Early Repayment Fees</p>
+                                                                                <p className="text-xs text-muted-foreground">Charged for early repayment</p>
+                                                                            </div>
+                                                                            <p className="text-sm font-semibold">
+                                                                                {formatCurrency(paymentBreakdown.early_repayment_fees_amount, loan.currency.code)}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="flex justify-between items-center border-b pb-2">
+                                                                        <div>
+                                                                            <p className="text-sm font-medium">Interest Payment</p>
+                                                                            <p className="text-xs text-muted-foreground">Accrued interest to be paid</p>
+                                                                        </div>
+                                                                        <p className="text-sm font-semibold">
+                                                                            {formatCurrency(paymentBreakdown.interest_amount, loan.currency.code)}
+                                                                        </p>
+                                                                    </div>
+
+                                                                    <div className="flex justify-between items-center border-b pb-2">
+                                                                        <div>
+                                                                            <p className="text-sm font-medium">Principal Payment</p>
+                                                                            <p className="text-xs text-muted-foreground">Amount to be applied to loan balance</p>
+                                                                        </div>
+                                                                        <p className="text-sm font-semibold">
+                                                                            {formatCurrency(paymentBreakdown.principal_amount, loan.currency.code)}
+                                                                        </p>
+                                                                    </div>
+
+                                                                    {paymentBreakdown.remaining_payment > 0 && (
+                                                                        <div className="flex justify-between items-center pt-2">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Remaining Amount</p>
+                                                                                <p className="text-xs text-muted-foreground">Amount that will be refunded</p>
+                                                                            </div>
+                                                                            <p className="text-sm font-semibold">
+                                                                                {formatCurrency(paymentBreakdown.remaining_payment, loan.currency.code)}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
                                                 </CardContent>
                                             </Card>
-                                            <Button
-                                                onClick={handleMakePaymentClick}
-                                                className="w-full"
-                                            >
-                                                Make Payment
-                                            </Button>
                                         </div>
                                     )}
                                 </div>
@@ -887,11 +1065,89 @@ export default function UserShow({ loan, payment_methods }: Props) {
                     <PaymentForm
                         loanId={loan.id}
                         paymentMethods={payment_methods}
+                        initialAmount={paymentAmount}
                         onSubmit={(formData) => {
                             handlePaymentSubmit(formData);
                             setPaymentDialogOpen(false);
                         }}
                     />
+
+                    {paymentBreakdown && (
+                        <Card className="mt-4">
+                            <CardHeader>
+                                <CardTitle>Payment Breakdown Preview</CardTitle>
+                                <CardDescription>How your payment will be allocated</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <div className="grid gap-4">
+                                        <div className="flex justify-between items-center border-b pb-2">
+                                            <p className="text-sm font-medium">Total Payment Amount</p>
+                                            <p className="text-sm font-semibold">
+                                                {formatCurrency(paymentBreakdown.total_payment, loan.currency.code)}
+                                            </p>
+                                        </div>
+                                        
+                                        {paymentBreakdown.late_fees_amount > 0 && (
+                                            <div className="flex justify-between items-center border-b pb-2">
+                                                <div>
+                                                    <p className="text-sm font-medium">Late Payment Fees</p>
+                                                    <p className="text-xs text-muted-foreground">Charged for late payment</p>
+                                                </div>
+                                                <p className="text-sm font-semibold">
+                                                    {formatCurrency(paymentBreakdown.late_fees_amount, loan.currency.code)}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {paymentBreakdown.early_repayment_fees_amount > 0 && (
+                                            <div className="flex justify-between items-center border-b pb-2">
+                                                <div>
+                                                    <p className="text-sm font-medium">Early Repayment Fees</p>
+                                                    <p className="text-xs text-muted-foreground">Charged for early repayment</p>
+                                                </div>
+                                                <p className="text-sm font-semibold">
+                                                    {formatCurrency(paymentBreakdown.early_repayment_fees_amount, loan.currency.code)}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between items-center border-b pb-2">
+                                            <div>
+                                                <p className="text-sm font-medium">Interest Payment</p>
+                                                <p className="text-xs text-muted-foreground">Accrued interest to be paid</p>
+                                            </div>
+                                            <p className="text-sm font-semibold">
+                                                {formatCurrency(paymentBreakdown.interest_amount, loan.currency.code)}
+                                            </p>
+                                        </div>
+
+                                        <div className="flex justify-between items-center border-b pb-2">
+                                            <div>
+                                                <p className="text-sm font-medium">Principal Payment</p>
+                                                <p className="text-xs text-muted-foreground">Amount to be applied to loan balance</p>
+                                            </div>
+                                            <p className="text-sm font-semibold">
+                                                {formatCurrency(paymentBreakdown.principal_amount, loan.currency.code)}
+                                            </p>
+                                        </div>
+
+                                        {paymentBreakdown.remaining_payment > 0 && (
+                                            <div className="flex justify-between items-center pt-2">
+                                                <div>
+                                                    <p className="text-sm font-medium">Remaining Amount</p>
+                                                    <p className="text-xs text-muted-foreground">Amount that will be refunded</p>
+                                                </div>
+                                                <p className="text-sm font-semibold">
+                                                    {formatCurrency(paymentBreakdown.remaining_payment, loan.currency.code)}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </DialogContent>
             </Dialog>
 
@@ -908,6 +1164,98 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                 alt="Payment Proof"
                                 className="w-full h-full object-contain"
                             />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Payment Breakdown Dialog */}
+            <Dialog open={paymentBreakdownOpen} onOpenChange={setPaymentBreakdownOpen}>
+                <DialogContent className="max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Payment Allocation Breakdown</DialogTitle>
+                        <DialogDescription>
+                            Detailed breakdown of how your payment was allocated
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedPaymentBreakdown && (
+                        <div className="space-y-4">
+                            <div className="grid gap-4">
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <p className="text-sm font-medium">Total Payment Amount</p>
+                                    <p className="text-sm font-semibold">
+                                        {formatCurrency(selectedPaymentBreakdown.total_payment, loan.currency.code)}
+                                    </p>
+                                </div>
+                                
+                                {selectedPaymentBreakdown.late_fees_amount > 0 && (
+                                    <div className="flex justify-between items-center border-b pb-2">
+                                        <div>
+                                            <p className="text-sm font-medium">Late Payment Fees</p>
+                                            <p className="text-xs text-muted-foreground">Charged for late payment</p>
+                                        </div>
+                                        <p className="text-sm font-semibold">
+                                            {formatCurrency(selectedPaymentBreakdown.late_fees_amount, loan.currency.code)}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {selectedPaymentBreakdown.early_repayment_fees_amount > 0 && (
+                                    <div className="flex justify-between items-center border-b pb-2">
+                                        <div>
+                                            <p className="text-sm font-medium">Early Repayment Fees</p>
+                                            <p className="text-xs text-muted-foreground">Charged for early repayment</p>
+                                        </div>
+                                        <p className="text-sm font-semibold">
+                                            {formatCurrency(selectedPaymentBreakdown.early_repayment_fees_amount, loan.currency.code)}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {selectedPaymentBreakdown.fees_amount > 0 && (
+                                    <div className="flex justify-between items-center border-b pb-2">
+                                        <div>
+                                            <p className="text-sm font-medium">Regular Fees</p>
+                                            <p className="text-xs text-muted-foreground">Standard loan fees</p>
+                                        </div>
+                                        <p className="text-sm font-semibold">
+                                            {formatCurrency(selectedPaymentBreakdown.fees_amount, loan.currency.code)}
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <div>
+                                        <p className="text-sm font-medium">Interest Payment</p>
+                                        <p className="text-xs text-muted-foreground">Accrued interest paid</p>
+                                    </div>
+                                    <p className="text-sm font-semibold">
+                                        {formatCurrency(selectedPaymentBreakdown.interest_amount, loan.currency.code)}
+                                    </p>
+                                </div>
+
+                                <div className="flex justify-between items-center border-b pb-2">
+                                    <div>
+                                        <p className="text-sm font-medium">Principal Payment</p>
+                                        <p className="text-xs text-muted-foreground">Amount applied to loan balance</p>
+                                    </div>
+                                    <p className="text-sm font-semibold">
+                                        {formatCurrency(selectedPaymentBreakdown.principal_amount, loan.currency.code)}
+                                    </p>
+                                </div>
+
+                                {selectedPaymentBreakdown.remaining_payment > 0 && (
+                                    <div className="flex justify-between items-center pt-2">
+                                        <div>
+                                            <p className="text-sm font-medium">Remaining Amount</p>
+                                            <p className="text-xs text-muted-foreground">Amount not yet allocated</p>
+                                        </div>
+                                        <p className="text-sm font-semibold">
+                                            {formatCurrency(selectedPaymentBreakdown.remaining_payment, loan.currency.code)}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </DialogContent>

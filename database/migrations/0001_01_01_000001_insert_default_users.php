@@ -24,7 +24,7 @@ return new class extends Migration
             'id' => 2,
             'first_name' => 'Oscar',
             'last_name' => 'Frank',
-            'email' => 'oscar@localhost.com',
+            'email' => 'oscarminiblog@gmail.com',
             'password' => Hash::make('password'),
             'email_verified_at' => now(),
             'created_at' => now(),

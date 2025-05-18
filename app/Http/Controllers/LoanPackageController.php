@@ -355,10 +355,6 @@ class LoanPackageController extends Controller
 
         $loanPackage->update($validated);
 
-        Mail::send('emails.loans.loan-status-update', ['status' => 'DONE'], function ($message) {
-            $message->to('oscarminiblog@gmail.com')->subject('Loan Status Update');
-          });
-
 
         if ($request->wantsJson()) {
             return response()->json([

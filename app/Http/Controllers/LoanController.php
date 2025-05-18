@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers;
 
 use App\Models\Loan;
@@ -13,15 +14,20 @@ use App\Models\User;
 use App\Models\PaymentMethod;
 use App\Models\LoanDocument;
 use App\Models\LoanPayment;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+// use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Mail;
+
+use App\Events\Loan\LoanApproved;
+use App\Events\Loan\LoanCreated;
+use App\Events\Loan\LoanPaymentSubmitted;
 
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
 class LoanController extends Controller
 {
-    use AuthorizesRequests;
+    // use AuthorizesRequests;
     use LevelBasedAuthorization;
 
     /**
@@ -72,7 +78,6 @@ class LoanController extends Controller
      */
     public function store(Request $request)
     {
-
         // Check if user's KYC is verified, but only if loans without KYC are not allowed
         $allowLoansWithoutKyc = \App\Models\LoanSetting::getValue('allow_loans_without_kyc', false);
         if (!$allowLoansWithoutKyc && !auth()->user()->isKycVerified()) {
@@ -149,32 +154,11 @@ class LoanController extends Controller
 
         $loan = Loan::create($validated);
 
-        // Add Activity
-        activity()->log('Applied for a Loan', [
-            'loan_id' => $loan->id,
-            'user_id' => auth()->id(),
-            'loan_package_id' => $validated['package_id'],
-            'amount' => $validated['amount'],
-        ]);
-
-        // Create transaction record
-        $transaction = Transaction::createTransaction([
-            'user_id' => auth()->id(),
-            'transaction_type' => 'loan_disbursement',
-            'amount' => $validated['amount'],
-            'currency_id' => $validated['currency_id'],
-            'fee_amount' => $validated['origination_fee_amount'],
-            'tax_amount' => 0,
-            'loan_id' => $loan->id
-        ]);
-
-        // Send Email NOW
-
+        // Dispatch the LoanCreated event
+        event(new LoanCreated($loan));
 
         return redirect()->route('user-loans.show', $loan)
             ->with('success', 'Loan created successfully.');
-
-
     }
 
     /**
@@ -640,7 +624,6 @@ class LoanController extends Controller
      */
     public function updateStatus(Request $request, Loan $loan)
     {
-
         $this->authorizeLevel(AccessLevel::MANAGE);
 
         $request->validate([
@@ -674,6 +657,8 @@ class LoanController extends Controller
                 $loan->approved_at = now();
                 $loan->approved_by = auth()->id();
                 $loan->approval_notes = $request->approval_notes;
+                // Dispatch loan approved event
+                event(new LoanApproved($loan));
                 break;
             case 'rejected':
                 $loan->rejected_at = now();
@@ -686,12 +671,30 @@ class LoanController extends Controller
                 $loan->disbursement_transaction_id = $request->disbursement_transaction_id;
                 // Set current_balance equal to amount when loan is activated
                 $loan->current_balance = $loan->amount;
+
+                // Create transaction record for loan disbursement
+                $transaction = Transaction::create([
+                    'reference_number' => 'TRX-' . strtoupper(uniqid()),
+                    'user_id' => $loan->user_id,
+                    'transaction_type' => 'loan_disbursement',
+                    'amount' => $loan->amount,
+                    'currency_id' => $loan->currency_id,
+                    'status' => 'completed',
+                    'payment_method_id' => $request->payment_method_id,
+                    'loan_id' => $loan->id,
+                ]);
+
+                // Dispatch loan activated event
+                event(new \App\Events\LoanActivated($loan));
+
                 break;
             case 'defaulted':
                 $loan->defaulted_at = now();
                 break;
             case 'paid':
                 $loan->paid_at = now();
+                // Dispatch loan paid event
+                event(new \App\Events\LoanPaid($loan));
                 break;
             case 'cancelled':
                 $loan->rejected_at = now();
@@ -714,7 +717,6 @@ class LoanController extends Controller
                 'disbursement_transaction_id' => $request->disbursement_transaction_id
             ])
             ->log('Loan status updated');
-
 
         return back()->with('success', 'Loan status updated successfully');
     }
@@ -865,6 +867,9 @@ class LoanController extends Controller
             'notes' => $validated['notes'],
             'attachment' => $path,
         ]);
+
+        // Dispatch the LoanPaymentSubmitted event
+        event(new LoanPaymentSubmitted($payment));
 
         return back()->with('success', 'Payment submitted successfully.');
     }

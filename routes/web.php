@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\ApiSettingsController;
 use App\Http\Controllers\Admin\LoanSettingsController;
 use App\Http\Controllers\LoanController;
+// use Modules\Loan\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanPackageController;
 use App\Http\Controllers\EmailTemplateController;
 use App\Http\Controllers\CurrencyController;

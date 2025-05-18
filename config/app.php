@@ -123,4 +123,10 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'social_links' => [
+        'facebook' => env('FACEBOOK_URL', 'https://facebook.com/illbytes'),
+        'twitter' => env('TWITTER_URL', 'https://twitter.com/illbytes'),
+        'linkedin' => env('LINKEDIN_URL', 'https://linkedin.com/company/illbytes'),
+    ],
+
 ];

@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
+use App\Models\Transaction;
+
+use App\Events\Loan\LoanPaymentSubmitted;
+use App\Events\Loan\LoanPaymentCompleted;
+use App\Events\Loan\LoanPaid;
+
 
 class LoanPaymentController extends Controller
 {
@@ -56,7 +62,6 @@ class LoanPaymentController extends Controller
             // Generate a unique reference number if not provided
             $referenceNumber = $request->reference_number ?? 'PAY-' . time() . '-' . rand(1000, 9999);
 
-
             // Create the payment record
             $payment = LoanPayment::create([
                 'amount' => $request->amount,
@@ -78,6 +83,9 @@ class LoanPaymentController extends Controller
             }
 
             DB::commit();
+
+            // Dispatch payment submitted event
+            event(new LoanPaymentSubmitted($payment));
 
             // If it's an online payment, redirect to payment gateway
             if ($paymentMethod->is_online) {
@@ -308,15 +316,33 @@ class LoanPaymentController extends Controller
                 'next_payment_amount' => $nextPaymentAmount
             ]);
 
+            // Create transaction record for loan repayment
+            $transaction = Transaction::create([
+                'reference_number' => 'TRX-' . strtoupper(uniqid()),
+                'user_id' => $loan->user_id,
+                'transaction_type' => 'loan_repayment',
+                'amount' => $payment->amount,
+                'currency_id' => $loan->currency_id,
+                'status' => 'completed',
+                'payment_method_id' => $payment->payment_method_id,
+                'loan_id' => $loan->id,
+                'loan_payment_id' => $payment->id,
+            ]);
+
             // Check if loan is fully paid
             if ($this->isLoanFullyPaid($loan)) {
                 $loan->update([
                     'status' => 'paid',
                     'paid_at' => now()
                 ]);
+                // Dispatch loan paid event
+                event(new LoanPaid($loan));
             }
 
             DB::commit();
+
+            // Dispatch payment completed event
+            event(new LoanPaymentCompleted($payment));
 
             return redirect()->back()->with('success', 'Payment approved successfully.');
         } catch (\Exception $e) {

@@ -53,6 +53,7 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+    'api_domain' => env('API_SUBDOMAIN', 'api') . '.' . preg_replace('#^https?://#', '', env('APP_URL', 'localhost')),
 
     /*
     |--------------------------------------------------------------------------

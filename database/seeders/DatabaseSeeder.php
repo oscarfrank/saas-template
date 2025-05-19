@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use Modules\User\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -17,12 +17,11 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             // UserSeeder::class,
-            PaymentMethodSeeder::class,
+            // PaymentMethodSeeder::class,
             // ProductSeeder::class,
             // TransactionSeeder::class,
             // LoanSeeder::class,
-            EmailTemplateSeeder::class,
-            LoanEmailTemplateSeeder::class,
+            // EmailTemplateSeeder::class,
         ]);
     }
 }

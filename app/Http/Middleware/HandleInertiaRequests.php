@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\SiteSettings;
+use Modules\Settings\Models\SiteSettings;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;

@@ -1,0 +1,11 @@
+{
+    "name": "Pages",
+    "alias": "pages",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Pages\\Providers\\PagesServiceProvider"
+    ],
+    "files": []
+}

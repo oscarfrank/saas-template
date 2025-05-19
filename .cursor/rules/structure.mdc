@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 # Laravel 12 Application Structure Guide
 
@@ -364,7 +364,7 @@ class GenerateMonthlyReport implements ShouldQueue
 namespace App\Policies;
 
 use App\Models\Product;
-use App\Models\User;
+use Modules\User\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ProductPolicy
@@ -516,7 +516,7 @@ namespace Database\Factories;
 
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\User;
+use Modules\User\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ProductFactory extends Factory
@@ -569,7 +569,7 @@ class ProductFactory extends Factory
 namespace Tests\Feature;
 
 use App\Models\Product;
-use App\Models\User;
+use Modules\User\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -742,9 +742,9 @@ class CreateProductAction
 
 ## Additional Resources
 
-- [Laravel Documentation](https://laravel.com/docs/12.x)
-- [Laravel Best Practices](https://github.com/alexeymezenin/laravel-best-practices)
-- [Laravel Patterns](https://github.com/pattern-lab/patternlab-php)
+- [Laravel Documentation](mdc:https:/laravel.com/docs/12.x)
+- [Laravel Best Practices](mdc:https:/github.com/alexeymezenin/laravel-best-practices)
+- [Laravel Patterns](mdc:https:/github.com/pattern-lab/patternlab-php)
 
 ## Conclusion
 

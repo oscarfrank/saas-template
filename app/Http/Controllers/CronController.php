@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Loan;
-use App\Models\User;
+use Modules\Loan\Models\Loan;
+use Modules\User\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;

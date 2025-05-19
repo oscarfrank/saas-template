@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/kyc",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\KYC\\": "app/",
+            "Modules\\KYC\\Database\\Factories\\": "database/factories/",
+            "Modules\\KYC\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\KYC\\Tests\\": "tests/"
+        }
+    }
+}

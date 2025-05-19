@@ -50,7 +50,7 @@ $users = DB::table('users')->simplePaginate(15);
 ### Standard Pagination
 
 ```php
-use App\Models\User;
+use Modules\User\Models\User;
 
 // Basic pagination
 $users = User::paginate(15);
@@ -376,7 +376,7 @@ The JSON output includes:
 namespace App\Http\Controllers\API;
 
 use App\Http\Resources\UserResource;
-use App\Models\User;
+use Modules\User\Models\User;
 use App\Http\Controllers\Controller;
 
 class UserController extends Controller

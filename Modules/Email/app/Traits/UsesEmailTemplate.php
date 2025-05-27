@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Traits;
+namespace Modules\Email\Traits;
 
-use App\Models\EmailTemplate;
+use Modules\Email\Models\EmailTemplate;
 
 trait UsesEmailTemplate
 {

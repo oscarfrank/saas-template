@@ -481,7 +481,7 @@ export default function Welcome() {
                                 <ul className="space-y-2">
                                     <li className="flex items-center space-x-2 text-gray-400">
                                         <Mail className="h-4 w-4" />
-                                        <span>support@lendfast.com</span>
+                                        <span>support@LendFast.com</span>
                                     </li>
                                     <li className="flex items-center space-x-2 text-gray-400">
                                         <Phone className="h-4 w-4" />

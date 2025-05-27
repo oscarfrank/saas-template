@@ -16,7 +16,6 @@ return new class extends Migration
             // User and Package Associations
             $table->foreignId('user_id')->constrained()->comment('User who made the investment');
             $table->foreignId('package_id')->nullable()->constrained('borrow_packages')->nullOnDelete()->comment('Associated borrow package if standard');
-            $table->foreignId('custom_package_id')->nullable()->constrained('custom_packages')->nullOnDelete()->comment('Associated custom package if custom');
             
             // Basic Investment Information
             $table->string('reference_number')->unique()->comment('Unique reference number for the investment');

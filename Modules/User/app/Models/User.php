@@ -10,6 +10,8 @@ use Spatie\Permission\Traits\HasRoles;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
+use Laravel\Cashier\Billable;
+
 use Modules\KYC\Models\KycVerification;
 use Modules\Payment\Models\PaymentMethod;
 
@@ -22,11 +24,12 @@ use Modules\Loan\Models\LoanPayment;
 use Modules\Loan\Models\BorrowPayment;
 use Modules\Loan\Models\Loan;
 use Modules\Loan\Models\Borrow;
+use Modules\Payment\Models\Customer;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, HasRoles, Billable;
 
     /**
      * The attributes that are mass assignable.
@@ -285,5 +288,50 @@ class User extends Authenticatable
     public function verifiedKycVerifications()
     {
         return $this->hasMany(KycVerification::class, 'verified_by');
+    }
+
+    public function customer()
+    {
+        return $this->hasOne(Customer::class);
+    }
+
+    // Proxy method to check subscription
+    public function subscribed($name = 'default', $price = null)
+    {
+        if (!$this->customer) {
+            return false;
+        }
+        
+        return $this->customer->subscribed($name, $price);
+    }
+
+    // Proxy method to get subscription
+    public function subscription($name = 'default')
+    {
+        if (!$this->customer) {
+            return null;
+        }
+        
+        return $this->customer->subscription($name);
+    }
+
+    public function createSubscription(Request $request)
+    {
+        $user = auth()->user();
+        
+        // Make sure the user has a customer record
+        if (!$user->customer) {
+            $customer = new Customer();
+            $customer->user_id = $user->id;
+            $customer->save();
+            $user->refresh();
+        }
+        
+        // Create the subscription on the customer
+        $subscription = $user->customer->newSubscription('default', $request->plan)
+            ->create($request->payment_method);
+            
+        return redirect()->route('dashboard')
+            ->with('success', 'Your subscription was created successfully!');
     }
 }

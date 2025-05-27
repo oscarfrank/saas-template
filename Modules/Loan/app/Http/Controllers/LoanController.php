@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
 
-use App\Models\Transaction;
+use Modules\Transaction\Models\Transaction; 
 use Modules\User\Models\User;
 use Modules\Loan\Models\LoanDocument;
 use Modules\Loan\Models\LoanPayment;
@@ -47,7 +47,7 @@ class LoanController extends Controller
      */
     public function index()
     {
-        $loans = Loan::with(['user', 'currency', 'package', 'customPackage'])
+        $loans = Loan::with(['user', 'currency', 'package'])
             ->latest()
             ->paginate(10);
 
@@ -101,7 +101,6 @@ class LoanController extends Controller
 
         $validated = $request->validate([
             'package_id' => 'nullable|exists:loan_packages,id',
-            'custom_package_id' => 'nullable|exists:custom_packages,id',
             'amount' => 'required|numeric|min:0',
             'currency_id' => 'required|exists:currencies,id',
             'interest_rate' => 'required|numeric|min:0',
@@ -201,7 +200,7 @@ class LoanController extends Controller
         
         return Inertia::render('loans/show', [
             'loan' => $loan,
-            'payment_methods' => \App\Models\PaymentMethod::where('is_active', true)
+            'payment_methods' => \Modules\Payment\Models\PaymentMethod::where('is_active', true)
                 ->select('id', 'name', 'method_type')
                 ->get()
         ]);
@@ -572,17 +571,17 @@ class LoanController extends Controller
             ]);
 
             // Create transaction record
-            $transaction = Transaction::create([
-                'reference_number' => 'TRX-' . strtoupper(uniqid()),
-                'user_id' => $loan->user_id,
-                'transaction_type' => 'loan_repayment',
-                'amount' => $payment->amount,
-                'currency_id' => $loan->currency_id,
-                'status' => 'completed',
-                'payment_method_id' => $payment->payment_method_id,
-                'loan_id' => $loan->id,
-                'loan_payment_id' => $payment->id,
-            ]);
+            // $transaction = Transaction::create([
+            //     'reference_number' => 'TRX-' . strtoupper(uniqid()),
+            //     'user_id' => $loan->user_id,
+            //     'transaction_type' => 'loan_repayment',
+            //     'amount' => $payment->amount,
+            //     'currency_id' => $loan->currency_id,
+            //     'status' => 'completed',
+            //     'payment_method_id' => $payment->payment_method_id,
+            //     'loan_id' => $loan->id,
+            //     'loan_payment_id' => $payment->id,
+            // ]);
         });
 
         return redirect()->back()->with('success', 'Payment approved successfully.');
@@ -685,16 +684,16 @@ class LoanController extends Controller
                 $loan->current_balance = $loan->amount;
 
                 // Create transaction record for loan disbursement
-                $transaction = Transaction::create([
-                    'reference_number' => 'TRX-' . strtoupper(uniqid()),
-                    'user_id' => $loan->user_id,
-                    'transaction_type' => 'loan_disbursement',
-                    'amount' => $loan->amount,
-                    'currency_id' => $loan->currency_id,
-                    'status' => 'completed',
-                    'payment_method_id' => $request->payment_method_id,
-                    'loan_id' => $loan->id,
-                ]);
+                // $transaction = Transaction::create([
+                //     'reference_number' => 'TRX-' . strtoupper(uniqid()),
+                //     'user_id' => $loan->user_id,
+                //     'transaction_type' => 'loan_disbursement',
+                //     'amount' => $loan->amount,
+                //     'currency_id' => $loan->currency_id,
+                //     'status' => 'completed',
+                //     'payment_method_id' => $request->payment_method_id,
+                //     'loan_id' => $loan->id,
+                // ]);
 
                 // Dispatch loan activated event
                 event(new LoanActivated($loan));

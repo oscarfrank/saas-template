@@ -47,7 +47,7 @@ return new class extends Migration
             'company_address' => '123 Financial Street, Suite 100',
             'company_phone' => '+1 (555) 123-4567',
             'company_email' => 'info@illbytes.com',
-            'company_website' => 'https://illbytes.com/lendfast',
+            'company_website' => 'https://illbytes.com/LendFast',
             'facebook_url' => 'https://facebook.com/illbytes',
             'twitter_url' => 'https://twitter.com/illbytes',
             'instagram_url' => 'https://instagram.com/illbytes',
@@ -55,7 +55,7 @@ return new class extends Migration
             'youtube_url' => 'https://youtube.com/illbytes',
             'google_analytics_code' => null,
             'meta_tags' => '<meta name="robots" content="index, follow">',
-            'footer_text' => '© 2025 Lendfast Inc. All rights reserved.',
+            'footer_text' => '© 2025 LendFast Inc. All rights reserved.',
             'maintenance_mode' => false,
         ]);
     }

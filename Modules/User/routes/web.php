@@ -6,6 +6,7 @@ use Inertia\Inertia;
 
 // Local Modular Dependencies
 use Modules\User\Http\Controllers\UserController; 
+use Modules\User\Http\Controllers\RoleController;
 
 use Modules\User\Http\Controllers\Auth\AuthenticatedSessionController;
 use Modules\User\Http\Controllers\Auth\ConfirmablePasswordController;

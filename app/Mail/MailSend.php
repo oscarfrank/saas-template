@@ -2,8 +2,8 @@
 
 namespace App\Mail;
 
-use App\Models\EmailTemplate;
-use App\Traits\UsesEmailTemplate;
+use Modules\Email\Models\EmailTemplate;
+use Modules\Email\Traits\UsesEmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;

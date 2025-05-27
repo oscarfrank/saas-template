@@ -4,6 +4,9 @@ namespace Modules\Payment\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
+use Laravel\Cashier\Events\WebhookReceived;
+use Laravel\Cashier\Events\WebhookHandled;
+
 class EventServiceProvider extends ServiceProvider
 {
     /**
@@ -11,7 +14,11 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        WebhookReceived::class => [
+            \Modules\Payment\Listeners\StripeEventListener::class, 
+        ],
+    ];
 
     /**
      * Indicates if events should be discovered.

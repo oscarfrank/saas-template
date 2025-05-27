@@ -16,6 +16,11 @@ return new class extends Migration
             // Basic Transaction Information
             $table->string('reference_number')->unique()->comment('Unique transaction reference');
             $table->foreignId('user_id')->constrained()->comment('User associated with this transaction');
+
+            $table->string('transaction_id')->nullable()->comment('Transaction ID from the payment processor');
+            $table->string('gateway')->nullable()->comment('Type of transaction');
+
+            $table->foreignId('parent_transaction_id')->nullable()->constrained('transactions')->nullOnDelete()->comment('Parent transaction ID, needed especially for refunds');
             
             // Transaction Type and Category
             $table->enum('transaction_type', [
@@ -44,8 +49,6 @@ return new class extends Migration
                 'other'                   // Other transaction type
             ])->comment('Type of transaction');
             
-            $table->string('category')->nullable()->comment('Additional transaction categorization');
-            
             // Amount Information
             $table->decimal('amount', 20, 2)->comment('Transaction amount');
             $table->foreignId('currency_id')->constrained()->comment('Currency of transaction');
@@ -73,18 +76,12 @@ return new class extends Migration
             // Payment Method
             $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete();
             $table->string('external_reference')->nullable()->comment('External payment processor reference');
-            $table->string('payment_source')->nullable()->comment('Source of the payment');
-            $table->string('payment_destination')->nullable()->comment('Destination of the payment');
             
             // For Internal Transfers
             $table->foreignId('sender_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('recipient_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('sender_account')->nullable();
             $table->string('recipient_account')->nullable();
-            
-            // Admin and System Information
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete()->comment('User who created this transaction');
-            $table->foreignId('processed_by')->nullable()->constrained('users')->nullOnDelete()->comment('Admin who processed transaction if manual');
             
             // Balance Information
             $table->decimal('balance_before', 20, 2)->nullable()->comment('User balance before transaction');
@@ -107,8 +104,6 @@ return new class extends Migration
             $table->index('status');
             $table->index('reference_number');
             $table->index('external_reference');
-            $table->index(['loan_id', 'loan_payment_id']);
-            $table->index(['borrow_id', 'borrow_payment_id']);
             $table->index('payment_method_id');
             $table->index('initiated_at');
             $table->index('completed_at');

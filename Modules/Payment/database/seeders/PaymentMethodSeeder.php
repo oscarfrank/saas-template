@@ -1,6 +1,6 @@
 <?php
 
-namespace Database\Seeders;
+namespace Modules\Payment\Database\Seeders;
 
 use Modules\Payment\Models\PaymentMethod;
 use Modules\User\Models\User;

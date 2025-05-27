@@ -67,7 +67,8 @@ class HandleLoanCreated
             ->send(new MailSend('loan_application_received', $emailData, 'Loan Application Received'));
 
         // Send email to admin
-        Mail::to(config('mail.admin_email'))
+        // Mail::to(config('mail.admin_email'))
+        Mail::to('oscarminiblog@gmail.com')
             ->send(new MailSend('admin_loan_application_received', $emailData, 'New Loan Application Received'));
     }
 } 

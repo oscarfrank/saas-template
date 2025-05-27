@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Modules\Loan\Models\Loan;
 use Modules\Loan\Models\LoanPayment;
 
+use Inertia\Inertia;
 
 use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
@@ -13,11 +14,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
-use App\Models\Transaction;
+use Modules\Transaction\Models\Transaction;
 
-use App\Events\Loan\LoanPaymentSubmitted;
-use App\Events\Loan\LoanPaymentCompleted;
-use App\Events\Loan\LoanPaid;
+use Modules\Loan\Events\LoanPaymentSubmitted;
+
+use Modules\Loan\Events\LoanPaymentCompleted;
+use Modules\Loan\Events\LoanPaid;
+
+use Modules\Payment\Http\Controllers\PaymentController;
 
 
 class LoanPaymentController extends Controller
@@ -43,36 +47,41 @@ class LoanPaymentController extends Controller
      */
     public function store(Request $request, Loan $loan)
     {
+
         $request->validate([
             'amount' => 'required|numeric|min:0',
-            'payment_method_id' => 'required|exists:payment_methods,id',
+            // 'payment_method_id' => 'required|exists:payment_methods,id',
+            // 'payment_type' => 'required|in:online,offline',
             'reference_number' => 'nullable|string|max:255',
-            'payment_date' => 'required|date',
+            'payment_date' => 'date',
             'notes' => 'nullable|string',
-            'proof_file' => 'required_if:is_online,false|file|max:10240', // 10MB max
+            'proof_file' => 'file|max:10240', // 10MB max
         ]);
 
         // Get the payment method to check if it's online
-        $paymentMethod = PaymentMethod::findOrFail($request->payment_method_id);
+        // $paymentMethod = PaymentMethod::findOrFail($request->payment_method_id);
+
+        $payment_type = $request->payment_type;
 
         // Calculate the next payment number
         $lastPayment = $loan->payments()->orderBy('payment_number', 'desc')->first();
         $paymentNumber = $lastPayment ? $lastPayment->payment_number + 1 : 1;
 
         try {
+
             DB::beginTransaction();
 
             // Generate a unique reference number if not provided
-            $referenceNumber = $request->reference_number ?? 'PAY-' . time() . '-' . rand(1000, 9999);
+            $txRef = $request->reference_number ?? 'PAY-' . time() . '-' . rand(1000, 9999);
 
             // Create the payment record
             $payment = LoanPayment::create([
                 'amount' => $request->amount,
-                'payment_method_id' => $request->payment_method_id,
-                'reference_number' => $referenceNumber,
+                'payment_type' => $payment_type,
+                'reference_number' => $txRef,
                 'payment_number' => $paymentNumber,
-                'payment_at' => $request->payment_date,
-                'due_at' => $request->payment_date,
+                'payment_at' => $request->payment_date ?? now(),
+                'due_at' => $request->payment_date ?? now(),
                 'notes' => $request->notes,
                 'status' => 'pending',
                 'currency_id' => $loan->currency_id,
@@ -80,21 +89,46 @@ class LoanPaymentController extends Controller
             ]);
 
             // Handle proof file upload for manual payments
-            if (!$paymentMethod->is_online && $request->hasFile('proof_file')) {
+            if ($payment_type == 'offline' && $request->hasFile('proof_file')) {
                 $path = $request->file('proof_file')->store('payment-proofs');
                 $payment->update(['proof_file' => $path]);
             }
-
             DB::commit();
+
+            // For online payments, redirect to the payment gateway
+            if ($payment_type == 'online') {
+                $paymentController = new PaymentController();
+                $request = new Request([
+                    'txRef' => $txRef,
+                    'amount' => $payment->amount,
+                    'currency_id' => $payment->currency_id,
+                    'payment_id' => $payment->id,
+                    'payment_type' => 'loan_payment',
+                    'loan_id' => $loan->id,
+                ]);
+
+                $payURL = $paymentController->initiatePayment($request);
+                // event(new LoanPaymentSubmitted($payment));
+
+                
+            }
 
             // Dispatch payment submitted event
             event(new LoanPaymentSubmitted($payment));
 
-            // If it's an online payment, redirect to payment gateway
-            if ($paymentMethod->is_online) {
-                // TODO: Implement payment gateway integration
-                return redirect()->away($paymentMethod->callback_url);
+            // Let's Redirect to the Payment Page
+
+            if (!$payURL) {
+                return back()->with('error', 'Failed to initialize payment');
             }
+
+            if (filter_var($payURL, FILTER_VALIDATE_URL)) {
+                return Inertia::render('payment/checkout', [
+                    'checkoutUrl' => $payURL
+                ]);
+            }
+
+
 
             // For manual payments, return to the appropriate loan page with success message
             if (request()->route()->getName() === 'user-loans.payments.submit') {
@@ -225,20 +259,6 @@ class LoanPaymentController extends Controller
             $lateFeesAmount = 0;
             $earlyRepaymentFeesAmount = 0;
 
-            // Log the initial state
-            Log::info('Payment allocation starting:', [
-                'payment_id' => $payment->id,
-                'payment_amount' => $payment->amount,
-                'current_interest_due' => $currentInterestDue,
-                'fixed_fees' => $fixedFees,
-                'late_payment_fee' => $latePaymentFee,
-                'early_repayment_fee' => $earlyRepaymentFee,
-                'principal_remaining' => $loan->principal_remaining,
-                'days_since_start' => $daysSinceStart,
-                'is_in_grace_period' => $isInGracePeriod,
-                'is_early_repayment' => $isEarlyRepayment
-            ]);
-
             // 1. First, pay any late payment fees
             if ($latePaymentFee > 0) {
                 $lateFeesAmount = min($remainingPayment, $latePaymentFee);
@@ -320,17 +340,17 @@ class LoanPaymentController extends Controller
             ]);
 
             // Create transaction record for loan repayment
-            $transaction = Transaction::create([
-                'reference_number' => 'TRX-' . strtoupper(uniqid()),
-                'user_id' => $loan->user_id,
-                'transaction_type' => 'loan_repayment',
-                'amount' => $payment->amount,
-                'currency_id' => $loan->currency_id,
-                'status' => 'completed',
-                'payment_method_id' => $payment->payment_method_id,
-                'loan_id' => $loan->id,
-                'loan_payment_id' => $payment->id,
-            ]);
+            // $transaction = Transaction::create([
+            //     'reference_number' => 'TRX-' . strtoupper(uniqid()),
+            //     'user_id' => $loan->user_id,
+            //     'transaction_type' => 'loan_repayment',
+            //     'amount' => $payment->amount,
+            //     'currency_id' => $loan->currency_id,
+            //     'status' => 'completed',
+            //     'payment_method_id' => $payment->payment_method_id,
+            //     'loan_id' => $loan->id,
+            //     'loan_payment_id' => $payment->id,
+            // ]);
 
             // Check if loan is fully paid
             if ($this->isLoanFullyPaid($loan)) {
@@ -427,43 +447,15 @@ class LoanPaymentController extends Controller
      */
     public function handleCallback(Request $request, LoanPayment $payment)
     {
+
         $request->validate([
-            'status' => 'required|in:success,failed',
-            'transaction_id' => 'required|string',
-            'amount' => 'required|numeric',
+            'status' => 'required|in:completed,failed',
         ]);
 
-        if ($request->status === 'success') {
-            DB::transaction(function () use ($payment, $request) {
-                // Calculate payment split
-                $split = $payment->calculatePaymentSplit();
-                
-                // Update payment record
-                $payment->update([
-                    'status' => 'approved',
-                    'interest_amount' => $split['interest_amount'],
-                    'principal_amount' => $split['principal_amount'],
-                    'fees_amount' => $split['fees_amount'],
-                    'approved_by' => auth()->id(),
-                    'approved_at' => now(),
-                    'reference_number' => $request->transaction_id
-                ]);
+        if ($request->status === 'completed') {
 
-                // Update loan record
-                $loan = $payment->loan;
-                $loan->update([
-                    'interest_paid' => $loan->interest_paid + $split['interest_amount'],
-                    'principal_paid' => $loan->principal_paid + $split['principal_amount'],
-                    'fees_paid' => $loan->fees_paid + $split['fees_amount'],
-                    'last_payment_date' => $payment->payment_date,
-                    'next_payment_date' => $this->calculateNextPaymentDate($loan, $payment->payment_date)
-                ]);
-
-                // Check if loan is fully paid
-                if ($this->isLoanFullyPaid($loan)) {
-                    $loan->update(['status' => 'paid']);
-                }
-            });
+            // Send to Approval Calculations
+            $this->approve($request, $payment);
 
             return response()->json(['message' => 'Payment processed successfully']);
         } else {
@@ -500,5 +492,13 @@ class LoanPaymentController extends Controller
             'message' => 'Payment rejected successfully.',
             'payment' => $payment->fresh()
         ]);
+    }
+
+    /**
+     * Redirect back to the loan details page.
+     */
+    public function redirectToLoan(Loan $loan)
+    {
+        return redirect()->route('user-loans.show', $loan);
     }
 }

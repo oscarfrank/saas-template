@@ -6,9 +6,13 @@ use Modules\Payment\Services\Flutterwave\FlutterwaveService;
 use Modules\Payment\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+use App\Models\Dump;
 use App\Http\Controllers\Controller;
 use Modules\Loan\Models\Loan;
+use Modules\Loan\Models\LoanPayment;
+use Modules\Loan\Http\Controllers\LoanPaymentController;
+use Modules\Payment\Models\Currency; 
+
 
 class FlutterwavePaymentController extends Controller
 {
@@ -21,45 +25,38 @@ class FlutterwavePaymentController extends Controller
 
     public function initiatePayment(Request $request)
     {
+        $user = auth()->user();
 
-        // $request->validate([
-        //     'amount' => 'required|numeric|min:1',
-        //     'email' => 'required|email',
-        //     'name' => 'required|string|max:255',
-        //     'phone' => 'nullable|string|max:20'
-        // ]);
+        $request->validate([
+            'amount' => 'required|numeric|min:1',
+        ]);
 
         DB::beginTransaction();
         
         try {
-            // Format payment data
-            // $paymentData = $this->flutterwaveService->formatPaymentData(
-            //     $request->amount,
-            //     $request->email,
-            //     $request->name,
-            //     $request->phone
-            // );
 
-           // Test data
+
+           // Payment Data
             $paymentData = [
-            'tx_ref' => 'TEST_' . uniqid(),
-            'amount' => 1000,
-            'currency' => 'NGN',
-            'redirect_url' => 'https://larv.frank.ng/flutterwave/callback',
-            'payment_options' => 'card,banktransfer,ussd',
-            'customer' => [
-                'email' => 'test@example.com',
-                'phonenumber' => '08012345678',
-                'name' => 'Test User',
-            ],
-            'customizations' => [
-                'title' => 'Amount Top Up',
-                'description' => 'Amount Top Up for user',
-                'logo' => 'https://oscarmini.com/logo.png',
-            ],
-        ];
+                'tx_ref' => $request->txRef,
+                'amount' => $request->amount,
+                'currency' => Currency::find($request->currency_id)->code,
+                'redirect_url' => 'https://larv.frank.ng/flutterwave/callback',
 
-        // dd($result);
+                // 'redirect_url' => route('user-loans.show', ['loan' => $request->loan_id]),
+
+                'payment_options' => 'card,banktransfer,ussd',
+                'customer' => [
+                    'email' => $user->email,
+                    // 'phonenumber' => $user->phone,
+                    'name' => $user->first_name . ' ' . $user->last_name,
+                ],
+                'customizations' => [
+                    'title' => 'Payment',
+                    'description' => 'Payment for ' . $request->payment_type,
+                    'logo' => config('app.logo'),
+                ],
+            ];
 
             // Store payment record
             // $payment = Payment::create([
@@ -75,11 +72,11 @@ class FlutterwavePaymentController extends Controller
 
             // Initialize payment with Flutterwave
             $result = $this->flutterwaveService->initiatePayment($paymentData);
-            // dd($result);
 
             if ($result['success']) {
                 DB::commit();
-                return redirect($result['data']['data']['link']);
+                $redirectUrl = $result['data']['data']['link'];
+                return $redirectUrl;
             }
 
             DB::rollBack();
@@ -87,85 +84,73 @@ class FlutterwavePaymentController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Payment Initiation Error: ' . $e->getMessage());
+            \Log::error('FlutterwaveController: Payment Initiation Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return back()->with('error', 'Something went wrong. Please try again.');
         }
     }
 
     public function handleCallback(Request $request)
     {
+
         $transactionId = $request->transaction_id;
         $txRef = $request->tx_ref;
         $status = $request->status;
-
-
-        $loan = Loan::create([
-            // Required fields from migration
-            'user_id' => 1, // Using authenticated user
-            'reference_number' => json_encode($request->all()), // Generating unique reference
-            'amount' => 1000,
-            'currency_id' => 1, // Assuming 1 is the default currency ID
-            'interest_rate' => 0.05, // 5% interest rate
-            'duration_days' => 30, // 30 days duration
-            'status' => 'pending',
-            'package_id' => 1,
-            
-            // Optional fields with defaults
-            'interest_type' => 'simple',
-            'interest_calculation' => 'monthly',
-            'interest_payment_frequency' => 'monthly',
-            'allows_early_repayment' => true,
-            'has_collateral' => false,
-            'auto_payments_enabled' => false,
-            
-            // Timestamps
-            'submitted_at' => now(),
+        // Create a new request with transformed status
+        $transformedRequest = new Request([
+            'status' => $status,
+            'transaction_id' => $transactionId,
+            'tx_ref' => $txRef,
+            'notes' => 'Flutterwave Payment'
         ]);
 
-        return response('OK', 200);
-
-
-
-
-        if (!$transactionId || !$txRef) {
-            return redirect()->route('payment.failed')
-                   ->with('error', 'Invalid payment response');
-        }
-
         // Find the payment record
-        $payment = Payment::where('tx_ref', $txRef)->first();
+        $payment = LoanPayment::where('reference_number', $txRef)->first();
         
         if (!$payment) {
-            return redirect()->route('payment.failed')
-                   ->with('error', 'Payment record not found');
+            return response()->json([
+                'error' => 'Payment record not found',
+                'tx_ref' => $txRef
+            ], 404);
         }
 
         // Verify transaction with Flutterwave
         $verification = $this->flutterwaveService->verifyTransaction($transactionId);
 
         if ($verification['success'] && $verification['is_successful']) {
-            // Payment successful
-            $payment->update([
-                'status' => 'completed',
-                'flw_transaction_id' => $verification['data']['data']['id'],
-                'flw_ref' => $verification['data']['data']['flw_ref'] ?? null,
-                'verified_at' => now(),
-            ]);
+            try {
+                // Send to Approval Calculations
+                $loanPaymentController = new LoanPaymentController();
+                $result = $loanPaymentController->handleCallback($transformedRequest, $payment);
 
-            // Trigger any post-payment actions
-            $this->handleSuccessfulPayment($payment);
-
-            return redirect()->route('payment.success')
-                   ->with('success', 'Payment completed successfully!');
+                return redirect()->route('dashboard')->with('success', 'Payment processed successfully');
+            } catch (\Exception $e) {
+                \Log::error('FlutterwaveController: Error in LoanPaymentController->handleCallback', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                
+                return response()->json([
+                    'error' => 'Error processing payment',
+                    'message' => $e->getMessage()
+                ], 500);
+            }
         } else {
-            // Payment failed
+            \Log::error('FlutterwaveController: Payment verification failed', [
+                'verification' => $verification
+            ]);
+            
             $payment->update([
                 'status' => 'failed',
                 'failure_reason' => $verification['message'] ?? 'Payment verification failed'
             ]);
 
-            return redirect()->route('payment.failed')
-                   ->with('error', 'Payment verification failed');
+            return response()->json([
+                'error' => 'Payment verification failed',
+                'verification' => $verification
+            ], 400);
         }
     }
 
@@ -178,49 +163,62 @@ class FlutterwavePaymentController extends Controller
         if (!$this->flutterwaveService->validateWebhookSignature($payload, $signature)) {
             return response('Unauthorized', 401);
         }
-        // Add a new loan
-        $loan = Loan::create([
-            // Required fields from migration
-            'user_id' => 1, // Using authenticated user
-            // 'reference_number' => 'WEBHOOK_' . uniqid(), // Generating unique reference
-            'reference_number' => json_encode($payload), // Generating unique reference
-            'amount' => 1000,
-            'currency_id' => 1, // Assuming 1 is the default currency ID
-            'interest_rate' => 0.05, // 5% interest rate
-            'duration_days' => 30, // 30 days duration
-            'status' => 'pending',
-            'package_id' => 2,
-            
-            // Optional fields with defaults
-            'interest_type' => 'simple',
-            'interest_calculation' => 'monthly',
-            'interest_payment_frequency' => 'monthly',
-            'allows_early_repayment' => true,
-            'has_collateral' => false,
-            'auto_payments_enabled' => false,
-            
-            // Timestamps
-            'submitted_at' => now(),
-        ]);
-
-        return response('OK', 200);
 
         if (isset($payload['event']) && $payload['event'] === 'charge.completed') {
             $txRef = $payload['data']['tx_ref'];
             $status = $payload['data']['status'];
 
-            $payment = Payment::where('tx_ref', $txRef)->first();
+            // $payment = Payment::where('tx_ref', $txRef)->first();
+            $payment = LoanPayment::where('reference_number', $txRef)->first();
+
+                $transformedRequest = new Request([
+                    'status' => "completed",
+                    'tx_ref' => $txRef,
+                    'notes' => 'Flutterwave Payment'
+                ]);
+                
             
             if ($payment) {
+
+
                 if ($status === 'successful') {
-                    $payment->update([
-                        'status' => 'completed',
-                        'flw_transaction_id' => $payload['data']['id'],
-                        'flw_ref' => $payload['data']['flw_ref'] ?? null,
-                        'verified_at' => now(),
-                    ]);
+                    try {
+                        // Send to Approval Calculations
+                        $loanPaymentController = new LoanPaymentController();
+                        $result = $loanPaymentController->handleCallback($transformedRequest, $payment);
+
+
+                        // $payment->update([
+                        //     'status' => 'completed',
+                        //     'flw_transaction_id' => $payload['data']['id'],
+                        //     'flw_ref' => $payload['data']['flw_ref'] ?? null,
+                        //     'verified_at' => now(),
+                        // ]);
+
+                        $this->handleSuccessfulPayment($payment);
+
+        
+                        return redirect()->route('dashboard')->with('success', 'Payment processed successfully');
+    
+        
+                    } catch (\Exception $e) {
+                        \Log::error('FlutterwaveController: Error in LoanPaymentController->handleCallback', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        
+                        return response()->json([
+                            'error' => 'Error processing payment',
+                            'message' => $e->getMessage()
+                        ], 500);
+                    }
                     
-                    $this->handleSuccessfulPayment($payment);
+
+                    return response()->json([
+                        'message' => 'Payment processed successfully',
+                        'result' => $result
+                    ]);
+                        
                 } else {
                     $payment->update(['status' => 'failed']);
                 }
@@ -230,7 +228,7 @@ class FlutterwavePaymentController extends Controller
         return response('OK', 200);
     }
 
-    private function handleSuccessfulPayment(Payment $payment)
+    private function handleSuccessfulPayment(LoanPayment $payment)
     {
         // Add your business logic here:
         // - Send confirmation email
@@ -242,6 +240,7 @@ class FlutterwavePaymentController extends Controller
         // Example:
         // Mail::to($payment->email)->send(new PaymentConfirmation($payment));
         // event(new PaymentCompleted($payment));
+        $pay = $payment;
     }
 
     

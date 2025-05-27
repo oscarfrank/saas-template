@@ -49,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
     // Loan Payments
+    Route::get('/loans/{loan}/payments', [LoanPaymentController::class, 'redirectToLoan'])->name('loans.payments.redirect');
     Route::post('/loans/{loan}/payments', [LoanPaymentController::class, 'store'])->name('loans.payments.store');
     Route::post('/loans/payments/{payment}/approve', [LoanPaymentController::class, 'approve'])->name('loans.payments.approve');
     Route::post('/loans/payments/{payment}/reject', [LoanPaymentController::class, 'reject'])->name('loans.payments.reject');

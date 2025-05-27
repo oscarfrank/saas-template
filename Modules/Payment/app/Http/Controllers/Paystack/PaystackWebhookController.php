@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 use App\Http\Controllers\Controller;
-
+use App\Models\Dump;
 class PaystackPaymentController extends Controller
 {
     protected $paystackService;
@@ -51,6 +51,13 @@ class PaystackPaymentController extends Controller
 
         // Log the event
         Log::info('Webhook received', ['event' => $event['event'], 'data' => $event['data']]);
+
+
+        // DUMP
+        $dump = new Dump();
+        $dump->payload = json_encode($payload);
+        $dump->source = 'paystack';
+        $dump->save();
 
         try {
             // Handle different event types

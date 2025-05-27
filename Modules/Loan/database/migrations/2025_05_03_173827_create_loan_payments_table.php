@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('loan_payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('loan_id')->constrained()->onDelete('cascade');
-            $table->foreignId('payment_method_id')->constrained()->onDelete('restrict');
+            $table->string('payment_type')->default('offline');
             $table->string('reference_number')->unique();
             $table->integer('payment_number')->unsigned()->comment('Sequential payment number in schedule');
             $table->decimal('amount', 20, 2);
@@ -22,8 +22,8 @@ return new class extends Migration
             $table->decimal('early_payment_fee_amount', 20, 2)->default(0);
             $table->decimal('additional_amount', 20, 2)->default(0);
             $table->foreignId('currency_id')->constrained();
-            $table->timestamp('due_at')->comment('Date and time payment is due');
-            $table->timestamp('payment_at')->comment('Date and time payment was made');
+            $table->timestamp('due_at')->nullable()->comment('Date and time payment is due');
+            $table->timestamp('payment_at')->nullable()->comment('Date and time payment was made');
             $table->integer('days_late')->default(0);
             $table->boolean('is_overdue')->default(false);
             $table->enum('status', [

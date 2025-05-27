@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,63 +9,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { format } from 'date-fns';
 
-interface PaymentMethod {
-    id: number;
-    name: string;
-    method_type: string;
-    is_online: boolean;
-    callback_url?: string;
-    configuration?: Record<string, any>;
-}
-
 interface PaymentFormProps {
     loanId: number;
-    paymentMethods: Array<PaymentMethod>;
-    onSubmit: (formData: FormData) => void;
+    onSubmit: (formData: FormData, paymentType: 'online' | 'offline') => void;
     initialAmount?: string;
 }
 
-export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialAmount }: PaymentFormProps) {
+type PaymentType = 'online' | 'offline';
+
+export default function PaymentForm({ loanId, onSubmit, initialAmount }: PaymentFormProps) {
     const [file, setFile] = useState<File | null>(null);
-    const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
+    const [paymentType, setPaymentType] = useState<PaymentType | ''>('');
+    
     const { data, setData, post, processing, errors, reset } = useForm({
         amount: initialAmount || '',
-        payment_method_id: '',
+        payment_type: '',
         reference_number: '',
         payment_date: format(new Date(), 'yyyy-MM-dd'),
         notes: '',
         proof_file: null as File | null,
     });
 
-    useEffect(() => {
-        if (data.payment_method_id) {
-            const method = paymentMethods.find(m => m.id.toString() === data.payment_method_id);
-            setSelectedMethod(method || null);
-        } else {
-            setSelectedMethod(null);
-        }
-    }, [data.payment_method_id, paymentMethods]);
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData();
         formData.append('amount', data.amount);
-        formData.append('payment_method_id', data.payment_method_id);
+        formData.append('payment_type', paymentType);
         
-        // Only append reference number for manual payments
-        if (!selectedMethod?.is_online) {
+        if (paymentType === 'offline') {
             formData.append('reference_number', data.reference_number);
+            formData.append('payment_date', data.payment_date);
+            formData.append('notes', data.notes);
+            if (file) {
+                formData.append('proof_file', file);
+            }
         }
         
-        formData.append('payment_date', data.payment_date);
-        formData.append('notes', data.notes);
-        
-        // Only append proof file for manual payments
-        if (!selectedMethod?.is_online && file) {
-            formData.append('proof_file', file);
-        }
-        
-        onSubmit(formData);
+        onSubmit(formData, paymentType as PaymentType);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,36 +55,9 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
         }
     };
 
-    const handleOnlinePayment = async () => {
-        if (!selectedMethod?.callback_url) return;
-        
-        try {
-            const response = await fetch(selectedMethod.callback_url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    loan_id: loanId,
-                    amount: data.amount,
-                    payment_method_id: data.payment_method_id,
-                    payment_date: data.payment_date,
-                }),
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                // Handle the payment gateway response
-                if (result.redirect_url) {
-                    window.location.href = result.redirect_url;
-                }
-            } else {
-                throw new Error('Payment gateway error');
-            }
-        } catch (error) {
-            console.error('Payment gateway error:', error);
-            // Handle error appropriately
-        }
+    const handlePaymentTypeChange = (value: string) => {
+        setPaymentType(value as PaymentType);
+        setData('payment_type', value);
     };
 
     const handleAmountChange = (value: string) => {
@@ -116,8 +69,8 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
             <CardHeader>
                 <CardTitle>Submit Payment</CardTitle>
                 <CardDescription>
-                    {selectedMethod?.is_online 
-                        ? 'Complete your payment using the selected payment method.'
+                    {paymentType === 'online' 
+                        ? 'Complete your payment using our secure online payment system.'
                         : 'Please provide the payment details and upload proof of payment.'}
                 </CardDescription>
             </CardHeader>
@@ -130,6 +83,7 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
                                 id="amount"
                                 type="number"
                                 step="0.01"
+                                min={initialAmount}
                                 value={data.amount}
                                 onChange={(e) => handleAmountChange(e.target.value)}
                                 required
@@ -142,32 +96,45 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="payment_method">Payment Method</Label>
+                            <Label htmlFor="payment_type">Payment Type</Label>
                             <Select
-                                value={data.payment_method_id}
-                                onValueChange={(value) => setData('payment_method_id', value)}
+                                value={data.payment_type}
+                                onValueChange={handlePaymentTypeChange}
                             >
                                 <SelectTrigger className="mt-1">
-                                    <SelectValue placeholder="Select payment method" />
+                                    <SelectValue placeholder="Select payment type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {paymentMethods.map((method) => (
-                                        <SelectItem key={method.id} value={method.id.toString()}>
-                                            {method.name}
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="online">Online Payment</SelectItem>
+                                    <SelectItem value="offline">Offline Payment</SelectItem>
                                 </SelectContent>
                             </Select>
-                            {errors.payment_method_id && (
+                            {errors.payment_type && (
                                 <Alert variant="destructive">
-                                    <AlertDescription>{errors.payment_method_id}</AlertDescription>
+                                    <AlertDescription>{errors.payment_type}</AlertDescription>
                                 </Alert>
                             )}
                         </div>
                     </div>
 
-                    {!selectedMethod?.is_online && (
+                    {paymentType === 'online' && (
+                        <Alert>
+                            <AlertDescription>
+                                Online payment covers: Credit/Debit Card, Bank Transfer, and Mobile Banking Apps.
+                                You will be redirected to our secure payment gateway to complete your transaction.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {paymentType === 'offline' && (
                         <>
+                            <Alert>
+                                <AlertDescription>
+                                    Offline payment covers: Cash deposits at bank branches, Mobile App screenshots,
+                                    or any other manual payment method. Please ensure to provide all required details.
+                                </AlertDescription>
+                            </Alert>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="reference_number">Reference Number</Label>
@@ -202,7 +169,7 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="notes">Notes</Label>
+                                <Label htmlFor="notes">Notes (Optional)</Label>
                                 <Textarea
                                     id="notes"
                                     value={data.notes}
@@ -232,19 +199,12 @@ export default function PaymentForm({ loanId, paymentMethods, onSubmit, initialA
                         </>
                     )}
 
-                    {selectedMethod?.is_online ? (
-                        <Button 
-                            type="button" 
-                            onClick={handleOnlinePayment} 
-                            disabled={processing || !data.amount || !data.payment_method_id}
-                        >
-                            {processing ? 'Processing...' : 'Proceed to Payment'}
-                        </Button>
-                    ) : (
-                        <Button type="submit" disabled={processing}>
-                            {processing ? 'Submitting...' : 'Submit Payment'}
-                        </Button>
-                    )}
+                    <Button 
+                        type="submit" 
+                        disabled={processing || !data.amount || !data.payment_type}
+                    >
+                        {processing ? 'Processing...' : paymentType === 'online' ? 'Proceed to Payment' : 'Submit Payment'}
+                    </Button>
                 </form>
             </CardContent>
         </Card>

@@ -2,7 +2,7 @@
 
 namespace Modules\Loan\Database\Seeders;
 
-use App\Models\EmailTemplate;
+use Modules\Email\Models\EmailTemplate;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 

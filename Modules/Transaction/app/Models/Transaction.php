@@ -90,11 +90,6 @@ class Transaction extends Model
         return $this->belongsTo(Currency::class);
     }
 
-    public function originalCurrency(): BelongsTo
-    {
-        return $this->belongsTo(Currency::class, 'original_currency_id');
-    }
-
     public function paymentMethod(): BelongsTo
     {
         return $this->belongsTo(PaymentMethod::class);
@@ -130,10 +125,6 @@ class Transaction extends Model
         return $this->belongsTo(User::class, 'recipient_id');
     }
 
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
 
     public function processor(): BelongsTo
     {
@@ -149,6 +140,18 @@ class Transaction extends Model
     {
         return $this->belongsTo(User::class, 'reviewed_by');
     }
+
+
+    public function parent()
+    {
+        return $this->belongsTo(Transaction::class, 'parent_transaction_id');
+    }
+
+    public function refunds()
+    {
+        return $this->hasMany(Transaction::class, 'parent_transaction_id');
+    }
+
 
     /**
      * Create a new transaction with the given data

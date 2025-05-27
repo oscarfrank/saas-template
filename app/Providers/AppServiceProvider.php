@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
+use Laravel\Cashier\Cashier;
+use Modules\Payment\Models\Customer;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,6 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Tell Cashier to use Customer model instead of User
+        Cashier::useCustomerModel(Customer::class);
     }
 }

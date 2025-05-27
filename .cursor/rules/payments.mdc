@@ -1,0 +1,21 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+This is all about handling payments using the Laravel 12 cashier
+You can get the Laravel 12 Cashier implementation - `https://laravel.com/docs/12.x/billing`
+
+# GUIDE
+
+Here some important instructions to note
+
+- I have implemented Stripe but with a custom Model named Customer inside the Payment Module.
+
+- You can check the `User` Module (`Modules\User`), and the User Model inside the User Module. The Model is [User.php](mdc:Modules/User/app/Models/User.php)
+
+- I have also created the Stripe webhook insie the `Payment` Module, inside `Webhooks` (`Modules\Payment\Http\Controllers\Webhooks\`) directory. For stripe it is [StripeWebhookController.php](mdc:Modules/Payment/app/Http/Controllers/Webhooks/StripeWebhookController.php)
+
+- Everything about Payment is in the Payment Module `Modules\Payment`.
+
+- The migrations created by cashier include [2025_05_21_065735_create_subscriptions_table.php](mdc:database/migrations/2025_05_21_065735_create_subscriptions_table.php), [2025_05_21_065736_create_subscription_items_table.php](mdc:database/migrations/2025_05_21_065736_create_subscription_items_table.php) and my customer table [2025_05_21_create_customers_table.php](mdc:Modules/Payment/database/migrations/2025_05_21_create_customers_table.php)

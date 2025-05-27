@@ -130,4 +130,8 @@ return [
         'linkedin' => env('LINKEDIN_URL', 'https://linkedin.com/company/illbytes'),
     ],
 
+    'mail' => [
+        'admin_email' => env('ADMIN_EMAIL', 'admin@illbytes.com'),
+    ],
+
 ];

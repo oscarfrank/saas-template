@@ -186,13 +186,6 @@ class UserController extends Controller
                 ->where('user_id', $user->id)
                 ->delete();
 
-            // 6. Delete custom packages
-            DB::table('custom_packages')
-                ->where('user_id', $user->id)
-                ->orWhere('created_by', $user->id)
-                ->orWhere('approved_by', $user->id)
-                ->delete();
-
             // 7. Set null for foreign keys in transactions
             DB::table('transactions')
                 ->where('sender_id', $user->id)

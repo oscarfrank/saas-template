@@ -4,6 +4,8 @@ namespace Modules\Payment\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 
+use Modules\Payment\Database\Seeders\PaymentMethodSeeder;
+use Modules\Payment\Database\Seeders\SubscriptionPlanSeeder;
 class PaymentDatabaseSeeder extends Seeder
 {
     /**
@@ -13,6 +15,7 @@ class PaymentDatabaseSeeder extends Seeder
     {
         $this->call([
             PaymentMethodSeeder::class,
+            SubscriptionPlanSeeder::class,
         ]);
     }
 }

@@ -219,22 +219,40 @@ export default function UserShow({ loan, payment_methods }: Props) {
         });
     };
 
-    const handlePaymentSubmit = (formData: FormData) => {
-        router.post(route('loans.payments.store', loan.id), formData, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Payment submitted successfully');
-                setShowPaymentForm(false);
-                setPaymentDialogOpen(false);
-                // Refresh the current page instead of redirecting
-                router.reload({ preserveUrl: true });
-            },
-            onError: (errors) => {
-                Object.values(errors).forEach((error) => {
-                    toast.error(error);
-                });
-            },
-        });
+    const handlePaymentSubmit = (formData: FormData, paymentType: 'online' | 'offline') => {
+        if (paymentType === 'online') {
+            // For online payments, we'll redirect to the payment gateway
+            router.post(route('loans.payments.store', loan.id), formData, {
+                preserveScroll: true,
+                onSuccess: (response) => {
+                    if (response.url) {
+                        window.location.href = response.url;
+                    }
+                },
+                onError: (errors) => {
+                    Object.values(errors).forEach((error) => {
+                        toast.error(error);
+                    });
+                },
+            });
+        } else {
+            // For offline payments, we'll submit normally
+            router.post(route('loans.payments.store', loan.id), formData, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Payment submitted successfully');
+                    setShowPaymentForm(false);
+                    setPaymentDialogOpen(false);
+                    // Refresh the current page instead of redirecting
+                    router.reload({ preserveUrl: true });
+                },
+                onError: (errors) => {
+                    Object.values(errors).forEach((error) => {
+                        toast.error(error);
+                    });
+                },
+            });
+        }
     };
 
     const getStatusColor = (status: string) => {
@@ -1045,90 +1063,12 @@ export default function UserShow({ loan, payment_methods }: Props) {
 
                     <PaymentForm
                         loanId={loan.id}
-                        paymentMethods={payment_methods}
                         initialAmount={paymentAmount}
-                        onSubmit={(formData) => {
-                            handlePaymentSubmit(formData);
+                        onSubmit={(formData, paymentType) => {
+                            handlePaymentSubmit(formData, paymentType);
                             setPaymentDialogOpen(false);
                         }}
                     />
-
-                    {paymentBreakdown && (
-                        <Card className="mt-4">
-                            <CardHeader>
-                                <CardTitle>Payment Breakdown Preview</CardTitle>
-                                <CardDescription>How your payment will be allocated</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="grid gap-4">
-                                        <div className="flex justify-between items-center border-b pb-2">
-                                            <p className="text-sm font-medium">Total Payment Amount</p>
-                                            <p className="text-sm font-semibold">
-                                                {formatCurrency(paymentBreakdown.total_payment, loan.currency.code)}
-                                            </p>
-                                        </div>
-                                        
-                                        {paymentBreakdown.late_fees_amount > 0 && (
-                                            <div className="flex justify-between items-center border-b pb-2">
-                                                <div>
-                                                    <p className="text-sm font-medium">Late Payment Fees</p>
-                                                    <p className="text-xs text-muted-foreground">Charged for late payment</p>
-                                                </div>
-                                                <p className="text-sm font-semibold">
-                                                    {formatCurrency(paymentBreakdown.late_fees_amount, loan.currency.code)}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {paymentBreakdown.early_repayment_fees_amount > 0 && (
-                                            <div className="flex justify-between items-center border-b pb-2">
-                                                <div>
-                                                    <p className="text-sm font-medium">Early Repayment Fees</p>
-                                                    <p className="text-xs text-muted-foreground">Charged for early repayment</p>
-                                                </div>
-                                                <p className="text-sm font-semibold">
-                                                    {formatCurrency(paymentBreakdown.early_repayment_fees_amount, loan.currency.code)}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        <div className="flex justify-between items-center border-b pb-2">
-                                            <div>
-                                                <p className="text-sm font-medium">Interest Payment</p>
-                                                <p className="text-xs text-muted-foreground">Accrued interest to be paid</p>
-                                            </div>
-                                            <p className="text-sm font-semibold">
-                                                {formatCurrency(paymentBreakdown.interest_amount, loan.currency.code)}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex justify-between items-center border-b pb-2">
-                                            <div>
-                                                <p className="text-sm font-medium">Principal Payment</p>
-                                                <p className="text-xs text-muted-foreground">Amount to be applied to loan balance</p>
-                                            </div>
-                                            <p className="text-sm font-semibold">
-                                                {formatCurrency(paymentBreakdown.principal_amount, loan.currency.code)}
-                                            </p>
-                                        </div>
-
-                                        {paymentBreakdown.remaining_payment > 0 && (
-                                            <div className="flex justify-between items-center pt-2">
-                                                <div>
-                                                    <p className="text-sm font-medium">Remaining Amount</p>
-                                                    <p className="text-xs text-muted-foreground">Amount that will be refunded</p>
-                                                </div>
-                                                <p className="text-sm font-semibold">
-                                                    {formatCurrency(paymentBreakdown.remaining_payment, loan.currency.code)}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
                 </DialogContent>
             </Dialog>
 

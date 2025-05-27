@@ -277,19 +277,37 @@ export default function Show({ loan, payment_methods, auth }: Props) {
         });
     };
 
-    const handlePaymentSubmit = (formData: FormData) => {
-        router.post(route('loans.payments.store', loan.id), formData, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Payment submitted successfully');
-                setShowPaymentForm(false);
-            },
-            onError: (errors) => {
-                Object.values(errors).forEach((error) => {
-                    toast.error(error);
-                });
-            },
-        });
+    const handlePaymentSubmit = (formData: FormData, paymentType: 'online' | 'offline') => {
+        if (paymentType === 'online') {
+            // For online payments, we'll redirect to the payment gateway
+            router.post(route('loans.payments.store', loan.id), formData, {
+                preserveScroll: true,
+                onSuccess: (response) => {
+                    if (response.url) {
+                        window.location.href = response.url;
+                    }
+                },
+                onError: (errors) => {
+                    Object.values(errors).forEach((error) => {
+                        toast.error(error);
+                    });
+                },
+            });
+        } else {
+            // For offline payments, we'll submit normally
+            router.post(route('loans.payments.store', loan.id), formData, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Payment submitted successfully');
+                    setShowPaymentForm(false);
+                },
+                onError: (errors) => {
+                    Object.values(errors).forEach((error) => {
+                        toast.error(error);
+                    });
+                },
+            });
+        }
     };
 
     const handleStatusUpdate = (newStatus: string) => {
@@ -320,7 +338,8 @@ export default function Show({ loan, payment_methods, auth }: Props) {
         }
         
         router.put(route('loans.update-status', loan.id), data, {
-            onSuccess: () => {
+            preserveScroll: true,
+            onSuccess: (response) => {
                 toast.success(`Loan status updated to ${pendingStatus}`);
                 setStatusDialogOpen(false);
                 setPendingStatus(null);
@@ -328,6 +347,9 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                 setRejectionReason('');
                 setPaymentMethodId('');
                 setDisbursementTransactionId('');
+                
+                // Reload the page to get fresh data
+                router.reload({ only: ['loan'] });
             },
             onError: (errors) => {
                 toast.error('Failed to update loan status');
@@ -637,21 +659,20 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                         {pendingStatus === 'active' && (
                             <div className="mt-4 space-y-4">
                                 <div>
-                                    <Label htmlFor="payment_method">Payment Method</Label>
+                                    <Label htmlFor="payment_method">Disbursement Method</Label>
                                     <Select
                                         value={paymentMethodId}
                                         onValueChange={setPaymentMethodId}
                                         required
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select payment method" />
+                                            <SelectValue placeholder="Select disbursement method" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {payment_methods.map((method) => (
-                                                <SelectItem key={method.id} value={String(method.id)}>
-                                                    {method.name}
-                                                </SelectItem>
-                                            ))}
+                                            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                                            <SelectItem value="cash">Cash</SelectItem>
+                                            <SelectItem value="btc">Bitcoin (BTC)</SelectItem>
+                                            <SelectItem value="usdt">Tether (USDT)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1226,104 +1247,105 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                     <div className="mt-6">
                                         <h3 className="text-lg font-medium mb-4">Payment History</h3>
                                         <div className="space-y-4">
-                                            {loan.payments?.map((payment) => (
-                                                <Card key={payment.id}>
-                                                    <CardContent className="p-4">
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <p className="font-medium">Payment #{payment.payment_number}</p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Amount: {formatCurrency(payment.amount, loan.currency.code)}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Payment Date: {payment.payment_at && !isNaN(new Date(payment.payment_at).getTime())
-                                                                        ? format(new Date(payment.payment_at), 'PPP')
-                                                                        : 'N/A'}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Approved Date: {payment.approved_at && !isNaN(new Date(payment.approved_at).getTime())
-                                                                        ? format(new Date(payment.approved_at), 'PPP')
-                                                                        : 'N/A'}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Last Payment: {loan.last_payment_date && !isNaN(new Date(loan.last_payment_date).getTime())
-                                                                        ? format(new Date(loan.last_payment_date), 'PPP')
-                                                                        : 'N/A'}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Payment Method: {payment.payment_method?.name || 'N/A'}
-                                                                </p>
-                                                                <p className="text-sm text-muted-foreground">
-                                                                    Status: <Badge className={getStatusColor(payment.status)}>
-                                                                        {payment.status.toUpperCase()}
-                                                                    </Badge>
-                                                                </p>
-                                                                {payment.notes && (
-                                                                    <p className="text-sm mt-2">
-                                                                        Notes: {payment.notes}
+                                            {loan.payments && loan.payments.length > 0 ? (
+                                                loan.payments.map((payment) => (
+                                                    <Card key={payment.id}>
+                                                        <CardContent className="p-4">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <p className="font-medium">Payment #{payment.payment_number}</p>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Amount: {formatCurrency(payment.amount, loan.currency.code)}
                                                                     </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                {payment.attachment && (
-                                                                    <div className="flex flex-col items-center gap-2">
-                                                                        <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
-                                                                            <img
-                                                                                src={route('loans.payments.download-proof', [loan.id, payment.id])}
-                                                                                alt="Payment Proof"
-                                                                                className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Payment Date: {payment.payment_at && !isNaN(new Date(payment.payment_at).getTime())
+                                                                            ? format(new Date(payment.payment_at), 'PPP')
+                                                                            : 'N/A'}
+                                                                    </p>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Approved Date: {payment.approved_at && !isNaN(new Date(payment.approved_at).getTime())
+                                                                            ? format(new Date(payment.approved_at), 'PPP')
+                                                                            : 'N/A'}
+                                                                    </p>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Last Payment: {loan.last_payment_date && !isNaN(new Date(loan.last_payment_date).getTime())
+                                                                            ? format(new Date(loan.last_payment_date), 'PPP')
+                                                                            : 'N/A'}
+                                                                    </p>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Payment Method: {payment.payment_method?.name || 'N/A'}
+                                                                    </p>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        Status: <Badge className={getStatusColor(payment.status)}>
+                                                                            {payment.status.toUpperCase()}
+                                                                        </Badge>
+                                                                    </p>
+                                                                    {payment.notes && (
+                                                                        <p className="text-sm mt-2">
+                                                                            Notes: {payment.notes}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    {payment.attachment && (
+                                                                        <div className="flex flex-col items-center gap-2">
+                                                                            <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                                                                                <img
+                                                                                    src={route('loans.payments.download-proof', [loan.id, payment.id])}
+                                                                                    alt="Payment Proof"
+                                                                                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                                                    onClick={() => handlePreviewImage(payment)}
+                                                                                />
+                                                                            </div>
+                                                                            <Button
+                                                                                variant="outline"
+                                                                                size="sm"
                                                                                 onClick={() => handlePreviewImage(payment)}
-                                                                            />
+                                                                                className="flex items-center gap-2"
+                                                                            >
+                                                                                <ImageIcon className="h-4 w-4" />
+                                                                                View Full
+                                                                            </Button>
                                                                         </div>
+                                                                    )}
+                                                                    {payment.status === 'pending' && (
+                                                                        <>
+                                                                            <Button
+                                                                                variant="default"
+                                                                                size="sm"
+                                                                                className="bg-green-600 hover:bg-green-700"
+                                                                                onClick={() => handlePaymentAction(payment, 'approve')}
+                                                                            >
+                                                                                <CheckCircle className="h-4 w-4 mr-1" />
+                                                                                Approve
+                                                                            </Button>
+                                                                            <Button
+                                                                                variant="destructive"
+                                                                                size="sm"
+                                                                                onClick={() => handlePaymentAction(payment, 'reject')}
+                                                                            >
+                                                                                <XCircle className="h-4 w-4 mr-1" />
+                                                                                Reject
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                    {payment.status === 'completed' && (
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            onClick={() => handlePreviewImage(payment)}
+                                                                            onClick={() => handleShowPaymentBreakdown(payment)}
                                                                             className="flex items-center gap-2"
                                                                         >
-                                                                            <ImageIcon className="h-4 w-4" />
-                                                                            View Full
+                                                                            <DollarSign className="h-4 w-4" />
+                                                                            View Breakdown
                                                                         </Button>
-                                                                    </div>
-                                                                )}
-                                                                {payment.status === 'pending' && (
-                                                                    <>
-                                                                        <Button
-                                                                            variant="default"
-                                                                            size="sm"
-                                                                            className="bg-green-600 hover:bg-green-700"
-                                                                            onClick={() => handlePaymentAction(payment, 'approve')}
-                                                                        >
-                                                                            <CheckCircle className="h-4 w-4 mr-1" />
-                                                                            Approve
-                                                                        </Button>
-                                                                        <Button
-                                                                            variant="destructive"
-                                                                            size="sm"
-                                                                            onClick={() => handlePaymentAction(payment, 'reject')}
-                                                                        >
-                                                                            <XCircle className="h-4 w-4 mr-1" />
-                                                                            Reject
-                                                                        </Button>
-                                                                    </>
-                                                                )}
-                                                                {payment.status === 'completed' && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => handleShowPaymentBreakdown(payment)}
-                                                                        className="flex items-center gap-2"
-                                                                    >
-                                                                        <DollarSign className="h-4 w-4" />
-                                                                        View Breakdown
-                                                                    </Button>
-                                                                )}
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            ))}
-                                            {(!loan.payments || loan.payments.length === 0) && (
+                                                        </CardContent>
+                                                    </Card>
+                                                ))
+                                            ) : (
                                                 <p className="text-sm text-muted-foreground">No payment history available.</p>
                                             )}
                                         </div>

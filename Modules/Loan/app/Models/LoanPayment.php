@@ -12,7 +12,7 @@ class LoanPayment extends Model
 
     protected $fillable = [
         'loan_id',
-        'payment_method_id',
+        'payment_type',
         'reference_number',
         'payment_number',
         'amount',
@@ -105,10 +105,10 @@ class LoanPayment extends Model
     /**
      * Get the payment method for this payment.
      */
-    public function payment_method(): BelongsTo
-    {
-        return $this->belongsTo(PaymentMethod::class);
-    }
+    // public function payment_method(): BelongsTo
+    // {
+        // return $this->belongsTo(PaymentMethod::class);
+    // }
 
     /**
      * Get the user who approved the payment.

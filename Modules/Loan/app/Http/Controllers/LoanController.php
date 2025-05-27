@@ -183,7 +183,6 @@ class LoanController extends Controller
             'user',
             'currency',
             'approved_by_user:id,first_name,last_name,email',
-            'payment_method',
             'documents' => function ($query) {
                 $query->with('uploadedBy')
                       ->orderBy('created_at', 'desc');
@@ -192,17 +191,10 @@ class LoanController extends Controller
                 $query->with(['createdBy', 'updatedBy'])
                       ->orderBy('created_at', 'desc');
             },
-            'payments' => function ($query) {
-                $query->with('payment_method')
-                      ->orderBy('due_date', 'desc');
-            }
         ]);
         
         return Inertia::render('loans/show', [
             'loan' => $loan,
-            'payment_methods' => \Modules\Payment\Models\PaymentMethod::where('is_active', true)
-                ->select('id', 'name', 'method_type')
-                ->get()
         ]);
     }
 
@@ -502,7 +494,7 @@ class LoanController extends Controller
 
         $this->authorizeLevel(AccessLevel::USER, $loan);
         $validated = $request->validate([
-            'payment_method_id' => ['required', 'exists:payment_methods,id'],
+            // 'payment_method_id' => ['required', 'exists:payment_methods,id'],
             'amount' => [
                 'required',
                 'numeric',
@@ -530,10 +522,10 @@ class LoanController extends Controller
             'currency_id' => $loan->currency_id,
             'due_date' => $loan->next_payment_due_date ?? now(), // Use current date if next_payment_due_date is null
             'status' => 'pending',
-            'payment_method_id' => $validated['payment_method_id'],
+            // 'payment_type' => 'loan_payment',
             'notes' => $validated['notes'],
             'attachment' => $path,
-            'payer_name' => auth()->user()->name,
+            'payer_name' => auth()->user()->first_name . ' ' . auth()->user()->last_name,
             'payer_email' => auth()->user()->email,
         ]);
 
@@ -650,7 +642,7 @@ class LoanController extends Controller
             ])],
             'approval_notes' => ['nullable', 'string', 'required_if:status,approved'],
             'rejection_reason' => ['nullable', 'string', 'required_if:status,rejected'],
-            'payment_method_id' => ['nullable', 'exists:payment_methods,id', 'required_if:status,active'],
+            // 'payment_method_id' => ['nullable', 'exists:payment_methods,id', 'required_if:status,active'],
             'disbursement_transaction_id' => ['nullable', 'string', 'required_if:status,active'],
             'start_date' => ['nullable', 'date', 'required_if:status,active'],
             'end_date' => ['nullable', 'date', 'after:start_date', 'required_if:status,active'],
@@ -678,7 +670,7 @@ class LoanController extends Controller
             case 'active':
                 $loan->start_date = $request->start_date;
                 $loan->end_date = $request->end_date;
-                $loan->payment_method_id = $request->payment_method_id;
+                // $loan->payment_method_id = $request->payment_method_id;
                 $loan->disbursement_transaction_id = $request->disbursement_transaction_id;
                 // Set current_balance equal to amount when loan is activated
                 $loan->current_balance = $loan->amount;
@@ -762,16 +754,12 @@ class LoanController extends Controller
                 $query->with(['createdBy', 'updatedBy']);
             },
             'payments' => function ($query) {
-                $query->with('payment_method')
-                      ->orderBy('due_date', 'desc');
+                $query->orderBy('due_date', 'desc');
             },
         ]);
 
         return Inertia::render('loans/user-show', [
-            'loan' => $loan,
-            'payment_methods' => PaymentMethod::where('is_active', true)
-                ->select('id', 'name', 'method_type', 'is_online')
-                ->get(),
+            'loan' => $loan
         ]);
     }
 
@@ -860,7 +848,7 @@ class LoanController extends Controller
         }
 
         $validated = $request->validate([
-            'payment_method_id' => 'required|exists:payment_methods,id',
+            // 'payment_method_id' => 'required|exists:payment_methods,id',
             'amount' => 'required|numeric|min:' . $loan->next_payment_amount,
             'payment_proof' => 'required|file|max:10240', // 10MB max
             'notes' => 'nullable|string|max:1000',

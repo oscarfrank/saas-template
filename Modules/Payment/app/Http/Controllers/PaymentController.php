@@ -9,6 +9,8 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 use Modules\Payment\Models\SubscriptionPlan; 
+use Modules\Payment\Services\PaymentGatewayManager;
+use Modules\Payment\Models\Currency;
 
 
 use Modules\User\Models\User;
@@ -91,6 +93,28 @@ class PaymentController extends Controller
      * Remove the specified resource from storage.
      */
     public function destroy($id) {}
+
+
+    public function initiatePayment(Request $request)
+    {
+
+
+        $customer = auth()->user();
+        $amount = $request->amount;
+        $currency_id = $request->currency_id;
+        $currency = Currency::where('id', $currency_id)->first();
+        $txRef = $request->txRef;
+
+        // Determine what Gateway to use
+        $paymentGatewayManager = app(PaymentGatewayManager::class);
+        $gateway = $paymentGatewayManager->resolve($currency->code);
+
+        $response = $gateway->initiatePayment($request);
+        
+        // For regular requests, return the redirect response
+        return $response;
+
+    }
 
 
 

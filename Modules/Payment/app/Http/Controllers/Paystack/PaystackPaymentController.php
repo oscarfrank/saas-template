@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Models\Dump;
+use Modules\Payment\Models\Currency;
+use Modules\Loan\Models\LoanPayment;
+use Modules\Loan\Http\Controllers\LoanPaymentController;
+
 
 class PaystackPaymentController extends Controller
 {
@@ -21,68 +26,69 @@ class PaystackPaymentController extends Controller
     /**
      * Initialize payment
      */
-    public function initializePayment(Request $request)
+    public function initiatePayment(Request $request)
     {
+
+        $user = auth()->user();
         $request->validate([
-            'email' => 'required|email',
             'amount' => 'required|numeric|min:1',
-            'currency' => 'sometimes|string|max:3',
-            'callback_url' => 'sometimes|url',
-            'metadata' => 'sometimes|array',
         ]);
+
+        DB::beginTransaction();
+
 
         try {
             // Generate unique reference
-            $reference = 'txn_' . time() . '_' . Str::random(10);
-
-            // Convert amount to subunit
-            $amountInSubunit = $this->paystackService->convertToSubunit($request->amount);
+            $reference = 'PAY_PST_' . time() . '_' . Str::random(10);
 
             $data = [
-                'email' => $request->email,
-                'amount' => $amountInSubunit,
-                'reference' => $reference,
-                'currency' => $request->currency ?? config('paystack.currency'),
-                'callback_url' => $request->callback_url ?? url('/payment/callback'),
+                'email' => $user->email,
+                'amount' => $request->amount,
+                'reference' =>$request->txRef,
+                // 'currency' => 'NGN',
+                'currency' => Currency::find($request->currency_id)->code,
+                'callback_url' => 'https://larv.frank.ng/paystack/callback',
+                // 'callback_url' => $request->callback_url ?? url('/payment/callback'),
                 'metadata' => $request->metadata ?? [],
             ];
 
-            // Store transaction in database (optional)
-            DB::table('transactions')->insert([
-                'reference' => $reference,
-                'email' => $request->email,
-                'amount' => $request->amount,
-                'currency' => $data['currency'],
-                'status' => 'pending',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // // Store transaction in database (optional)
+            // DB::table('transactions')->insert([
+            //     'reference' => $reference,
+            //     'email' => $request->email,
+            //     'amount' => $request->amount,
+            //     'currency' => $data['currency'],
+            //     'status' => 'pending',
+            //     'created_at' => now(),
+            //     'updated_at' => now(),
+            // ]);
 
             $response = $this->paystackService->initializeTransaction($data);
 
-            if ($response['status']) {
-                return response()->json([
-                    'success' => true,
-                    'data' => [
-                        'authorization_url' => $response['data']['authorization_url'],
-                        'access_code' => $response['data']['access_code'],
-                        'reference' => $response['data']['reference'],
-                    ]
-                ]);
+            if ($response['success']) {
+
+                    DB::commit();
+
+                    $redirectUrl = $response['data']['authorization_url'];
+                    return $redirectUrl;
+                
+                // return response()->json([
+                //     'success' => true,
+                //     'data' => $response['data']
+                // ]);
             }
 
-            return response()->json([
-                'success' => false,
-                'message' => $response['message'] ?? 'Payment initialization failed'
-            ], 400);
+            DB::rollBack();
+            return back()->with('error', $result['message'] ?? 'Payment initialization failed');
 
         } catch (\Exception $e) {
-            Log::error('Payment initialization error: ' . $e->getMessage());
+            DB::rollBack();
+            return back()->with('error', 'Something went wrong. Please try again.');
             
-            return response()->json([
-                'success' => false,
-                'message' => 'Payment initialization failed'
-            ], 500);
+            // return response()->json([
+            //     'success' => false,
+            //     'message' => 'Payment initialization failed'
+            // ], 500);
         }
     }
 
@@ -91,39 +97,71 @@ class PaystackPaymentController extends Controller
      */
     public function handleCallback(Request $request)
     {
-        $reference = $request->query('reference');
 
-        if (!$reference) {
-            return redirect('/payment/failed')->with('error', 'Invalid payment reference');
+        $transactionId = $request->trxref;
+        $txRef = $request->reference;
+        // Create a new request with transformed status
+
+        $transformedRequest = new Request([
+            'transaction_id' => $transactionId,
+            'tx_ref' => $txRef,
+            'notes' => 'Paystack Payment',
+            'status' => "completed"
+        ]);
+
+        // Find the payment record
+        $payment = LoanPayment::where('reference_number', $txRef)->first();
+        
+        if (!$payment) {
+            return response()->json([
+                'error' => 'Payment record not found',
+                'tx_ref' => $txRef
+            ], 404);
         }
 
-        try {
-            $response = $this->paystackService->verifyTransaction($reference);
+        // Verify transaction with Flutterwave
+            $verification = $this->verifyPayment($transactionId);
 
-            if ($response['status'] && $response['data']['status'] === 'success') {
-                // Update transaction status
-                DB::table('transactions')
-                    ->where('reference', $reference)
-                    ->update([
-                        'status' => 'completed',
-                        'paystack_reference' => $response['data']['id'],
-                        'gateway_response' => $response['data']['gateway_response'],
-                        'paid_at' => $response['data']['paid_at'],
-                        'updated_at' => now(),
+            // dd($verification);
+
+            if ($verification['success'] && $verification['data']['status'] === 'success') {
+
+                try {
+                    // Send to Approval Calculations
+                    $loanPaymentController = new LoanPaymentController();
+                    $result = $loanPaymentController->handleCallback($transformedRequest, $payment);
+    
+                    return redirect()->route('dashboard')->with('success', 'Payment processed successfully');
+                } catch (\Exception $e) {
+                    \Log::error('PaystackController: Error in LoanPaymentController->handleCallback', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
                     ]);
+                    
+                    return response()->json([
+                        'error' => 'Error processing payment',
+                        'message' => $e->getMessage()
+                    ], 500);
+                }
 
-                // Process successful payment (deliver value to customer)
-                $this->processSuccessfulPayment($response['data']);
-
-                return redirect('/payment/success')->with('success', 'Payment successful');
+            }
+            else {
+                \Log::error('PaystackController: Payment verification failed', [
+                    'verification' => $verification
+                ]);
+                
+                $payment->update([
+                    'status' => 'failed',
+                    'failure_reason' => $verification['message'] ?? 'Payment verification failed'
+                ]);
+    
+                return response()->json([
+                    'error' => 'Payment verification failed',
+                    'verification' => $verification
+                ], 400);
             }
 
-            return redirect('/payment/failed')->with('error', 'Payment verification failed');
 
-        } catch (\Exception $e) {
-            Log::error('Payment callback error: ' . $e->getMessage());
-            return redirect('/payment/failed')->with('error', 'Payment verification failed');
-        }
     }
 
     /**
@@ -134,40 +172,15 @@ class PaystackPaymentController extends Controller
         try {
             $response = $this->paystackService->verifyTransaction($reference);
 
-            if ($response['status']) {
-                // Update local transaction record
-                $transaction = DB::table('transactions')
-                    ->where('reference', $reference)
-                    ->first();
 
-                if ($transaction && $response['data']['status'] === 'success') {
-                    DB::table('transactions')
-                        ->where('reference', $reference)
-                        ->update([
-                            'status' => 'completed',
-                            'paystack_reference' => $response['data']['id'],
-                            'gateway_response' => $response['data']['gateway_response'],
-                            'paid_at' => $response['data']['paid_at'],
-                            'updated_at' => now(),
-                        ]);
+            if ($response['success']) {
 
-                    // Verify amount matches
-                    $expectedAmount = $this->paystackService->convertToSubunit($transaction->amount);
-                    if ($response['data']['amount'] != $expectedAmount) {
-                        Log::warning("Amount mismatch for transaction {$reference}");
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Amount verification failed'
-                        ], 400);
-                    }
+                return $response;
 
-                    $this->processSuccessfulPayment($response['data']);
-                }
-
-                return response()->json([
-                    'success' => true,
-                    'data' => $response['data']
-                ]);
+                // return response()->json([
+                //     'success' => true,
+                //     'data' => $response['data']
+                // ]);
             }
 
             return response()->json([
@@ -200,5 +213,96 @@ class PaystackPaymentController extends Controller
         ]);
 
         // Example: Update user account balance, send email, etc.
+    }
+
+
+    public function handleWebhook(Request $request)
+    {
+
+        // Get the signature and raw request body
+        $signature = $request->header('x-paystack-signature');
+        $rawPayload = $request->getContent();
+
+        // Validate webhook signature using raw payload
+        if (!$this->paystackService->validateWebhookSignature($rawPayload, $signature)) {
+            \Log::error('Paystack webhook: Invalid signature', [
+                'signature' => $signature,
+                'raw_payload' => $rawPayload
+            ]);
+            return response('Unauthorized', 401);
+        }
+
+        // Decode the payload for processing
+        $payload = json_decode($rawPayload, true);
+
+        // Paystack sends different event types, we're interested in charge.success
+        if (isset($payload['event']) && $payload['event'] === 'charge.success') {
+            $reference = $payload['data']['reference'];
+            $status = $payload['data']['status'];
+
+            \Log::info('Paystack webhook: Processing charge.success', [
+                'reference' => $reference,
+                'status' => $status,
+                'amount' => $payload['data']['amount'],
+                'customer_email' => $payload['data']['customer']['email']
+            ]);
+
+            // Find the payment record
+            $payment = LoanPayment::where('reference_number', $reference)->first();
+
+            if ($payment) {
+                if ($status === 'success') {
+                    try {
+                        // Create transformed request for loan payment controller
+                        $transformedRequest = new Request([
+                            'status' => "completed",
+                            'tx_ref' => $reference,
+                            'notes' => 'Paystack Payment',
+                        ]);
+
+                        // Send to Approval Calculations
+                        $loanPaymentController = new LoanPaymentController();
+                        $result = $loanPaymentController->handleCallback($transformedRequest, $payment);
+
+                        // $this->handleSuccessfulPayment($payment);
+
+                        return redirect()->route('dashboard')->with('success', 'Payment processed successfully');
+
+                        return response()->json([
+                            'message' => 'Payment processed successfully',
+                            'result' => $result
+                        ]);
+
+                    } catch (\Exception $e) {
+                        \Log::error('PaystackController: Error in LoanPaymentController->handleCallback', [
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'reference' => $reference
+                        ]);
+                        
+                        return response()->json([
+                            'error' => 'Error processing payment',
+                            'message' => $e->getMessage()
+                        ], 500);
+                    }
+                } else {
+                    $payment->update([
+                        'status' => 'failed',
+                        'verified_at' => now()
+                    ]);
+
+                    \Log::warning('Paystack webhook: Payment failed', [
+                        'reference' => $reference,
+                        'reason' => $payload['data']['gateway_response'] ?? 'Payment failed'
+                    ]);
+                }
+            } else {
+                \Log::warning('Paystack webhook: Payment record not found', [
+                    'reference' => $reference
+                ]);
+            }
+        }
+
+        return response('OK', 200);
     }
 }

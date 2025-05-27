@@ -5,6 +5,8 @@ namespace Modules\Payment\Http\Controllers\Stripe;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
+
 
 use Illuminate\Support\Facades\Validator;
 
@@ -19,6 +21,76 @@ use Laravel\Cashier\Exceptions\IncompletePayment;
 
 class StripePaymentController extends Controller
 {
+
+    public function initiatePayment(Request $request)
+    {
+        $user = auth()->user();
+    
+        // Auto-create a Customer record if it doesn't exist
+        $customer = $user->customer ?? $user->customer()->create();
+        
+        // Validate the amount
+        $validator = Validator::make($request->all(), [
+            'amount' => 'required|numeric|min:5|max:10000', // Set your own min/max limits
+        ]);
+        
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first('amount')
+            ], 422);
+        }
+        
+        // Convert amount to cents (Stripe uses smallest currency unit)
+        $amountInCents = (int) ($request->amount * 100);
+
+        DB::beginTransaction();
+
+        
+        try {
+            // Ensure the customer exists in Stripe
+            $customer->createOrGetStripeCustomer();
+            
+            // Create a Checkout session for a one-time charge
+            $checkout = $customer->checkoutCharge(
+                $amountInCents,
+                'Account Balance Funding', // Product name
+                1, // Quantity
+                [
+                    'success_url' => route('payment.success') . '?session_id={CHECKOUT_SESSION_ID}&type=fund',
+                    'cancel_url' => route('payment.cancel'),
+                    // 'currency' => 'usd',
+                    'metadata' => [
+                        'customer_id' => $customer->id,
+                        'funding_amount' => $request->amount,
+                        'transaction_type' => 'purchase'
+                    ]
+                ]
+            );
+
+            DB::commit();
+
+            return $checkout->url;
+
+            
+            // Return Inertia render like your subscription checkout
+            return Inertia::render('payment/checkout', [
+                'checkoutUrl' => $checkout->url
+            ]);
+            
+        } catch (\Exception $e) {
+            // Handle funding creation failure
+            DB::rollBack();
+            return back()->with('error', $result['message'] ?? 'Payment initialization failed');
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 422);
+        }
+
+
+
+    }
     
     /**
      * Process checkout for single purchase using Stripe Checkout
@@ -102,8 +174,9 @@ public function fundBalance(Request $request)
     
     // Validate the amount
     $validator = Validator::make($request->all(), [
-        'amount' => 'required|numeric|min:5|max:10000', // Set your own min/max limits
+        // 'amount' => 'required|numeric|min:5|max:10000', // Set your own min/max limits
     ]);
+    $request['amount'] = 100;
     
     if ($validator->fails()) {
         return response()->json([
@@ -154,16 +227,16 @@ public function fundBalance(Request $request)
      */
     public function handlePaymentSuccess(Request $request)
     {
-        $sessionId = $request->get('session_id');
+        // $sessionId = $request->get('session_id');
         
-        if ($sessionId) {
-            $session = \Laravel\Cashier\Cashier::stripe()->checkout->sessions->retrieve($sessionId);
+        // if ($sessionId) {
+        //     $session = \Laravel\Cashier\Cashier::stripe()->checkout->sessions->retrieve($sessionId);
             
-            // Process the completed payment
-            // You might want to update your order status, send email, etc.
+        //     // Process the completed payment
+        //     // You might want to update your order status, send email, etc.
             
-            return Inertia::render('payment/success', ['session' => $session]);
-        }
+        //     return Inertia::render('payment/success', ['session' => $session]);
+        // }
         
         return Inertia::render('payment/success');
     }

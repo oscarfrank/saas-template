@@ -83,7 +83,7 @@ Route::middleware('guest')->group(function () {
         ], [
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'password' => bcrypt('password'),
+            'password' => bcrypt(Str::random(10)),
             'email_verified_at' => now(),
             'google_id' => $googleUser->id,
             'oauth_provider' => 'google',
@@ -121,7 +121,7 @@ Route::middleware('guest')->group(function () {
         ], [
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'password' => bcrypt('password'),
+            'password' => bcrypt(Str::random(10)),
             'email_verified_at' => now(),
             'facebook_id' => $facebookUser->id,
             'oauth_provider' => 'facebook',
@@ -159,7 +159,7 @@ Route::middleware('guest')->group(function () {
         ], [
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'password' => bcrypt('password'),
+            'password' => bcrypt(Str::random(10)),
             'email_verified_at' => now(),
             'github_id' => $githubUser->id,
             'oauth_provider' => 'github',

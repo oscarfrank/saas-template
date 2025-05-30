@@ -23,12 +23,12 @@ class PermissionRoleSeeder extends Seeder
             'super-admin',
             'admin',
             'manager',
+            'user',
+            'support',
             'loan-officer',
             'investment-officer',
-            'support',
             'lender',
             'borrower',
-            'user',
         ];
 
         foreach ($roles as $role) {
@@ -101,6 +101,19 @@ class PermissionRoleSeeder extends Seeder
             'edit-profile', 'view-profile'
         ]);
 
+        $user = Role::where('name', 'user')->first();
+        $user->givePermissionTo([
+            'edit-profile', 'view-profile'
+        ]);
+
+        $support = Role::where('name', 'support')->first();
+        $support->givePermissionTo([
+            'view-users',
+            'view-loans',
+            'view-investments',
+            'edit-profile', 'view-profile'
+        ]);
+
         $loanOfficer = Role::where('name', 'loan-officer')->first();
         $loanOfficer->givePermissionTo([
             'create-loan', 'edit-loan', 'approve-loan', 'reject-loan', 'view-loans',
@@ -115,14 +128,6 @@ class PermissionRoleSeeder extends Seeder
             'edit-profile', 'view-profile'
         ]);
 
-        $support = Role::where('name', 'support')->first();
-        $support->givePermissionTo([
-            'view-users',
-            'view-loans',
-            'view-investments',
-            'edit-profile', 'view-profile'
-        ]);
-
         $lender = Role::where('name', 'lender')->first();
         $lender->givePermissionTo([
             'view-loans',
@@ -133,11 +138,6 @@ class PermissionRoleSeeder extends Seeder
         $borrower = Role::where('name', 'borrower')->first();
         $borrower->givePermissionTo([
             'view-loans',
-            'edit-profile', 'view-profile'
-        ]);
-
-        $user = Role::where('name', 'user')->first();
-        $user->givePermissionTo([
             'edit-profile', 'view-profile'
         ]);
     }

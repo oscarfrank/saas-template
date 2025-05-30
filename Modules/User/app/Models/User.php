@@ -40,8 +40,15 @@ class User extends Authenticatable
         'first_name',
         'last_name',
         'email',
+        'email_verified_at',
         'password',
         'kyc_verified_at',
+        'google_id',
+        'facebook_id',
+        'github_id',
+        'azure_id',
+        'oauth_tokens',
+        'oauth_provider',
     ];
 
     /**
@@ -63,6 +70,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'kyc_verified_at' => 'datetime',
+        'oauth_tokens' => 'array',
     ];
 
     /**
@@ -333,5 +341,104 @@ class User extends Authenticatable
             
         return redirect()->route('dashboard')
             ->with('success', 'Your subscription was created successfully!');
+    }
+
+    /**
+     * Get the OAuth tokens for a specific provider.
+     *
+     * @param string $provider
+     * @return array|null
+     */
+    public function getOAuthTokens(string $provider): ?array
+    {
+        return $this->oauth_tokens[$provider] ?? null;
+    }
+
+    /**
+     * Set the OAuth tokens for a specific provider.
+     *
+     * @param string $provider
+     * @param array $tokens
+     * @return void
+     */
+    public function setOAuthTokens(string $provider, array $tokens): void
+    {
+        $currentTokens = $this->oauth_tokens ?? [];
+        $currentTokens[$provider] = $tokens;
+        $this->oauth_tokens = $currentTokens;
+        $this->save();
+    }
+
+    /**
+     * Check if the user has a specific OAuth provider connected.
+     *
+     * @param string $provider
+     * @return bool
+     */
+    public function hasOAuthProvider(string $provider): bool
+    {
+        return !empty($this->getOAuthTokens($provider));
+    }
+
+    /**
+     * Get the user's OAuth provider ID.
+     *
+     * @param string $provider
+     * @return string|null
+     */
+    public function getOAuthId(string $provider): ?string
+    {
+        return $this->{"{$provider}_id"};
+    }
+
+    /**
+     * Set the user's OAuth provider ID.
+     *
+     * @param string $provider
+     * @param string $id
+     * @return void
+     */
+    public function setOAuthId(string $provider, string $id): void
+    {
+        $this->{"{$provider}_id"} = $id;
+        $this->save();
+    }
+
+    /**
+     * Check if the user's OAuth token is expired.
+     *
+     * @param string $provider
+     * @return bool
+     */
+    public function isOAuthTokenExpired(string $provider): bool
+    {
+        $tokens = $this->getOAuthTokens($provider);
+        if (!$tokens || !isset($tokens['expires_at'])) {
+            return true;
+        }
+
+        return now()->isAfter($tokens['expires_at']);
+    }
+
+    /**
+     * Get the user's primary OAuth provider.
+     *
+     * @return string|null
+     */
+    public function getPrimaryOAuthProvider(): ?string
+    {
+        return $this->oauth_provider;
+    }
+
+    /**
+     * Set the user's primary OAuth provider.
+     *
+     * @param string $provider
+     * @return void
+     */
+    public function setPrimaryOAuthProvider(string $provider): void
+    {
+        $this->oauth_provider = $provider;
+        $this->save();
     }
 }

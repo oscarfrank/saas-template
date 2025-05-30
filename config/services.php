@@ -50,4 +50,26 @@ return [
         'currency' => 'NGN', // Default currency
     ],
 
+    // Authentications.
+
+    // Github
+    'github' => [
+        'client_id' => env('AUTH_GITHUB_CLIENT_ID'),
+        'client_secret' => env('AUTH_GITHUB_CLIENT_SECRET'),
+        'redirect' => env('AUTH_GITHUB_REDIRECT', env('APP_URL') . ':8000/auth/github/callback'),
+    ],
+
+    // Google
+    'google' => [
+        'client_id' => env('AUTH_GOOGLE_CLIENT_ID'),
+        'client_secret' => env('AUTH_GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('AUTH_GOOGLE_REDIRECT', env('APP_URL') . ':8000/auth/google/callback'),
+    ],
+
+    // Facebook
+    'facebook' => [
+        'client_id' => env('AUTH_FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('AUTH_FACEBOOK_CLIENT_SECRET'),
+        'redirect' => env('AUTH_FACEBOOK_REDIRECT', env('APP_URL') . ':8000/auth/facebook/callback'),
+    ],
 ];

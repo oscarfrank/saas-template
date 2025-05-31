@@ -21,7 +21,6 @@ use Modules\User\Http\Controllers\Auth\PasswordResetLinkController;
 use Modules\User\Http\Controllers\Auth\RegisteredUserController;
 use Modules\User\Http\Controllers\Auth\VerifyEmailController;
 
-
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
@@ -100,8 +99,19 @@ Route::middleware('guest')->group(function () {
 
         Auth::login($user);
 
-        return redirect()->route('dashboard');
+        // Check if 2FA is required
+        if ($user->two_factor_secret) {
+            return Inertia::render('auth/login', [
+                'canResetPassword' => true,
+                'status' => session('status'),
+                'requiresTwoFactor' => true,
+                'email' => $user->email,
+                'password' => '',
+                'remember' => false,
+            ]);
+        }
 
+        return redirect()->route('dashboard');
     })->name('auth.google.callback');
 
     Route::get('auth/facebook/redirect', function(){
@@ -138,8 +148,19 @@ Route::middleware('guest')->group(function () {
 
         Auth::login($user);
 
-        return redirect()->route('dashboard');
+        // Check if 2FA is required
+        if ($user->two_factor_secret) {
+            return Inertia::render('auth/login', [
+                'canResetPassword' => true,
+                'status' => session('status'),
+                'requiresTwoFactor' => true,
+                'email' => $user->email,
+                'password' => '',
+                'remember' => false,
+            ]);
+        }
 
+        return redirect()->route('dashboard');
     })->name('auth.facebook.callback');
 
     Route::get('auth/github/redirect', function(){
@@ -176,8 +197,19 @@ Route::middleware('guest')->group(function () {
 
         Auth::login($user);
 
-        return redirect()->route('dashboard');
+        // Check if 2FA is required
+        if ($user->two_factor_secret) {
+            return Inertia::render('auth/login', [
+                'canResetPassword' => true,
+                'status' => session('status'),
+                'requiresTwoFactor' => true,
+                'email' => $user->email,
+                'password' => '',
+                'remember' => false,
+            ]);
+        }
 
+        return redirect()->route('dashboard');
     })->name('auth.github.callback');
 
     Route::get('register', [RegisteredUserController::class, 'create'])

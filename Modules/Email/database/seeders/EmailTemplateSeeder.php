@@ -2,11 +2,15 @@
 
 namespace Modules\Email\Database\Seeders;
 
-use Modules\Email\Models\EmailTemplate;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Modules\Email\Models\EmailTemplate;
 
 class EmailTemplateSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
         $templates = [
@@ -18,17 +22,17 @@ class EmailTemplateSeeder extends Seeder
                 'is_active' => true,
             ],
             [
-                'name' => 'Email Verification',
-                'shortcode' => 'email_verification',
-                'content' => "Dear {{user_name}},\n\nPlease verify your email address by clicking the link below:\n\n{{verification_link}}\n\nThis link will expire in {{expiry_time}}.\n\nIf you didn't create an account, please ignore this email.\n\nBest regards,\n{{company_name}} Team",
-                'placeholders' => ['user_name', 'verification_link', 'expiry_time', 'company_name'],
+                'name' => 'Password Reset',
+                'shortcode' => 'password_reset',
+                'content' => "Dear {{user_name}},\n\nYou are receiving this email because we received a password reset request for your account.\n\nClick the link below to reset your password:\n\n{{reset_link}}\n\nThis password reset link will expire in {{expiry_time}}.\n\nIf you did not request a password reset, no further action is required.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', 'reset_link', 'expiry_time', 'company_name'],
                 'is_active' => true,
             ],
             [
-                'name' => 'Password Reset',
-                'shortcode' => 'password_reset',
-                'content' => "Dear {{user_name}},\n\nWe received a request to reset your password. Click the link below to reset your password:\n\n{{reset_link}}\n\nThis link will expire in {{expiry_time}}.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\n{{company_name}} Team",
-                'placeholders' => ['user_name', 'reset_link', 'expiry_time', 'company_name'],
+                'name' => 'Email Verification',
+                'shortcode' => 'email_verification',
+                'content' => "Dear {{user_name}},\n\nPlease verify your email address by clicking the link below:\n\n{{verification_link}}\n\nThis verification link will expire in {{expiry_time}}.\n\nIf you did not create an account, no further action is required.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', 'verification_link', 'expiry_time', 'company_name'],
                 'is_active' => true,
             ],
             [
@@ -36,6 +40,34 @@ class EmailTemplateSeeder extends Seeder
                 'shortcode' => '2fa_code',
                 'content' => "Dear {{user_name}},\n\nYour two-factor authentication code is: {{2fa_code}}\n\nThis code will expire in {{expiry_time}}.\n\nIf you didn't request this code, please secure your account immediately.\n\nBest regards,\n{{company_name}} Team",
                 'placeholders' => ['user_name', '2fa_code', 'expiry_time', 'company_name'],
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Two-Factor Authentication Disable Code',
+                'shortcode' => '2fa_disable_code',
+                'content' => "Dear {{user_name}},\n\nYour two-factor authentication disable code is: {{2fa_disable_code}}\n\nThis code will expire in {{expiry_time}}.\n\nIf you didn't request to disable 2FA, please secure your account immediately.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', '2fa_disable_code', 'expiry_time', 'company_name'],
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Login Notification',
+                'shortcode' => 'login_notification',
+                'content' => "Dear {{user_name}},\n\nA new login was detected on your account.\n\nLogin Details:\n- Time: {{login_time}}\n- Location: {{login_location}}\n- IP Address: {{ip_address}}\n- Device: {{device_info}}\n\nIf this wasn't you, please secure your account immediately by changing your password and enabling two-factor authentication.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', 'login_time', 'login_location', 'ip_address', 'device_info', 'company_name'],
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Two-Factor Authentication Enabled',
+                'shortcode' => '2fa_enabled',
+                'content' => "Dear {{user_name}},\n\nTwo-factor authentication has been successfully enabled on your account.\n\nYour account is now more secure. You'll need to enter a verification code each time you log in.\n\nIf you didn't enable 2FA, please contact our support team immediately at {{support_email}}.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', 'support_email', 'company_name'],
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Two-Factor Authentication Disabled',
+                'shortcode' => '2fa_disabled',
+                'content' => "Dear {{user_name}},\n\nTwo-factor authentication has been successfully disabled on your account.\n\nPlease note that your account security has been reduced. We recommend keeping 2FA enabled for better security.\n\nIf you didn't disable 2FA, please contact our support team immediately at {{support_email}}.\n\nBest regards,\n{{company_name}} Team",
+                'placeholders' => ['user_name', 'support_email', 'company_name'],
                 'is_active' => true,
             ],
             [
@@ -83,7 +115,10 @@ class EmailTemplateSeeder extends Seeder
         ];
 
         foreach ($templates as $template) {
-            EmailTemplate::create($template);
+            EmailTemplate::updateOrCreate(
+                ['shortcode' => $template['shortcode']],
+                $template
+            );
         }
     }
 } 

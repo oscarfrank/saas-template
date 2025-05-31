@@ -11,6 +11,7 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 use Laravel\Cashier\Billable;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 
 use Modules\KYC\Models\KycVerification;
 use Modules\Payment\Models\PaymentMethod;
@@ -29,7 +30,7 @@ use Modules\Payment\Models\Customer;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, Billable;
+    use HasFactory, Notifiable, HasRoles, Billable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -49,6 +50,10 @@ class User extends Authenticatable
         'azure_id',
         'oauth_tokens',
         'oauth_provider',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_confirmed_at',
+        'two_factor_method',
     ];
 
     /**
@@ -59,6 +64,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -71,6 +78,7 @@ class User extends Authenticatable
         'password' => 'hashed',
         'kyc_verified_at' => 'datetime',
         'oauth_tokens' => 'array',
+        'two_factor_confirmed_at' => 'datetime',
     ];
 
     /**

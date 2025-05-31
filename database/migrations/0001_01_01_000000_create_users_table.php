@@ -19,6 +19,10 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
+            $table->string('two_factor_secret')->nullable();
+            $table->string('two_factor_recovery_codes')->nullable();
+            $table->timestamp('two_factor_confirmed_at')->nullable();
+            $table->string('two_factor_method')->default('authenticator')->after('two_factor_secret');
             $table->timestamps();
         });
 
@@ -46,5 +50,11 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('two_factor_recovery_codes');
+        Schema::dropIfExists('two_factor_confirmed_at');
+        Schema::dropIfExists('two_factor_method');
+        Schema::dropIfExists('two_factor_secret');
+        Schema::dropIfExists('two_factor_enabled');
+
     }
 };

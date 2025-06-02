@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { useAppearance } from '@/hooks/use-appearance';
+import { Monitor, Moon, Sun } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -57,6 +59,7 @@ const timeFormats = [
 
 export default function Preferences() {
     const { auth } = usePage<SharedData>().props;
+    const { appearance, updateAppearance } = useAppearance();
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<PreferencesForm>({
         language: 'en',
@@ -78,13 +81,64 @@ export default function Preferences() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Preferences" />
+            <Head title="Preferences & Appearance" />
 
             <SettingsLayout>
                 <div className="space-y-8">
-                    <HeadingSmall title="Preferences" description="Manage your account preferences and settings" />
+                    <HeadingSmall title="Preferences & Appearance" description="Manage your account preferences, appearance and settings" />
 
                     <form onSubmit={submit} className="space-y-8">
+                        {/* Appearance Section */}
+                        <div className="space-y-6">
+                            <h3 className="text-lg font-medium">Appearance</h3>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Theme</Label>
+                                    <div className="inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                                        <button
+                                            type="button"
+                                            onClick={() => updateAppearance('light')}
+                                            className={`flex items-center rounded-md px-3.5 py-1.5 transition-colors ${
+                                                appearance === 'light'
+                                                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
+                                                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60'
+                                            }`}
+                                        >
+                                            <Sun className="-ml-1 h-4 w-4" />
+                                            <span className="ml-1.5 text-sm">Light</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateAppearance('dark')}
+                                            className={`flex items-center rounded-md px-3.5 py-1.5 transition-colors ${
+                                                appearance === 'dark'
+                                                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
+                                                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60'
+                                            }`}
+                                        >
+                                            <Moon className="-ml-1 h-4 w-4" />
+                                            <span className="ml-1.5 text-sm">Dark</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateAppearance('system')}
+                                            className={`flex items-center rounded-md px-3.5 py-1.5 transition-colors ${
+                                                appearance === 'system'
+                                                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
+                                                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60'
+                                            }`}
+                                        >
+                                            <Monitor className="-ml-1 h-4 w-4" />
+                                            <span className="ml-1.5 text-sm">System</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Choose your preferred theme for the application
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Language and Timezone Section */}
                         <div className="space-y-6">
                             <h3 className="text-lg font-medium">Language & Region</h3>

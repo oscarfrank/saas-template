@@ -1,7 +1,7 @@
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { router } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2 } from 'lucide-react';
@@ -60,6 +60,7 @@ export const AppSidebar = memo(function AppSidebar() {
     const { user } = useAuth();
     const { hasRole } = useRole();
     const { notifications, effectiveTenant, tenants, preferences } = useEffectiveTenant();
+    const { state } = useSidebar();
 
     console.log(notifications);
 
@@ -199,23 +200,28 @@ export const AppSidebar = memo(function AppSidebar() {
                             defaultTeam={effectiveTenant.slug}
                         />
                     </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                    {effectiveTenant && (
+                        <div>
+                            <Button
+                                variant="ghost"
+                                className="w-full justify-start gap-2"
+                                onClick={() => router.visit(`/${effectiveTenant.slug}/dashboard`)}
+                            >
+                                <LayoutGrid className="size-4" />
+                                {state === "expanded" && <span>Dashboard</span>}
+                            </Button>
+                            {state === "expanded" && <AppNotifications unreadCount={notifications.unread_count} />}
+                        </div>
+                    )}
+                    </SidebarMenuItem>
+
                 </SidebarMenu>
             </SidebarHeader>
 
             <SidebarContent>
-                {effectiveTenant && (
-                    <div className="space-y-1 p-2">
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start gap-2"
-                            onClick={() => router.visit(`/${effectiveTenant.slug}/dashboard`)}
-                        >
-                            <LayoutGrid className="size-4" />
-                            <span>Dashboard</span>
-                        </Button>
-                        <AppNotifications unreadCount={notifications.unread_count} />
-                    </div>
-                )}
+                
                 <NavMain items={mainNavItems.filter(item => item.title !== 'Dashboard')} />
             </SidebarContent>
 

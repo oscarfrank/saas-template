@@ -3,6 +3,9 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
 
 // Local Modular Dependencies
 use Modules\Transaction\Http\Controllers\TransactionController;
@@ -13,7 +16,13 @@ use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// Tenant Routes - These should be tenant-aware
+Route::middleware([
+    'auth',
+    'verified',
+    InitializeTenancyByPath::class,
+    // PreventAccessFromCentralDomains::class,
+])->prefix('{tenant}')->group(function () {
 
         // Transaction routes
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');

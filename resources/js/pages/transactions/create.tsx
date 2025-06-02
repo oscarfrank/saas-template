@@ -15,13 +15,29 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    {
+        title: 'Transactions',
+        href: '/transactions',
+    },
+    {
+        title: 'Create Transaction',
+        href: '/transactions/create',
+    },
+];
 
 interface Props extends PageProps {
     currencies: { id: number; name: string; code: string }[];
     payment_methods: { id: number; name: string }[];
+    users: { id: number; first_name: string; last_name: string; email: string }[];
 }
 
-export default function Create({ currencies, payment_methods }: Props) {
+export default function Create({ currencies, payment_methods, users }: Props) {
+    const tenantRouter = useTenantRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -31,12 +47,12 @@ export default function Create({ currencies, payment_methods }: Props) {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        router.post(route('transactions.store'), data, {
+        router.post(tenantRouter.route('transactions.store'), data, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Transaction created successfully');
-                router.visit(route('transactions.index'));
+                router.visit(tenantRouter.route('transactions.index'));
             },
             onError: (errors) => {
                 toast.error('Failed to create transaction');
@@ -46,12 +62,12 @@ export default function Create({ currencies, payment_methods }: Props) {
     };
 
     return (
-        <>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Transaction" />
-            <div className="container mx-auto py-6">
+            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex items-center gap-4 mb-6">
                     <Button variant="outline" size="icon" asChild>
-                        <Link href={route('transactions.index')}>
+                        <Link href={tenantRouter.route('transactions.index')}>
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
                     </Button>
@@ -162,20 +178,27 @@ export default function Create({ currencies, payment_methods }: Props) {
                         </div>
 
                         <div className="space-y-2">
+                            <Label htmlFor="user_id">User</Label>
+                            <Select name="user_id" required>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select user" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {users.map((user) => (
+                                        <SelectItem key={user.id} value={String(user.id)}>
+                                            {user.first_name} {user.last_name} ({user.email})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
                             <Label htmlFor="external_reference">External Reference</Label>
                             <Input
                                 id="external_reference"
                                 name="external_reference"
                                 placeholder="Enter external reference"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="category">Category</Label>
-                            <Input
-                                id="category"
-                                name="category"
-                                placeholder="Enter category"
                             />
                         </div>
 
@@ -200,7 +223,7 @@ export default function Create({ currencies, payment_methods }: Props) {
 
                     <div className="flex justify-end gap-4">
                         <Button variant="outline" asChild>
-                            <Link href={route('transactions.index')}>
+                            <Link href={tenantRouter.route('transactions.index')}>
                                 Cancel
                             </Link>
                         </Button>
@@ -210,6 +233,6 @@ export default function Create({ currencies, payment_methods }: Props) {
                     </div>
                 </form>
             </div>
-        </>
+        </AppLayout>
     );
 }

@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useState } from 'react';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 import { formatCurrency } from "@/lib/utils";
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 
 interface Props extends PageProps {
     transaction: {
@@ -36,6 +38,7 @@ interface Props extends PageProps {
 }
 
 export default function Show({ transaction }: Props) {
+    const tenantRouter = useTenantRouter();
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -61,7 +64,7 @@ export default function Show({ transaction }: Props) {
             <div className="container mx-auto py-6">
                 <div className="flex items-center gap-4 mb-6">
                     <Button variant="outline" size="icon" asChild>
-                        <Link href={route('transactions.index')}>
+                        <Link href={tenantRouter.route('transactions.index')}>
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
                     </Button>
@@ -170,7 +173,7 @@ export default function Show({ transaction }: Props) {
 
                 <div className="flex justify-end gap-4 mt-6">
                     <Button variant="outline" asChild>
-                        <Link href={route('transactions.edit', transaction.id)}>
+                        <Link href={tenantRouter.route('transactions.edit', { transaction: transaction.id })}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit Transaction
                         </Link>

@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
+            $table->string('tenant_id')->after('id');
+            $table->foreign('tenant_id')
+                    ->references('id')
+                    ->on('tenants')
+                    ->onUpdate('cascade')
+                    ->onDelete('cascade');
             // Basic Transaction Information
             $table->string('reference_number')->unique()->comment('Unique transaction reference');
             $table->foreignId('user_id')->constrained()->comment('User associated with this transaction');

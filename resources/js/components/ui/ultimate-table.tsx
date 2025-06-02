@@ -317,16 +317,16 @@ export function UltimateTable<TData extends Record<string, any>>({
     // Transform configured columns into Tanstack Table columns
     const columns: ColumnDef<TData>[] = [
         // Selection column
-        {
+        ...(config.features?.selection !== false ? [{
             id: "select",
-            header: ({ table }) => (
+            header: ({ table }: { table: any }) => (
                 <Checkbox
                     checked={table.getIsAllPageRowsSelected()}
                     onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
                     aria-label="Select all"
                 />
             ),
-            cell: ({ row }) => (
+            cell: ({ row }: { row: Row<TData> }) => (
                 <Checkbox
                     checked={row.getIsSelected()}
                     onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -335,7 +335,7 @@ export function UltimateTable<TData extends Record<string, any>>({
             ),
             enableSorting: false,
             enableHiding: false,
-        },
+        }] : []),
         // Transform configured columns
         ...config.columns.map(column => {
             const baseColumn = {

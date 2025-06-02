@@ -213,6 +213,8 @@ export function UltimateTable<TData extends Record<string, any>>({
 
     const handlePageChange = useCallback((page: number) => {
         if (!config.api?.baseUrl) return;
+
+        console.log('handlePageChange is called');
         
         setIsLoading(true);
         setError(null);

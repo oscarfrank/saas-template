@@ -70,6 +70,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { PlaceholderPattern } from "@/components/ui/placeholder-pattern";
 import { toast } from 'sonner';
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface PrintConfig<TData> {
     title: string;
@@ -85,6 +86,12 @@ interface DataTableProps<TData extends Record<string, any>, TValue> {
     data: TData[];
     searchPlaceholder?: string;
     searchColumns?: string[];
+    showSearch?: boolean;
+    showExport?: boolean;
+    showFilters?: boolean;
+    showPagination?: boolean;
+    showPrint?: boolean;
+    showBulkActions?: boolean;
     bulkActions?: {
         label: string;
         action: (selectedRows: TData[]) => void;
@@ -128,6 +135,12 @@ export function DataTable<TData extends Record<string, any>, TValue>({
     data,
     searchPlaceholder = "Search...",
     searchColumns = ["name"],
+    showSearch = true,
+    showExport = true,
+    showFilters = true,
+    showPagination = true,
+    showPrint = true,
+    showBulkActions = true,
     bulkActions = [],
     onBulkDelete,
     onBulkArchive,
@@ -542,15 +555,17 @@ export function DataTable<TData extends Record<string, any>, TValue>({
         <div>
             <div className="flex items-center gap-4 py-4">
                 <div className="flex-1 flex items-center gap-2">
-                    <Input
-                        ref={searchInputRef}
-                        placeholder={searchPlaceholder}
-                        value={globalFilter ?? ""}
-                        onChange={(event) => setGlobalFilter(event.target.value)}
-                        className="w-full"
-                        disabled={isLoading}
-                    />
-                    {table.getSelectedRowModel().rows.length > 0 && (
+                    {showSearch && (
+                        <Input
+                            ref={searchInputRef}
+                            placeholder={searchPlaceholder}
+                            value={globalFilter ?? ""}
+                            onChange={(event) => setGlobalFilter(event.target.value)}
+                            className="w-full"
+                            disabled={isLoading}
+                        />
+                    )}
+                    {showBulkActions && table.getSelectedRowModel().rows.length > 0 && (
                         <div className="flex items-center gap-2">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -573,10 +588,12 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                                         <Copy className="mr-2 h-4 w-4" />
                                         Copy Selected
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleBulkPrint}>
-                                        <Printer className="mr-2 h-4 w-4" />
-                                        Print Selected
-                                    </DropdownMenuItem>
+                                    {showPrint && (
+                                        <DropdownMenuItem onClick={handleBulkPrint}>
+                                            <Printer className="mr-2 h-4 w-4" />
+                                            Print Selected
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
                                         onClick={handleDelete}
@@ -631,110 +648,118 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <Download className="mr-2 h-4 w-4" />
-                                Export
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleExport('csv')}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Export All {tableName} as CSV
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleExport('json')}>
-                                <FileJson className="mr-2 h-4 w-4" />
-                                Export All {tableName} as JSON
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handlePrint}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print All
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {showExport && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Export All {tableName} as CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('json')}>
+                                    <FileJson className="mr-2 h-4 w-4" />
+                                    Export All {tableName} as JSON
+                                </DropdownMenuItem>
+                                {showPrint && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={handlePrint}>
+                                            <Printer className="mr-2 h-4 w-4" />
+                                            Print All
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
             </div>
-            <div className="flex items-center gap-2 py-2">
-                <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 border-dashed">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Filter
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80">
-                        <div className="grid gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Add Filter</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Filter the table by specific columns
-                                </p>
-                            </div>
-                            <div className="grid gap-2">
-                                <div className="grid grid-cols-3 items-center gap-4">
-                                    <label htmlFor="column">Column</label>
-                                    <Select
-                                        value={selectedColumn}
-                                        onValueChange={(value) => {
-                                            setSelectedColumn(value);
-                                        }}
-                                    >
-                                        <SelectTrigger className="col-span-2">
-                                            <SelectValue placeholder="Select column">
-                                                {selectedColumn ? 
-                                                    columns.find(c => c.id === selectedColumn)?.header as string 
-                                                    : "Select column"}
-                                            </SelectValue>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {columns
-                                                .filter(column => column.id !== "actions")
-                                                .map((column) => (
-                                                    <SelectItem 
-                                                        key={column.id} 
-                                                        value={column.id as string}
-                                                    >
-                                                        {column.header as string}
-                                                    </SelectItem>
-                                                ))}
-                                        </SelectContent>
-                                    </Select>
+            {showFilters && (
+                <div className="flex items-center gap-2 py-2">
+                    <Popover open={isFilterPopoverOpen} onOpenChange={setIsFilterPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Filter
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <div className="grid gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Add Filter</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Filter the table by specific columns
+                                    </p>
                                 </div>
-                                <div className="grid grid-cols-3 items-center gap-4">
-                                    <label htmlFor="value">Value</label>
-                                    <Input
-                                        id="value"
-                                        value={filterValue}
-                                        onChange={(e) => setFilterValue(e.target.value)}
-                                        className="col-span-2"
-                                    />
+                                <div className="grid gap-2">
+                                    <div className="grid grid-cols-3 items-center gap-4">
+                                        <label htmlFor="column">Column</label>
+                                        <Select
+                                            value={selectedColumn}
+                                            onValueChange={(value) => {
+                                                setSelectedColumn(value);
+                                            }}
+                                        >
+                                            <SelectTrigger className="col-span-2">
+                                                <SelectValue placeholder="Select column">
+                                                    {selectedColumn ? 
+                                                        columns.find(c => c.id === selectedColumn)?.header as string 
+                                                        : "Select column"}
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {columns
+                                                    .filter(column => column.id !== "actions")
+                                                    .map((column) => (
+                                                        <SelectItem 
+                                                            key={column.id} 
+                                                            value={column.id as string}
+                                                        >
+                                                            {column.header as string}
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-3 items-center gap-4">
+                                        <label htmlFor="value">Value</label>
+                                        <Input
+                                            id="value"
+                                            value={filterValue}
+                                            onChange={(e) => setFilterValue(e.target.value)}
+                                            className="col-span-2"
+                                        />
+                                    </div>
+                                    <Button onClick={addFilter}>Add</Button>
                                 </div>
-                                <Button onClick={addFilter}>Add</Button>
                             </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
-                {filters.map((filter) => {
-                    const column = columns.find(c => c.id === filter.column);
-                    return (
-                        <Badge
-                            key={filter.id}
-                            variant="secondary"
-                            className="flex items-center gap-1"
-                        >
-                            {column?.header as string}: {filter.value}
-                            <button
-                                onClick={() => removeFilter(filter.id)}
-                                className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        </PopoverContent>
+                    </Popover>
+                    {filters.map((filter) => {
+                        const column = columns.find(c => c.id === filter.column);
+                        return (
+                            <Badge
+                                key={filter.id}
+                                variant="secondary"
+                                className="flex items-center gap-1"
                             >
-                                <X className="h-3 w-3" />
-                            </button>
-                        </Badge>
-                    );
-                })}
-            </div>
+                                {column?.header as string}: {filter.value}
+                                <button
+                                    onClick={() => removeFilter(filter.id)}
+                                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        );
+                    })}
+                </div>
+            )}
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -773,14 +798,17 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={columns.length + 1} className="h-96">
-                                    <div className="flex flex-col items-center justify-center h-full">
-                                        <PlaceholderPattern className="w-16 h-16" />
-                                        <p className="mt-4 text-sm text-muted-foreground">Loading data...</p>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
+                            <>
+                                {Array.from({ length: pagination?.per_page || 5 }).map((_, index) => (
+                                    <TableRow key={`skeleton-${index}`}>
+                                        {columns.map((column, colIndex) => (
+                                            <TableCell key={`skeleton-cell-${colIndex}`}>
+                                                <Skeleton className="h-6 w-full" />
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </>
                         ) : error ? (
                             <TableRow>
                                 <TableCell colSpan={columns.length + 1} className="h-96">
@@ -819,7 +847,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
                     </TableBody>
                 </Table>
             </div>
-            {pagination && (
+            {showPagination && pagination && (
                 <div className="flex items-center justify-between px-2 py-4">
                     <div className="flex-1 text-sm text-muted-foreground">
                         {table.getFilteredSelectedRowModel().rows.length} of{" "}

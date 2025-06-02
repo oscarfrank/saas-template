@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('loan_packages', function (Blueprint $table) {
             $table->id();
+            $table->string('tenant_id')->after('id');
+            $table->foreign('tenant_id')
+                    ->references('id')
+                    ->on('tenants')
+                    ->onUpdate('cascade')
+                    ->onDelete('cascade');
              // Basic Package Information
              $table->string('name')->comment('Package name for display');
              $table->string('code')->unique()->comment('Unique package identifier');
@@ -109,5 +115,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('loan_packages');
+        $table->dropForeign(['tenant_id']);
+        $table->dropColumn('tenant_id');
     }
 };

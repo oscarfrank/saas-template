@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, MessageSquare, Send } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -54,6 +55,7 @@ interface Props {
 }
 
 export default function UserShow({ ticket }: Props) {
+    const tenantRouter = useTenantRouter();
     const [message, setMessage] = useState('');
 
     // Filter out internal messages
@@ -67,9 +69,7 @@ export default function UserShow({ ticket }: Props) {
             return;
         }
 
-        router.post(route('tickets.reply', ticket.id), {
-            message,
-        }, {
+        tenantRouter.post('tickets.reply', { message }, { ticket: ticket.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -101,7 +101,7 @@ export default function UserShow({ ticket }: Props) {
             <Head title={`View Ticket - ${ticket.subject}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('tickets.user')}>
+                    <Link href={tenantRouter.route('tickets.user')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to My Tickets

@@ -3,6 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { EditForm } from './components/edit-form';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -16,6 +17,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Create() {
+    const tenantRouter = useTenantRouter();
     const fields = [
         { name: 'name', type: 'text' as const, label: 'Name', required: true },
         { name: 'description', type: 'textarea' as const, label: 'Description', required: true },
@@ -28,7 +30,7 @@ export default function Create() {
             <Head title="Create Product" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
-                    <Link href={route('products.index')}>
+                    <Link href={tenantRouter.route('products.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>

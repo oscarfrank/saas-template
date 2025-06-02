@@ -168,7 +168,7 @@ class LoanController extends Controller
         // Dispatch the LoanCreated event
         event(new LoanCreated($loan));
 
-        return redirect()->route('user-loans.show', $loan)
+        return redirect()->route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
             ->with('success', 'Loan created successfully.');
     }
 
@@ -248,9 +248,9 @@ class LoanController extends Controller
             'affected_user_id' => $validated['user_id'],
             'affected_user_name' => User::find($validated['user_id'])->first_name . ' ' . User::find($validated['user_id'])->last_name
         ])
-        ->log('Loan status updated to ' . strtoupper($validated['status']));
+        ->log('Loan [' . $loan->reference_number . '] status updated to ' . strtoupper($validated['status']));
 
-        return redirect()->route('loans.show', $loan)
+        return redirect()->route('loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
             ->with('success', 'Loan updated successfully.');
     }
 
@@ -262,7 +262,7 @@ class LoanController extends Controller
         
         $loan->delete();
 
-        return redirect()->route('loans.index')
+        return redirect()->route('loans.index', ['tenant' => tenant('id')])
             ->with('success', 'Loan deleted successfully.');
     }
 
@@ -325,7 +325,7 @@ class LoanController extends Controller
 
         Loan::whereIn('id', $validated['ids'])->delete();
 
-        return redirect()->route('loans.index')
+        return redirect()->route('loans.index', ['tenant' => tenant('id')])
             ->with('success', 'Selected loans deleted successfully.');
     }
 
@@ -341,7 +341,7 @@ class LoanController extends Controller
 
         Loan::whereIn('id', $validated['ids'])->update(['status' => 'closed']);
 
-        return redirect()->route('loans.index')
+        return redirect()->route('loans.index', ['tenant' => tenant('id')])
             ->with('success', 'Selected loans archived successfully.');
     }
 
@@ -717,9 +717,9 @@ class LoanController extends Controller
                 'rejection_reason' => $request->rejection_reason,
                 'start_date' => $request->start_date,
                 'end_date' => $request->end_date,
-                'disbursement_transaction_id' => $request->disbursement_transaction_id
+                'disbursement_transaction_id' => $request->disbursement_transaction_id,
             ])
-            ->log('Loan status updated');
+            ->log('Loan [' . $loan->reference_number . '] status updated');
 
         return back()->with('success', 'Loan status updated successfully');
     }
@@ -907,7 +907,7 @@ class LoanController extends Controller
             'rejected_at' => now(),
         ]);
 
-        return redirect()->route('user-loans')
+        return redirect()->route('user-loans', ['tenant' => tenant('id')])
             ->with('success', 'Loan application cancelled successfully.');
     }
 }

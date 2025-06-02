@@ -16,6 +16,8 @@ import { AlertCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 const ID_TYPE_MAP: Record<string, string> = {
     'passport': 'Passport',
     'national_id': 'National ID Card',
@@ -50,6 +52,7 @@ interface Props {
 }
 
 export default function Create({ existingKyc }: Props) {
+    const tenantRouter = useTenantRouter();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(
@@ -223,10 +226,10 @@ export default function Create({ existingKyc }: Props) {
             console.log(`Form data - ${key}:`, value);
         }
 
-        router.post(route('kyc.store'), formDataObj, {
+        router.post(tenantRouter.route('kyc.store'), formDataObj, {
             onSuccess: () => {
                 toast.success('KYC verification submitted successfully');
-                router.visit(route('kyc.show'), { preserveScroll: true });
+                router.visit(tenantRouter.route('kyc.show'), { preserveScroll: true });
                 window.location.reload();
             },
             onError: (errors) => {
@@ -269,7 +272,7 @@ export default function Create({ existingKyc }: Props) {
                 </Alert>
 
                 <div className="flex justify-end">
-                    <Link href={route('dashboard')}>
+                    <Link href={tenantRouter.route('dashboard')}>
                         <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>

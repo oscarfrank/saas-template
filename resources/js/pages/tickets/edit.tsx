@@ -2,9 +2,10 @@ import { PageProps } from '@/types';
 import { Head } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Save } from 'lucide-react';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface Props extends PageProps {
     ticket: {
@@ -18,11 +19,13 @@ interface Props extends PageProps {
     };
     users: Array<{
         id: number;
-        name: string;
+        first_name: string;
+        last_name: string;
     }>;
 }
 
 export default function Edit({ ticket, users }: Props) {
+    const tenantRouter = useTenantRouter();
     const [formData, setFormData] = useState({
         subject: ticket.subject,
         description: ticket.description,
@@ -45,7 +48,7 @@ export default function Edit({ ticket, users }: Props) {
             return;
         }
 
-        router.put(route('tickets.update', ticket.id), formData, {
+        tenantRouter.put('tickets.update', formData, { ticket: ticket.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -64,7 +67,7 @@ export default function Edit({ ticket, users }: Props) {
             <div className="container mx-auto py-6">
                 <div className="mb-6">
                     <Button variant="ghost" asChild>
-                        <Link href={route('admin.tickets.show', ticket.id)}>
+                        <Link href={tenantRouter.route('admin.tickets.show', { ticket: ticket.id })}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Back to Ticket
                         </Link>

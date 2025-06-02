@@ -7,12 +7,21 @@ use Inertia\Inertia;
 // Local Modular Dependencies
 use Modules\Product\Http\Controllers\ProductController;
 
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
 
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
+// Tenant Routes - These should be tenant-aware
+Route::middleware([
+    'auth',
+    'verified',
+    InitializeTenancyByPath::class,
+    // PreventAccessFromCentralDomains::class,
+])->prefix('{tenant}')->group(function () {
 
 
 

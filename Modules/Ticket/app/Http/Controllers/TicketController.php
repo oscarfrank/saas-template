@@ -71,7 +71,7 @@ class TicketController extends Controller
             'status' => 'open',
         ]);
 
-        return redirect()->route('tickets.user.show', $ticket)
+        return redirect()->route('tickets.user.show', ['tenant' => tenant('id'), 'ticket' => $ticket])
             ->with('success', 'Ticket created successfully.');
     }
 
@@ -125,7 +125,7 @@ class TicketController extends Controller
 
         $ticket->update($validated);
 
-        return redirect()->route('admin.tickets.show', $ticket)
+        return redirect()->route('admin.tickets.show', ['tenant' => tenant('id'), 'ticket' => $ticket])
             ->with('success', 'Ticket updated successfully.');
     }
 
@@ -135,7 +135,7 @@ class TicketController extends Controller
 
         $ticket->delete();
 
-        return redirect()->route('admin.tickets.index')
+        return redirect()->route('admin.tickets.index', ['tenant' => tenant('id')])
             ->with('success', 'Ticket deleted successfully.');
     }
 
@@ -157,11 +157,11 @@ class TicketController extends Controller
 
         // Redirect based on user level
         if ($this->hasLevel(AccessLevel::SUPPORT)) {
-            return redirect()->route('admin.tickets.show', $ticket)
+            return redirect()->route('admin.tickets.show', ['tenant' => tenant('id'), 'ticket' => $ticket])
                 ->with('success', 'Reply added successfully.');
         }
 
-        return redirect()->route('tickets.user.show', $ticket)
+        return redirect()->route('tickets.user.show', ['tenant' => tenant('id'), 'ticket' => $ticket])
             ->with('success', 'Reply added successfully.');
     }
 
@@ -210,7 +210,7 @@ class TicketController extends Controller
             $ticket->delete();
         }
 
-        return redirect()->route('admin.tickets.index')
+        return redirect()->route('admin.tickets.index', ['tenant' => tenant('id')])
             ->with('success', 'Selected tickets deleted successfully.');
     }
 

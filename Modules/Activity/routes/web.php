@@ -3,6 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
+
 
 // Local Modular Dependencies
 
@@ -12,13 +16,20 @@ use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware([
+    'auth',
+    'verified',
+    InitializeTenancyByPath::class,
+    // PreventAccessFromCentralDomains::class,
+])->prefix('{tenant}')->group(function () {
 
 
     // Activity routes
     Route::get('/activity', [ActivityController::class, 'user'])->name('activity.user');
     Route::get('/activity/load-more', [ActivityController::class, 'getUserLoadMore'])->name('activity.user.get-load-more');
     Route::post('/activity/load-more', [ActivityController::class, 'userLoadMore'])->name('activity.user.load-more');
+    Route::post('/activity/notifications', [ActivityController::class, 'getNotifications'])->name('activity.user-notifications');
+    Route::post('/activity/reset-counter', [ActivityController::class, 'resetCounter'])->name('activity.user.reset-counter');
     
 
     // ======================================================================
@@ -46,4 +57,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
 
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::post('/activity/user/notifications', [ActivityController::class, 'getNotifications'])->name('activity.user.notifications');
+    Route::post('/activity/user/reset-counter', [ActivityController::class, 'resetCounter'])->name('activity.user.reset-counter');
 });

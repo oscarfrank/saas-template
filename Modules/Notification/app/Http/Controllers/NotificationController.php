@@ -2,11 +2,15 @@
 
 namespace Modules\Notification\Http\Controllers;
 
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
+    use BelongsToTenant;
+
     /**
      * Display a listing of the resource.
      */

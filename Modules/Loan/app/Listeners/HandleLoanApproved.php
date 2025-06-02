@@ -42,7 +42,7 @@ class HandleLoanApproved implements ShouldQueue
                 '{{loan_term}}' => $loan->duration_days . ' days',
                 '{{interest_rate}}' => $loan->interest_rate . '%',
                 '{{monthly_payment}}' => $loan->next_payment_amount ?? 'N/A',
-                '{{loan_acceptance_link}}' => route('user-loans.show', $loan),
+                '{{loan_acceptance_link}}' => route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan]),
                 '{{company_name}}' => config('app.name'),
             ];
 

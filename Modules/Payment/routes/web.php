@@ -66,7 +66,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // ======================================================================
 // ====================== PAYMENT ROUTES ================================
 // ======================================================================
-Route::middleware(['web', 'auth'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     // General Payment Routes
     Route::get('/payment/fund-balance', [StripePaymentController::class, 'fundBalance']) ->name('payment.fund-balance');
     Route::post('/checkout/single', [StripePaymentController::class, 'checkoutSinglePurchase'])->name('checkout.single');

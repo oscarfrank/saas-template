@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/navigation-menu";
 
 export function Header() {
-    const { auth, siteSettings } = usePage<SharedData>().props;
+    const { auth, siteSettings, tenant } = usePage<SharedData>().props;
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md dark:bg-gray-900/90 border-b border-gray-100 dark:border-gray-800">
@@ -201,7 +201,7 @@ export function Header() {
                     <div className="flex items-center space-x-4">
                         {auth.user ? (
                             <Button asChild variant="default">
-                                <Link href={route('dashboard')}>Dashboard</Link>
+                                <Link href={tenant ? `/${tenant.slug}/dashboard` : route('dashboard')}>Dashboard</Link>
                             </Button>
                         ) : (
                             <>

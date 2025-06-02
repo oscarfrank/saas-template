@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { Table } from './components/table';
 import { createColumns } from './components/user-table-columns';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Plus } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -31,6 +32,9 @@ interface Props {
 }
 
 export default function UserTickets({ tickets, filters }: Props) {
+    const tenantRouter = useTenantRouter();
+    const { tenant } = usePage().props;
+
     const [search, setSearch] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,7 +48,7 @@ export default function UserTickets({ tickets, filters }: Props) {
         const params = new URLSearchParams(window.location.search);
         params.set('page', page.toString());
         
-        router.get(route('tickets.user') + '?' + params.toString(), {}, { 
+        tenantRouter.get('tickets.user', {}, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -62,7 +66,7 @@ export default function UserTickets({ tickets, filters }: Props) {
     const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
         setIsLoading(true);
         setError(null);
-        router.get(route('tickets.user'), { sort, direction }, { 
+        tenantRouter.get('tickets.user', { sort, direction }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -81,7 +85,7 @@ export default function UserTickets({ tickets, filters }: Props) {
         setError(null);
         
         if (search.trim()) {
-            router.get(route('tickets.user'), { search }, { 
+            tenantRouter.get('tickets.user', { search }, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['tickets', 'filters'],
@@ -94,7 +98,7 @@ export default function UserTickets({ tickets, filters }: Props) {
                 }
             });
         } else {
-            router.get(route('tickets.user'), {}, { 
+            tenantRouter.get('tickets.user', {}, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['tickets', 'filters'],
@@ -112,7 +116,7 @@ export default function UserTickets({ tickets, filters }: Props) {
     const handlePerPageChange = (perPage: number) => {
         setIsLoading(true);
         setError(null);
-        router.get(route('tickets.user'), { per_page: perPage }, { 
+        tenantRouter.get('tickets.user', { per_page: perPage }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -130,7 +134,7 @@ export default function UserTickets({ tickets, filters }: Props) {
         if (!selectedTicket) return;
 
         setIsLoading(true);
-        router.delete(route('tickets.destroy', selectedTicket.id), {
+        tenantRouter.delete('tickets.destroy', { ticket: selectedTicket.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -138,7 +142,7 @@ export default function UserTickets({ tickets, filters }: Props) {
                 setIsDeleteDialogOpen(false);
                 setSelectedTicket(null);
                 setKey(prev => prev + 1);
-                router.reload({
+                tenantRouter.reload({
                     only: ['tickets', 'filters'],
                     onSuccess: () => {
                         setIsLoading(false);
@@ -172,7 +176,7 @@ export default function UserTickets({ tickets, filters }: Props) {
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                     </div>
-                    <Link href={route('tickets.create')}>
+                    <Link href={tenantRouter.route('tickets.create')}>
                         <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
                             Create New Ticket

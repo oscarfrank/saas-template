@@ -26,11 +26,16 @@ use Modules\Loan\Models\BorrowPayment;
 use Modules\Loan\Models\Loan;
 use Modules\Loan\Models\Borrow;
 use Modules\Payment\Models\Customer;
+use Modules\User\Models\UserPreference;
+use Modules\Settings\Traits\HasTenancyPreferences;
+
+use App\Models\Tenant;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasRoles, Billable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, HasRoles, Billable, TwoFactorAuthenticatable, HasTenancyPreferences;
 
     /**
      * The attributes that are mass assignable.
@@ -54,6 +59,7 @@ class User extends Authenticatable
         'two_factor_recovery_codes',
         'two_factor_confirmed_at',
         'two_factor_method',
+        'tenant_id',
     ];
 
     /**
@@ -448,5 +454,33 @@ class User extends Authenticatable
     {
         $this->oauth_provider = $provider;
         $this->save();
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function tenants()
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_user')
+            ->select(['tenants.id', 'tenants.name', 'tenants.slug'])
+            ->withTimestamps()->withPivot('role');
+    }
+
+    /**
+     * Get the user's preferences.
+     */
+    public function preferences()
+    {
+        return $this->hasOne(UserPreference::class);
+    }
+
+    /**
+     * Get or create user preferences.
+     */
+    public function getPreferences()
+    {
+        return $this->preferences ?? UserPreference::getForUser($this->id);
     }
 }

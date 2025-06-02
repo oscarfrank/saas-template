@@ -11,6 +11,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 import { formatCurrency } from "@/lib/utils";
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export default function Index({ products, pagination }: Props) {
+    const tenantRouter = useTenantRouter();
     const [search, setSearch] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function Index({ products, pagination }: Props) {
         const params = new URLSearchParams(window.location.search);
         params.set('page', page.toString());
         
-        router.get(route('products.index') + '?' + params.toString(), {}, { 
+        router.get(tenantRouter.route('products.index') + '?' + params.toString(), {}, { 
             preserveState: true,
             preserveScroll: true,
             only: ['products', 'pagination'],
@@ -63,7 +65,7 @@ export default function Index({ products, pagination }: Props) {
     const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
         setIsLoading(true);
         setError(null);
-        router.get(route('products.index'), { sort, direction }, { 
+        router.get(tenantRouter.route('products.index'), { sort, direction }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['products', 'pagination'],
@@ -83,7 +85,7 @@ export default function Index({ products, pagination }: Props) {
         
         // Only trigger search if there's actual input
         if (search.trim()) {
-            router.get(route('products.index'), { search }, { 
+            router.get(tenantRouter.route('products.index'), { search }, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['products', 'pagination'],
@@ -97,7 +99,7 @@ export default function Index({ products, pagination }: Props) {
             });
         } else {
             // If search is empty, just reload the page without search parameter
-            router.get(route('products.index'), {}, { 
+            router.get(tenantRouter.route('products.index'), {}, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['products', 'pagination'],
@@ -115,7 +117,7 @@ export default function Index({ products, pagination }: Props) {
     const handlePerPageChange = (perPage: number) => {
         setIsLoading(true);
         setError(null);
-        router.get(route('products.index'), { per_page: perPage }, { 
+        router.get(tenantRouter.route('products.index'), { per_page: perPage }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['products', 'pagination'],
@@ -141,7 +143,7 @@ export default function Index({ products, pagination }: Props) {
         try {
             // Delete products sequentially
             for (const product of selectedProducts) {
-                await router.delete(route('products.destroy', product.id), {
+                await router.delete(tenantRouter.route('products.destroy', { product: product.id }), {
                     preserveState: true,
                     preserveScroll: true,
                 });
@@ -175,7 +177,7 @@ export default function Index({ products, pagination }: Props) {
         if (!selectedProduct) return;
 
         setIsLoading(true);
-        router.delete(route('products.destroy', selectedProduct.id), {
+        router.delete(tenantRouter.route('products.destroy', { product: selectedProduct.id }), {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -224,7 +226,7 @@ export default function Index({ products, pagination }: Props) {
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                     </div>
-                    <Link href={route('products.create')}>
+                    <Link href={tenantRouter.route('products.create')}>
                         <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
                             Add Product

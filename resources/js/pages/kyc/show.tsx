@@ -7,6 +7,7 @@ import { ArrowLeft, Edit, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useState } from 'react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -47,7 +48,7 @@ interface ShowProps {
 
 export default function Show({ kycVerification }: ShowProps) {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
+    const tenantRouter = useTenantRouter();
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'pending':
@@ -66,14 +67,14 @@ export default function Show({ kycVerification }: ShowProps) {
             <Head title="KYC Status" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('dashboard')}>
+                    <Link href={tenantRouter.route('dashboard')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Dashboard
                         </Button>
                     </Link>
                     {kycVerification.status === 'rejected' && (
-                        <Link href={route('kyc.create')}>
+                        <Link href={tenantRouter.route('kyc.create')}>
                             <Button className="cursor-pointer">
                                 <Edit className="mr-2 h-4 w-4" />
                                 Resubmit KYC

@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from "@/lib/utils";
 import { type Loan } from './table-columns';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface TableColumnsProps {
     onDelete: (id: number) => void;
@@ -41,9 +42,10 @@ export const createUserColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Lo
         enableHiding: true,
         cell: ({ row }) => {
             const loan = row.original;
+            const tenantRouter = useTenantRouter();
             return (
                 <Link 
-                    href={route('user-loans.show', loan.id)}
+                    href={tenantRouter.route('user-loans.show', { loan: loan.id })}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("reference_number")}
@@ -126,10 +128,11 @@ export const createUserColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Lo
         id: "actions",
         cell: ({ row }) => {
             const loan = row.original;
+            const tenantRouter = useTenantRouter();
 
             return (
                 <div className="flex items-center gap-2">
-                    <Link href={route('user-loans.show', loan.id)}>
+                    <Link href={tenantRouter.route('user-loans.show', { loan: loan.id })}>
                         <Button variant="outline" size="icon" className="cursor-pointer">
                             <Eye className="h-4 w-4" />
                         </Button>
@@ -143,7 +146,7 @@ export const createUserColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Lo
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem asChild>
-                                <Link href={route('user-loans.show', loan.id)}>
+                                <Link href={tenantRouter.route('user-loans.show', { loan: loan.id })}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Details
                                 </Link>

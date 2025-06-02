@@ -5,10 +5,11 @@ namespace Modules\Loan\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Stancl\Tenancy\Database\Concerns\BelongsToPrimaryModel;
 
 class LoanPayment extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, BelongsToPrimaryModel;
 
     protected $fillable = [
         'loan_id',
@@ -93,6 +94,11 @@ class LoanPayment extends Model
         'auto_payment_scheduled_for' => 'datetime',
         'adjusted_at' => 'datetime'
     ];
+
+    public function getRelationshipToPrimaryModel(): string
+    {
+        return 'loan';
+    }
 
     /**
      * Get the loan that owns the payment.

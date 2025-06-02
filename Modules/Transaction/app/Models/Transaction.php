@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
+
 
 use Modules\Loan\Models\Loan;
 use Modules\Loan\Models\LoanPayment;
@@ -25,7 +27,10 @@ use Modules\Payment\Models\Currency;
 
 class Transaction extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
+        'tenant_id',
         'reference_number',
         'user_id',
         'transaction_type',

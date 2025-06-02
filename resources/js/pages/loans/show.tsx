@@ -1,5 +1,5 @@
 import { PageProps } from '@/types';
-import { Head, useForm, Link, router, usePage } from '@inertiajs/react';
+import { Head, useForm, Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import PaymentForm from '@/components/PaymentForm';
 import PaymentHistory from '@/components/PaymentHistory';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface Payment {
     id: number;
@@ -201,7 +202,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Show({ loan, payment_methods, auth }: Props) {
-
+    const tenantRouter = useTenantRouter();
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
@@ -241,7 +242,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
 
     const handleAddNote = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('loans.notes.add', loan.id), {
+        post(tenantRouter.route('loans.notes.add', { id: loan.id }), {
             onSuccess: () => {
                 toast.success('Note added successfully');
                 setData('content', '');
@@ -259,8 +260,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
         formData.append('type', documentData.type);
         formData.append('description', documentData.description);
 
-        postDocument(route('loans.documents.upload', loan.id), {
-            preserveScroll: true,
+        postDocument(tenantRouter.route('loans.documents.upload', { id: loan.id }), {
             onSuccess: () => {
                 toast.success('Document uploaded successfully');
                 setDocumentData({
@@ -269,45 +269,26 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                     description: '',
                 });
             },
-            onError: (errors: Record<string, string>) => {
-                Object.values(errors).forEach((error) => {
-                    toast.error(error);
-                });
-            },
         });
     };
 
     const handlePaymentSubmit = (formData: FormData, paymentType: 'online' | 'offline') => {
-        if (paymentType === 'online') {
-            // For online payments, we'll redirect to the payment gateway
-            router.post(route('loans.payments.store', loan.id), formData, {
-                preserveScroll: true,
-                onSuccess: (response) => {
-                    if (response.url) {
-                        window.location.href = response.url;
-                    }
-                },
-                onError: (errors) => {
-                    Object.values(errors).forEach((error) => {
-                        toast.error(error);
-                    });
-                },
-            });
-        } else {
-            // For offline payments, we'll submit normally
-            router.post(route('loans.payments.store', loan.id), formData, {
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Payment submitted successfully');
-                    setShowPaymentForm(false);
-                },
-                onError: (errors) => {
-                    Object.values(errors).forEach((error) => {
-                        toast.error(error);
-                    });
-                },
-            });
-        }
+        const endpoint = paymentType === 'online' 
+            ? tenantRouter.route('loans.payments.online', { id: loan.id })
+            : tenantRouter.route('loans.payments.offline', { id: loan.id });
+
+        postPayment(endpoint, {
+            onSuccess: () => {
+                toast.success('Payment submitted successfully');
+                setShowPaymentForm(false);
+                setPaymentData({
+                    payment_method_id: '',
+                    amount: loan.next_payment_amount?.toString() || '',
+                    payment_proof: null,
+                    notes: '',
+                });
+            },
+        });
     };
 
     const handleStatusUpdate = (newStatus: string) => {
@@ -337,9 +318,8 @@ export default function Show({ loan, payment_methods, auth }: Props) {
             data.end_date = new Date(Date.now() + loan.duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         }
         
-        router.put(route('loans.update-status', loan.id), data, {
-            preserveScroll: true,
-            onSuccess: (response) => {
+        tenantRouter.put('loans.update-status', data, { loan: loan.id }, {
+            onSuccess: () => {
                 toast.success(`Loan status updated to ${pendingStatus}`);
                 setStatusDialogOpen(false);
                 setPendingStatus(null);
@@ -347,9 +327,6 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                 setRejectionReason('');
                 setPaymentMethodId('');
                 setDisbursementTransactionId('');
-                
-                // Reload the page to get fresh data
-                router.reload({ only: ['loan'] });
             },
             onError: (errors) => {
                 toast.error('Failed to update loan status');
@@ -463,10 +440,10 @@ export default function Show({ loan, payment_methods, auth }: Props) {
             return;
         }
 
-        router.delete(route('loans.destroy', loan.id), {
+        tenantRouter.delete('loans.destroy', { loan: loan.id }, {
             onSuccess: () => {
                 toast.success('Loan deleted successfully');
-                router.visit(route('loans.index'));
+                tenantRouter.visit('loans.index');
             },
             onError: () => {
                 toast.error('Failed to delete loan');
@@ -484,33 +461,27 @@ export default function Show({ loan, payment_methods, auth }: Props) {
     const confirmPaymentAction = () => {
         if (!selectedPayment || !paymentAction) return;
 
-        const actionRoute = paymentAction === 'approve' 
-            ? route('loans.payments.approve', [selectedPayment.id])
-            : route('loans.payments.reject', [selectedPayment.id]);
+        const endpoint = paymentAction === 'approve'
+            ? tenantRouter.route('loans.payments.approve', { id: loan.id, paymentId: selectedPayment.id })
+            : tenantRouter.route('loans.payments.reject', { id: loan.id, paymentId: selectedPayment.id });
 
-        router.post(actionRoute, {
-            notes: paymentActionNotes,
-            rejection_reason: paymentAction === 'reject' ? paymentActionNotes : undefined,
-        }, {
-            preserveScroll: true,
+        tenantRouter.post(endpoint, { notes: paymentActionNotes }, {}, {
             onSuccess: () => {
-                toast.success(`Payment ${paymentAction}d successfully`);
+                toast.success(`Payment ${paymentAction}ed successfully`);
                 setPaymentActionDialogOpen(false);
                 setSelectedPayment(null);
                 setPaymentAction(null);
                 setPaymentActionNotes('');
             },
-            onError: (errors) => {
-                Object.values(errors).forEach((error) => {
-                    toast.error(error);
-                });
-            },
+            onError: () => {
+                toast.error(`Failed to ${paymentAction} payment`);
+            }
         });
     };
 
     const handlePreviewImage = (payment: Payment) => {
         if (payment.attachment) {
-            setPreviewImage(route('loans.payments.download-proof', [loan.id, payment.id]));
+            setPreviewImage(tenantRouter.route('loans.payments.download-proof', [loan.id, payment.id]));
             setPreviewOpen(true);
         }
     };
@@ -566,7 +537,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
             <Head title={`View Loan - ${loan.reference_number}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between items-center">
-                    <Link href={route('loans.index')}>
+                    <Link href={tenantRouter.route('loans.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Loans
@@ -574,10 +545,10 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                     </Link>
                     <div className="flex gap-2">
                         {getStatusActionButtons()}
-                        <Link href={route('loans.edit', loan.id)}>
+                        <Link href={tenantRouter.route('loans.edit', { loan: loan.id })}>
                             <Button className="cursor-pointer">
                                 <Edit className="mr-2 h-4 w-4" />
-                                Edit Loan
+                                Edit
                             </Button>
                         </Link>
                         <Button
@@ -1106,7 +1077,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => window.open(route('loans.documents.download', [loan.id, document.id]), '_blank')}
+                                                                onClick={() => window.open(tenantRouter.route('loans.documents.download', [loan.id, document.id]), '_blank')}
                                                             >
                                                                 Download
                                                             </Button>
@@ -1115,7 +1086,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                 size="sm"
                                                                 onClick={() => {
                                                                     if (confirm('Are you sure you want to delete this document?')) {
-                                                                        router.delete(route('loans.documents.delete', [loan.id, document.id]), {
+                                                                        tenantRouter.delete('loans.documents.delete', [loan.id, document.id], {
                                                                             preserveScroll: true,
                                                                             onSuccess: () => {
                                                                                 toast.success('Document deleted successfully');
@@ -1188,7 +1159,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                 size="sm"
                                                                 onClick={() => {
                                                                     if (confirm('Are you sure you want to delete this note?')) {
-                                                                        router.delete(route('loans.notes.delete', [loan.id, note.id]), {
+                                                                        tenantRouter.delete('loans.notes.delete', [loan.id, note.id], {
                                                                             preserveScroll: true,
                                                                             onSuccess: () => {
                                                                                 toast.success('Note deleted successfully');
@@ -1291,7 +1262,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
                                                                         <div className="flex flex-col items-center gap-2">
                                                                             <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
                                                                                 <img
-                                                                                    src={route('loans.payments.download-proof', [loan.id, payment.id])}
+                                                                                    src={tenantRouter.route('loans.payments.download-proof', [loan.id, payment.id])}
                                                                                     alt="Payment Proof"
                                                                                     className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                                                     onClick={() => handlePreviewImage(payment)}

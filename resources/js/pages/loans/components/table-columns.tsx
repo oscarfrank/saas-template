@@ -1,5 +1,6 @@
 import { type ColumnDef } from '@tanstack/react-table';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { Button } from '@/components/ui/button';
 import { 
     Eye, 
@@ -116,9 +117,10 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
         enableHiding: true,
         cell: ({ row }) => {
             const loan = row.original;
+            const tenantRouter = useTenantRouter();
             return (
                 <Link 
-                    href={route('loans.show', loan.id)}
+                    href={tenantRouter.route('loans.show', { loan: loan.id })}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("reference_number")}
@@ -219,6 +221,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
             const loan = row.original;
             const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
             const [isDeleting, setIsDeleting] = useState(false);
+            const tenantRouter = useTenantRouter();
 
             const handleCopyId = () => {
                 navigator.clipboard.writeText(String(loan.id));
@@ -226,20 +229,20 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
             };
 
             const handleShare = () => {
-                const url = route('loans.show', loan.id);
+                const url = tenantRouter.route('loans.show', { loan: loan.id });
                 navigator.clipboard.writeText(url);
                 toast.success('Loan URL copied to clipboard');
             };
 
             const handleDelete = () => {
                 setIsDeleting(true);
-                router.delete(route('loans.destroy', loan.id), {
+                tenantRouter.delete('loans.destroy', { loan: loan.id }, {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         toast.success('Loan deleted successfully');
                         setIsDeleteDialogOpen(false);
-                        router.reload({
+                        tenantRouter.reload({
                             only: ['loans', 'pagination'],
                             onSuccess: () => {
                                 setIsDeleting(false);
@@ -251,22 +254,21 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
                         });
                     },
                     onError: () => {
-                        toast.error('Failed to delete loan');
                         setIsDeleting(false);
+                        toast.error('Failed to delete loan');
                     }
                 });
             };
 
             const handleStatusChange = (newStatus: string, action: string) => {
-                router.put(route('loans.update', loan.id), {
-                    status: newStatus,
-                    action: action
-                }, {
+                tenantRouter.put('loans.update-status', { status: newStatus }, { id: loan.id }, {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {
                         toast.success(`Loan ${action} successfully`);
-                        router.reload({ only: ['loans', 'pagination'] });
+                        tenantRouter.reload({
+                            only: ['loans', 'pagination']
+                        });
                     },
                     onError: () => {
                         toast.error(`Failed to ${action} loan`);
@@ -276,72 +278,75 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
 
             return (
                 <div className="flex items-center gap-2">
-                    <Link href={route('loans.show', loan.id)}>
-                        <Button variant="outline" size="icon" className="cursor-pointer">
-                            <Eye className="h-4 w-4" />
-                        </Button>
-                    </Link>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon" className="cursor-pointer">
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                                <Link href={route('loans.show', loan.id)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                </Link>
+                            <DropdownMenuItem onClick={handleCopyId}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Copy ID
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href={route('loans.edit', loan.id)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Loan
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href={route('loans.documents', loan.id)}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    View Documents
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href={route('loans.notes', loan.id)}>
-                                    <MessageSquare className="mr-2 h-4 w-4" />
-                                    View Notes
-                                </Link>
+                            <DropdownMenuItem onClick={handleShare}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {loan.status === 'pending_approval' && (
-                                <>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={route('loans.edit', loan.id)}>
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Approve Loan
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={route('loans.edit', loan.id)}>
-                                            <XCircle className="mr-2 h-4 w-4" />
-                                            Reject Loan
-                                        </Link>
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                            {loan.status === 'active' && (
-                                <DropdownMenuItem asChild>
-                                    <Link href={route('loans.edit', loan.id)}>
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Mark as Paid
-                                    </Link>
+                            <DropdownMenuItem asChild>
+                                <Link href={tenantRouter.route('loans.show', { loan: loan.id })}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href={tenantRouter.route('loans.edit', { loan: loan.id })}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit
+                                </Link>
+                            </DropdownMenuItem>
+                            {canApprove(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('approved', 'approve')}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    Approve
                                 </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => onDelete(loan.id)}
-                            >
+                            {canReject(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('rejected', 'reject')}>
+                                    <XCircle className="mr-2 h-4 w-4" />
+                                    Reject
+                                </DropdownMenuItem>
+                            )}
+                            {canDisburse(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('active', 'disburse')}>
+                                    <DollarSign className="mr-2 h-4 w-4" />
+                                    Disburse
+                                </DropdownMenuItem>
+                            )}
+                            {canMarkAsPaid(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('paid', 'mark as paid')}>
+                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                    Mark as Paid
+                                </DropdownMenuItem>
+                            )}
+                            {canClose(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('closed', 'close')}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Close
+                                </DropdownMenuItem>
+                            )}
+                            {canCancel(loan.status) && (
+                                <DropdownMenuItem onClick={() => handleStatusChange('cancelled', 'cancel')}>
+                                    <AlertCircle className="mr-2 h-4 w-4" />
+                                    Cancel
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setIsDeleteDialogOpen(true)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -351,8 +356,8 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
                         isOpen={isDeleteDialogOpen}
                         onClose={() => setIsDeleteDialogOpen(false)}
                         onConfirm={handleDelete}
-                        title="Are you sure?"
-                        description={`This action cannot be undone. This will permanently delete the loan "${loan.reference_number}".`}
+                        title="Delete Loan"
+                        description={`Are you sure you want to delete loan "${loan.reference_number}"? This action cannot be undone.`}
                         isLoading={isDeleting}
                     />
                 </div>

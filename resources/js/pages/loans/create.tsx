@@ -3,6 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { EditForm } from './components/edit-form';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export default function Create({ users, currencies, packages, customPackages }: Props) {
+    const tenantRouter = useTenantRouter();
     const fields = [
         { 
             name: 'user_id', 
@@ -171,7 +173,7 @@ export default function Create({ users, currencies, packages, customPackages }: 
             <Head title="Create Loan" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
-                    <Link href={route('loans.index')}>
+                    <Link href={tenantRouter.route('loans.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>

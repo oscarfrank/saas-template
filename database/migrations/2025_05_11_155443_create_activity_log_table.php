@@ -10,6 +10,13 @@ class CreateActivityLogTable extends Migration
     {
         Schema::connection(config('activitylog.database_connection'))->create(config('activitylog.table_name'), function (Blueprint $table) {
             $table->bigIncrements('id');
+            $table->string('tenant_id')->after('id');
+            $table->foreign('tenant_id')
+                    ->references('id')
+                    ->on('tenants')
+                    ->onUpdate('cascade')
+                    ->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->comment('User who applied for the loan');
             $table->string('log_name')->nullable();
             $table->text('description');
             $table->nullableMorphs('subject', 'subject');

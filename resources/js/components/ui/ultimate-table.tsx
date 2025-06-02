@@ -495,6 +495,12 @@ export function UltimateTable<TData extends Record<string, any>>({
                 data={config.data}
                 searchPlaceholder={config.searchPlaceholder}
                 searchColumns={config.searchColumns}
+                showSearch={config.features?.search !== false}
+                showExport={config.features?.export !== false}
+                showFilters={config.features?.filters !== false}
+                showPagination={config.features?.pagination !== false}
+                showPrint={config.features?.print !== false}
+                showBulkActions={config.features?.bulkActions !== false}
                 bulkActions={config.bulkActions}
                 onBulkDelete={handleBulkDelete}
                 onBulkArchive={config.onBulkArchive}

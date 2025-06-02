@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { type Product } from './table-columns';
+import { type Product } from '@/types';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useTenantRouter } from '@/hooks/use-tenant-router';

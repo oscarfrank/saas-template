@@ -1,29 +1,31 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { EditForm } from './components/edit-form';
-import { type Product } from './components/table-columns';
+import { EditForm } from '../components/forms/edit-form';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import { type Product } from '@/types';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Products',
-        href: '/products',
-    },
-    {
-        title: 'Edit Product',
-        href: '/products/edit',
-    },
-];
-
-interface EditProps {
-    product: Product;
+interface FormProps {
+    product?: Product;
+    mode: 'create' | 'edit';
 }
 
-export default function Edit({ product }: EditProps) {
+export default function Form({ product, mode }: FormProps) {
     const tenantRouter = useTenantRouter();
+    const isEditMode = mode === 'edit';
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Products',
+            href: '/products',
+        },
+        {
+            title: isEditMode ? 'Edit Product' : 'Create Product',
+            href: isEditMode ? '/products/edit' : '/products/create',
+        },
+    ];
+
     const fields = [
         { name: 'name', type: 'text' as const, label: 'Name', required: true },
         { name: 'description', type: 'textarea' as const, label: 'Description', required: true },
@@ -33,7 +35,7 @@ export default function Edit({ product }: EditProps) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Edit Product" />
+            <Head title={isEditMode ? 'Edit Product' : 'Create Product'} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
                     <Link href={tenantRouter.route('products.index')}>
@@ -43,7 +45,7 @@ export default function Edit({ product }: EditProps) {
                     </Link>
                 </div>
                 <EditForm
-                    entity={product}
+                    entity={isEditMode ? product : undefined}
                     fields={fields}
                     entityName="product"
                     onSubmit={(formData) => {

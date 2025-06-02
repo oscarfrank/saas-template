@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { type Product } from './components/table-columns';
+import { type Product } from '@/types';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 

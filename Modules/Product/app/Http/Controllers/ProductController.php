@@ -44,7 +44,7 @@ class ProductController extends Controller
             return $product;
         });
 
-        return Inertia::render('products/index', [
+        return Inertia::render('products/admin/index', [
             'products' => $formattedProducts,
             'pagination' => [
                 'current_page' => $products->currentPage(),
@@ -60,7 +60,9 @@ class ProductController extends Controller
      */
     public function create()
     {
-        return Inertia::render('products/create');
+        return Inertia::render('products/admin/form', [
+            'mode' => 'create',
+        ]);
     }
 
     /**
@@ -104,7 +106,7 @@ class ProductController extends Controller
         if ($product->featured_image) {
             $product->featured_image = asset('storage/' . $product->featured_image);
         }
-        return Inertia::render('products/show', [
+        return Inertia::render('products/admin/show', [
             'product' => $product,
         ]);
     }
@@ -117,8 +119,9 @@ class ProductController extends Controller
         if ($product->featured_image) {
             $product->featured_image = asset('storage/' . $product->featured_image);
         }
-        return Inertia::render('products/edit', [
+        return Inertia::render('products/admin/form', [
             'product' => $product,
+            'mode' => 'edit',
         ]);
     }
 
@@ -265,4 +268,9 @@ class ProductController extends Controller
 
         return response()->json(['error' => 'Invalid format'], 400);
     }
+
+
 }
+
+
+

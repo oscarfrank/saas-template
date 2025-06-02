@@ -71,7 +71,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PlaceholderPattern } from "@/components/ui/placeholder-pattern";
 import { toast } from 'sonner';
 
-interface PrintConfig<TData> {
+export interface PrintConfig<TData> {
     title: string;
     columns: {
         header: string;
@@ -192,28 +192,7 @@ export function DataTable<TData extends Record<string, any>, TValue>({
 
     const table = useReactTable({
         data,
-        columns: [
-            {
-                id: "select",
-                header: ({ table }) => (
-                    <Checkbox
-                        checked={table.getIsAllPageRowsSelected()}
-                        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                        aria-label="Select all"
-                    />
-                ),
-                cell: ({ row }) => (
-                    <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
-                        aria-label="Select row"
-                    />
-                ),
-                enableSorting: false,
-                enableHiding: false,
-            },
-            ...columns,
-        ],
+        columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,

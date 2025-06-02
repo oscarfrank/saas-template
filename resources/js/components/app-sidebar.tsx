@@ -62,7 +62,7 @@ export const AppSidebar = memo(function AppSidebar() {
     const { notifications, effectiveTenant, tenants, preferences } = useEffectiveTenant();
     const { state } = useSidebar();
 
-    console.log(notifications);
+    console.log('Notif', notifications);
 
     // Memoize the teams data
     const teams = useMemo(() => tenants.map(t => ({

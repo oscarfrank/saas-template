@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useState } from 'react';
 
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Admin',
@@ -57,6 +59,7 @@ interface ShowProps {
 }
 
 export default function AdminShow({ kycVerification }: ShowProps) {
+    const tenantRouter = useTenantRouter();
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     const getStatusBadge = (status: string) => {
@@ -77,13 +80,13 @@ export default function AdminShow({ kycVerification }: ShowProps) {
             <Head title="KYC Details" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('kyc.index')}>
+                    <Link href={tenantRouter.route('kyc.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to KYC Management
                         </Button>
                     </Link>
-                    <Link href={route('kyc.edit', kycVerification.id)}>
+                    <Link href={tenantRouter.route('kyc.edit', { id: kycVerification.id })}>
                         <Button className="cursor-pointer">
                             <Edit className="mr-2 h-4 w-4" />
                             Edit KYC

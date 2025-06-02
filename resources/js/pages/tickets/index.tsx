@@ -1,7 +1,7 @@
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Table } from './components/table';
 import { createColumns } from './components/table-columns';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 import { formatCurrency } from "@/lib/utils";
 import { Trash2 } from 'lucide-react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function Index({ tickets, filters }: Props) {
+    const tenantRouter = useTenantRouter();
     const [search, setSearch] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export default function Index({ tickets, filters }: Props) {
         const params = new URLSearchParams(window.location.search);
         params.set('page', page.toString());
         
-        router.get(route('admin.tickets.index') + '?' + params.toString(), {}, { 
+        tenantRouter.get('admin.tickets.index', {}, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -69,7 +71,7 @@ export default function Index({ tickets, filters }: Props) {
     const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
         setIsLoading(true);
         setError(null);
-        router.get(route('admin.tickets.index'), { sort, direction }, { 
+        tenantRouter.get('admin.tickets.index', { sort, direction }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -88,7 +90,7 @@ export default function Index({ tickets, filters }: Props) {
         setError(null);
         
         if (search.trim()) {
-            router.get(route('admin.tickets.index'), { search }, { 
+            tenantRouter.get('admin.tickets.index', { search }, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['tickets', 'filters'],
@@ -101,7 +103,7 @@ export default function Index({ tickets, filters }: Props) {
                 }
             });
         } else {
-            router.get(route('admin.tickets.index'), {}, { 
+            tenantRouter.get('admin.tickets.index', {}, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['tickets', 'filters'],
@@ -119,7 +121,7 @@ export default function Index({ tickets, filters }: Props) {
     const handlePerPageChange = (perPage: number) => {
         setIsLoading(true);
         setError(null);
-        router.get(route('admin.tickets.index'), { per_page: perPage }, { 
+        tenantRouter.get('admin.tickets.index', { per_page: perPage }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['tickets', 'filters'],
@@ -144,7 +146,7 @@ export default function Index({ tickets, filters }: Props) {
         
         try {
             for (const ticket of selectedTickets) {
-                await router.delete(route('tickets.destroy', ticket.id), {
+                await tenantRouter.delete('tickets.destroy', { ticket: ticket.id }, {
                     preserveState: true,
                     preserveScroll: true,
                 });
@@ -154,7 +156,7 @@ export default function Index({ tickets, filters }: Props) {
             
             setKey(prev => prev + 1);
             
-            router.reload({
+            tenantRouter.reload({
                 only: ['tickets', 'filters'],
                 onSuccess: () => {
                     setIsLoading(false);
@@ -176,7 +178,7 @@ export default function Index({ tickets, filters }: Props) {
         if (!selectedTicket) return;
 
         setIsLoading(true);
-        router.delete(route('tickets.destroy', selectedTicket.id), {
+        tenantRouter.delete('tickets.destroy', { ticket: selectedTicket.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -184,7 +186,7 @@ export default function Index({ tickets, filters }: Props) {
                 setIsDeleteDialogOpen(false);
                 setSelectedTicket(null);
                 setKey(prev => prev + 1);
-                router.reload({
+                tenantRouter.reload({
                     only: ['tickets', 'filters'],
                     onSuccess: () => {
                         setIsLoading(false);

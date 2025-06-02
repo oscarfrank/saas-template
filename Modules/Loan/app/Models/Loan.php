@@ -4,6 +4,7 @@ namespace Modules\Loan\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 // use Modules\Loan\Database\Factories\LoanFactory;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,9 +22,11 @@ use Modules\Loan\Models\LoanPayment;
 
 class Loan extends Model
 {
+    use BelongsToTenant;
 
     protected $fillable = [
         'user_id',
+        'tenant_id',
         'package_id',
         'reference_number',
         'purpose',

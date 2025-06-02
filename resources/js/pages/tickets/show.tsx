@@ -7,7 +7,7 @@ import { ArrowLeft, Edit, MessageSquare, Send } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { router } from '@inertiajs/react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -59,6 +59,7 @@ interface Props {
 }
 
 export default function Show({ ticket }: Props) {
+    const tenantRouter = useTenantRouter();
     const [message, setMessage] = useState('');
     const [isInternal, setIsInternal] = useState(false);
 
@@ -70,10 +71,10 @@ export default function Show({ ticket }: Props) {
             return;
         }
 
-        router.post(route('tickets.reply', ticket.id), {
+        tenantRouter.post('tickets.reply', { 
             message,
             is_internal: isInternal,
-        }, {
+        }, { ticket: ticket.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -106,7 +107,7 @@ export default function Show({ ticket }: Props) {
             <Head title={`View Ticket - ${ticket.subject}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('admin.tickets.index')}>
+                    <Link href={tenantRouter.route('admin.tickets.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Tickets
@@ -117,9 +118,9 @@ export default function Show({ ticket }: Props) {
                             <>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'in_progress'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as in progress')
@@ -129,9 +130,9 @@ export default function Show({ ticket }: Props) {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'resolved'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as resolved')
@@ -141,9 +142,9 @@ export default function Show({ ticket }: Props) {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'closed'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as closed')
@@ -157,9 +158,9 @@ export default function Show({ ticket }: Props) {
                             <>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'open'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket reopened')
@@ -169,9 +170,9 @@ export default function Show({ ticket }: Props) {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'resolved'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as resolved')
@@ -181,9 +182,9 @@ export default function Show({ ticket }: Props) {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'closed'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as closed')
@@ -197,9 +198,9 @@ export default function Show({ ticket }: Props) {
                             <>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'open'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket reopened')
@@ -209,9 +210,9 @@ export default function Show({ ticket }: Props) {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={() => router.put(route('tickets.update', ticket.id), {
+                                    onClick={() => tenantRouter.put('tickets.update', {
                                         status: 'closed'
-                                    }, {
+                                    }, { ticket: ticket.id }, {
                                         preserveState: true,
                                         preserveScroll: true,
                                         onSuccess: () => toast.success('Ticket marked as closed')
@@ -224,9 +225,9 @@ export default function Show({ ticket }: Props) {
                         {ticket.status === 'closed' && (
                             <Button
                                 variant="outline"
-                                onClick={() => router.put(route('tickets.update', ticket.id), {
+                                onClick={() => tenantRouter.put('tickets.update', {
                                     status: 'open'
-                                }, {
+                                }, { ticket: ticket.id }, {
                                     preserveState: true,
                                     preserveScroll: true,
                                     onSuccess: () => toast.success('Ticket reopened')
@@ -239,11 +240,11 @@ export default function Show({ ticket }: Props) {
                             variant="destructive"
                             onClick={() => {
                                 if (confirm('Are you sure you want to delete this ticket?')) {
-                                    router.delete(route('tickets.destroy', ticket.id), {
+                                    tenantRouter.delete('tickets.destroy', { ticket: ticket.id }, {
                                         preserveState: true,
                                         onSuccess: () => {
                                             toast.success('Ticket deleted successfully');
-                                            router.visit(route('admin.tickets.index'));
+                                            tenantRouter.visit('admin.tickets.index');
                                         }
                                     });
                                 }

@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { type Product } from './table-columns';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 
 interface EditFormProps {
     entity?: Product;
@@ -32,6 +34,7 @@ interface ProductFormData {
 }
 
 export function EditForm({ entity, onSubmit, processing, errors, fields, entityName }: EditFormProps) {
+    const tenantRouter = useTenantRouter();
     const { data, setData, post, put } = useForm<ProductFormData>({
         name: entity?.name ?? '',
         description: entity?.description ?? '',
@@ -53,7 +56,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
         
         if (entity) {
             formData.append('_method', 'PUT');
-            put(route('products.update', entity.id), {
+            put(tenantRouter.route('products.update', { product: entity.id }), {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`${entityName} updated successfully`);
@@ -65,7 +68,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
                 },
             });
         } else {
-            post(route('products.store'), {
+            post(tenantRouter.route('products.store'), {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`${entityName} created successfully`);

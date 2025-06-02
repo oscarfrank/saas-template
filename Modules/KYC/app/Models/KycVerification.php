@@ -5,12 +5,17 @@ namespace Modules\KYC\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
+
 use Modules\User\Models\User;
 
 class KycVerification extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
         'user_id',
+        'tenant_id',
         'full_name',
         'date_of_birth',
         'phone_number',

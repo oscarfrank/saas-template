@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EditForm } from './components/edit-form';
@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -98,6 +99,7 @@ interface Props {
 }
 
 export default function Edit({ loan, users, currencies, packages, customPackages, payment_methods }: Props) {
+    const tenantRouter = useTenantRouter();
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             data.end_date = new Date(Date.now() + loan.duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         }
         
-        router.put(route('loans.update-status', loan.id), data, {
+        tenantRouter.put('loans.update-status', data, { id: loan.id }, {
             onSuccess: () => {
                 toast.success(`Loan status updated to ${pendingStatus}`);
                 setStatusDialogOpen(false);
@@ -162,10 +164,10 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             return;
         }
 
-        router.delete(route('loans.destroy', loan.id), {
+        tenantRouter.delete('loans.destroy', { loan: loan.id }, {
             onSuccess: () => {
                 toast.success('Loan deleted successfully');
-                router.visit(route('loans.index'));
+                tenantRouter.visit('loans.index');
             },
             onError: () => {
                 toast.error('Failed to delete loan');

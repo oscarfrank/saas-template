@@ -102,7 +102,14 @@ class TenancyServiceProvider extends ServiceProvider
         $this->bootEvents();
         $this->mapRoutes();
 
+        // Make tenancy middleware highest priority
         $this->makeTenancyMiddlewareHighestPriority();
+
+        // Add debugging
+        \Illuminate\Support\Facades\Log::info('TenancyServiceProvider booted');
+        \Illuminate\Support\Facades\Log::info('Middleware stack:', [
+            'middleware' => $this->app[\Illuminate\Contracts\Http\Kernel::class]->getMiddleware()
+        ]);
     }
 
     protected function bootEvents()
@@ -121,10 +128,35 @@ class TenancyServiceProvider extends ServiceProvider
     protected function mapRoutes()
     {
         $this->app->booted(function () {
-            if (file_exists(base_path('routes/tenant.php'))) {
-                Route::namespace(static::$controllerNamespace)
-                    ->group(base_path('routes/tenant.php'));
-            }
+            // Register tenant routes first
+            Route::middleware([
+                'web',
+                \Stancl\Tenancy\Middleware\InitializeTenancyByPath::class,
+                \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+            ])->prefix('{tenant}')->group(function () {
+                // Load tenant routes
+                if (file_exists(base_path('routes/tenant.php'))) {
+                    require base_path('routes/tenant.php');
+                }
+
+                // Load module routes that should be tenant-aware
+                if (file_exists(base_path('Modules/Loan/routes/web.php'))) {
+                    require base_path('Modules/Loan/routes/web.php');
+                }
+            });
+
+            // Log the registered routes
+            \Illuminate\Support\Facades\Log::info('Registered routes:', [
+                'routes' => collect(\Illuminate\Support\Facades\Route::getRoutes())->map(function ($route) {
+                    return [
+                        'uri' => $route->uri(),
+                        'name' => $route->getName(),
+                        'methods' => $route->methods(),
+                        'middleware' => $route->middleware(),
+                        'controller' => $route->getActionName(),
+                    ];
+                })->toArray()
+            ]);
         });
     }
 

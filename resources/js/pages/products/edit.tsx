@@ -5,6 +5,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { EditForm } from './components/edit-form';
 import { type Product } from './components/table-columns';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,6 +23,7 @@ interface EditProps {
 }
 
 export default function Edit({ product }: EditProps) {
+    const tenantRouter = useTenantRouter();
     const fields = [
         { name: 'name', type: 'text' as const, label: 'Name', required: true },
         { name: 'description', type: 'textarea' as const, label: 'Description', required: true },
@@ -34,7 +36,7 @@ export default function Edit({ product }: EditProps) {
             <Head title="Edit Product" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-end">
-                    <Link href={route('products.index')}>
+                    <Link href={tenantRouter.route('products.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>

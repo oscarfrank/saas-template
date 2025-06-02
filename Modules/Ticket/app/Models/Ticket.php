@@ -5,6 +5,7 @@ namespace Modules\Ticket\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 use Modules\User\Models\User;
 use Modules\Ticket\Models\TicketReply;
@@ -12,11 +13,12 @@ use Modules\Ticket\Models\TicketReply;
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, BelongsToTenant;
 
     protected $fillable = [
         'user_id',
         'assigned_to',
+        'tenant_id',
         'subject',
         'description',
         'status',

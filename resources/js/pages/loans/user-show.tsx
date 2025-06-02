@@ -1,5 +1,5 @@
 import { PageProps } from '@/types';
-import { Head, useForm, Link, router } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import PaymentForm from '@/components/PaymentForm';
 import PaymentHistory from '@/components/PaymentHistory';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface Loan {
     id: number;
@@ -166,6 +167,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function UserShow({ loan, payment_methods }: Props) {
+    const tenantRouter = useTenantRouter();
 
     const { data: documentData, setData: setDocumentData, post: postDocument, processing: documentProcessing } = useForm({
         file: null as File | null,
@@ -201,8 +203,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
         formData.append('type', documentData.type);
         formData.append('description', documentData.description);
 
-        postDocument(route('loans.documents.upload', loan.id), {
-            preserveScroll: true,
+        postDocument(tenantRouter.route('loans.documents.upload', { id: loan.id }), {
             onSuccess: () => {
                 toast.success('Document uploaded successfully');
                 setDocumentData({
@@ -222,14 +223,15 @@ export default function UserShow({ loan, payment_methods }: Props) {
     const handlePaymentSubmit = (formData: FormData, paymentType: 'online' | 'offline') => {
         if (paymentType === 'online') {
             // For online payments, we'll redirect to the payment gateway
-            router.post(route('loans.payments.store', loan.id), formData, {
-                preserveScroll: true,
-                onSuccess: (response) => {
-                    if (response.url) {
-                        window.location.href = response.url;
-                    }
+            tenantRouter.post('loans.payments.store', formData, { id: loan.id }, {
+                onSuccess: () => {
+                    toast.success('Payment submitted successfully');
+                    setShowPaymentForm(false);
+                    setPaymentDialogOpen(false);
+                    // Refresh the current page instead of redirecting
+                    tenantRouter.reload();
                 },
-                onError: (errors) => {
+                onError: (errors: Record<string, string>) => {
                     Object.values(errors).forEach((error) => {
                         toast.error(error);
                     });
@@ -237,16 +239,15 @@ export default function UserShow({ loan, payment_methods }: Props) {
             });
         } else {
             // For offline payments, we'll submit normally
-            router.post(route('loans.payments.store', loan.id), formData, {
-                preserveScroll: true,
+            tenantRouter.post('loans.payments.store', formData, { id: loan.id }, {
                 onSuccess: () => {
                     toast.success('Payment submitted successfully');
                     setShowPaymentForm(false);
                     setPaymentDialogOpen(false);
                     // Refresh the current page instead of redirecting
-                    router.reload({ preserveUrl: true });
+                    tenantRouter.reload();
                 },
-                onError: (errors) => {
+                onError: (errors: Record<string, string>) => {
                     Object.values(errors).forEach((error) => {
                         toast.error(error);
                     });
@@ -277,31 +278,20 @@ export default function UserShow({ loan, payment_methods }: Props) {
         return colors[status] || 'bg-gray-500';
     };
 
-    const handlePreviewImage = (payment: {
-        id: number;
-        payment_number: number;
-        amount: number;
-        status: string;
-        due_date: string;
-        payer_name: string;
-        notes?: string;
-        attachment?: string;
-    }) => {
+    const handlePreviewImage = (payment: Payment) => {
         if (payment.attachment) {
-            setPreviewImage(route('loans.payments.download-proof', [loan.id, payment.id]));
+            setPreviewImage(tenantRouter.route('loans.payments.download-proof', { id: loan.id, paymentId: payment.id }));
             setPreviewOpen(true);
         }
     };
 
     const handleMakePaymentClick = () => {
+        setPaymentAmount(loan.next_payment_amount?.toString() || '');
+        setPaymentBreakdown(calculatePaymentBreakdown(loan.next_payment_amount || 0));
         setPaymentDialogOpen(true);
-        // Use setTimeout to ensure the dialog is rendered before scrolling
-        setTimeout(() => {
-            paymentsTabRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
     };
 
-    const handleShowPaymentBreakdown = (payment: any) => {
+    const handleShowPaymentBreakdown = (payment: Payment) => {
         setSelectedPaymentBreakdown({
             total_payment: payment.amount,
             late_fees_amount: payment.late_fees_amount || 0,
@@ -309,7 +299,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
             fees_amount: payment.fees_amount || 0,
             interest_amount: payment.interest_amount || 0,
             principal_amount: payment.principal_amount || 0,
-            remaining_payment: payment.remaining_payment || 0
+            remaining_payment: payment.remaining_payment || 0,
         });
         setPaymentBreakdownOpen(true);
     };
@@ -402,24 +392,24 @@ export default function UserShow({ loan, payment_methods }: Props) {
 
     const handleAmountChange = (value: string) => {
         setPaymentAmount(value);
-        const amount = parseFloat(value);
-        const minimumPayment = calculateMinimumPayment();
-        
-        if (!isNaN(amount)) {
-            if (amount >= minimumPayment) {
-                setPaymentBreakdown(calculatePaymentBreakdown(amount));
-            } else {
-                setPaymentBreakdown(null);
-            }
-        } else {
-            setPaymentBreakdown(null);
-        }
+        const amount = parseFloat(value) || 0;
+        setPaymentBreakdown(calculatePaymentBreakdown(amount));
     };
 
     const handleProceedToPayment = () => {
-        if (paymentBreakdown) {
-            setPaymentDialogOpen(true);
+        if (!paymentAmount) {
+            toast.error('Please enter a payment amount');
+            return;
         }
+
+        const amount = parseFloat(paymentAmount);
+        if (amount < calculateMinimumPayment()) {
+            toast.error(`Minimum payment amount is ${formatCurrency(calculateMinimumPayment(), loan.currency.code)}`);
+            return;
+        }
+
+        setPaymentDialogOpen(false);
+        setShowPaymentForm(true);
     };
 
     return (
@@ -427,7 +417,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
             <Head title={`Loan Details - ${loan.reference_number}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('user-loans')}>
+                    <Link href={tenantRouter.route('user-loans')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Loans
@@ -795,7 +785,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => window.open(route('loans.documents.download', [loan.id, document.id]), '_blank')}
+                                                                onClick={() => window.open(tenantRouter.route('loans.documents.download', { id: loan.id, documentId: document.id }), '_blank')}
                                                             >
                                                                 Download
                                                             </Button>
@@ -892,7 +882,7 @@ export default function UserShow({ loan, payment_methods }: Props) {
                                                                     <div className="flex flex-col items-center gap-2">
                                                                         <div className="relative w-20 h-20 rounded-lg overflow-hidden border">
                                                                             <img
-                                                                                src={route('loans.payments.download-proof', [loan.id, payment.id])}
+                                                                                src={tenantRouter.route('loans.payments.download-proof', { id: loan.id, paymentId: payment.id })}
                                                                                 alt="Payment Proof"
                                                                                 className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                                                                 onClick={() => handlePreviewImage(payment)}

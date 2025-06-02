@@ -87,7 +87,7 @@ class ProductController extends Controller
             // Create the product
             $product = Product::create($validated);
 
-            return redirect()->route('products.index')
+            return redirect()->route('products.index', ['tenant' => tenant('id')])
                 ->with('success', 'Product created successfully.');
         } catch (\Exception $e) {
             return back()->withErrors([
@@ -165,7 +165,7 @@ class ProductController extends Controller
             // Delete the product
             $product->delete();
 
-            return redirect()->route('products.index')
+            return redirect()->route('products.index', ['tenant' => tenant('id')])
                 ->with('success', 'Product deleted successfully.');
         } catch (\Exception $e) {
             return back()->withErrors([

@@ -1,6 +1,7 @@
 import { DataTable as BaseDataTable } from '@/components/ui/data-table';
 import { type Loan } from './table-columns';
 import axios from 'axios';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface TableProps<TData extends Loan, TValue> {
     columns: any[];
@@ -46,9 +47,11 @@ export function Table<TData extends Loan, TValue>({
     isLoading,
     error,
 }: TableProps<TData, TValue>) {
+    const tenantRouter = useTenantRouter();
+
     const handlePrint = async () => {
         try {
-            const response = await axios.post(route('loans.all'), {}, {
+            const response = await axios.post(tenantRouter.route('loans.all'), {}, {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -64,7 +67,7 @@ export function Table<TData extends Loan, TValue>({
 
     const handleExport = async (format: 'csv' | 'json') => {
         try {
-            const response = await axios.post(route('loans.export'), { format });
+            const response = await axios.post(tenantRouter.route('loans.export'), { format });
             return response.data;
         } catch (error) {
             console.error('Export failed:', error);

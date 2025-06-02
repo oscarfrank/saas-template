@@ -35,7 +35,7 @@ class KYCController extends Controller
         
         // Only redirect if the user has an approved KYC
         if ($existingKyc && $existingKyc->status === 'approved') {
-            return redirect()->route('kyc.show');
+            return redirect()->route('kyc.show', ['tenant' => tenant('id')]);
         }
 
         // For rejected or pending KYC, show the form with existing data
@@ -121,7 +121,7 @@ class KYCController extends Controller
                 'verified_at' => null,
             ]);
 
-            return redirect()->route('kyc.show')->with('success', 'KYC verification resubmitted successfully.');
+            return redirect()->route('kyc.show', ['tenant' => tenant('id')])->with('success', 'KYC verification resubmitted successfully.');
         }
 
         // Create new KYC verification
@@ -145,7 +145,7 @@ class KYCController extends Controller
             'submitted_at' => now(),
         ]);
 
-        return redirect()->route('kyc.show')->with('success', 'KYC verification submitted successfully.');
+        return redirect()->route('kyc.show', ['tenant' => tenant('id')])->with('success', 'KYC verification submitted successfully.');
     }
 
     /**
@@ -158,7 +158,7 @@ class KYCController extends Controller
             $kycVerification = KycVerification::where('user_id', Auth::id())->first();
 
             if (!$kycVerification) {
-                return redirect()->route('kyc.create');
+                return redirect()->route('kyc.create', ['tenant' => tenant('id')]);
             }
 
             return Inertia::render('kyc/show', [
@@ -208,7 +208,7 @@ class KYCController extends Controller
         }
         $user->save();
 
-        return redirect()->route('kyc.index')->with('success', 'KYC verification status updated successfully.');
+        return redirect()->route('kyc.index', ['tenant' => tenant('id')])->with('success', 'KYC verification status updated successfully.');
     }
 
     /**

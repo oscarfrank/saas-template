@@ -43,7 +43,7 @@ class FlutterwavePaymentController extends Controller
                 'currency' => Currency::find($request->currency_id)->code,
                 'redirect_url' => 'https://larv.frank.ng/flutterwave/callback',
 
-                // 'redirect_url' => route('user-loans.show', ['loan' => $request->loan_id]),
+                // 'redirect_url' => route('user-loans.show', [ 'tenant' => tenant('id'), 'loan' => $request->loan_id]),
 
                 'payment_options' => 'card,banktransfer,ussd',
                 'customer' => [

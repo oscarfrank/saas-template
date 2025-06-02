@@ -13,6 +13,12 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
+            $table->string('tenant_id')->after('id');
+            $table->foreign('tenant_id')
+                    ->references('id')
+                    ->on('tenants')
+                    ->onUpdate('cascade')
+                    ->onDelete('cascade');
             $table->string('name')->nullable();
             $table->string('description')->nullable();
             $table->decimal('price', 10, 2)->nullable();

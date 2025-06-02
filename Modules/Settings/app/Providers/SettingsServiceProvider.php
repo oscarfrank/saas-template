@@ -27,6 +27,10 @@ class SettingsServiceProvider extends ServiceProvider
         $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
+
+        // Register middleware
+        $this->app['router']->aliasMiddleware('track.last.visited', \Modules\Settings\Http\Middleware\TrackLastVisitedPage::class);
+        $this->app['router']->aliasMiddleware('track.tenancy', \Modules\Settings\Http\Middleware\TrackTenancy::class);
     }
 
     /**

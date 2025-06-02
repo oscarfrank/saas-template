@@ -19,6 +19,7 @@ import { type Loan } from './table-columns';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 interface EditFormProps {
     entity?: Loan;
@@ -66,6 +67,7 @@ interface LoanFormData {
 }
 
 export function EditForm({ entity, onSubmit, processing, errors, fields, entityName, availableUsers }: EditFormProps) {
+    const tenantRouter = useTenantRouter();
     const { data, setData, post, put } = useForm<LoanFormData>({
         user_id: entity?.user?.id.toString() ?? '',
         package_id: entity?.package?.id.toString() ?? '',
@@ -95,7 +97,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
         
         if (entity) {
             formData.append('_method', 'PUT');
-            put(route('loans.update', entity.id), {
+            put(tenantRouter.route('loans.update', { id: entity.id }), {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`${entityName} updated successfully`);
@@ -107,7 +109,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
                 },
             });
         } else {
-            post(route('loans.store'), {
+            post(tenantRouter.route('loans.store'), {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`${entityName} created successfully`);

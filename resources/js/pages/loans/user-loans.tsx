@@ -1,7 +1,7 @@
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Table } from './components/table';
 import { createUserColumns } from './components/user-table-columns';
 import { type Loan } from './components/table-columns';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 import { formatCurrency } from "@/lib/utils";
 import { PageProps } from '@/types';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -31,6 +32,7 @@ interface Props extends PageProps {
 }
 
 export default function UserLoans({ loans }: Props) {
+    const tenantRouter = useTenantRouter();
     const [search, setSearch] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function UserLoans({ loans }: Props) {
         const params = new URLSearchParams(window.location.search);
         params.set('page', page.toString());
         
-        router.get(route('user-loans') + '?' + params.toString(), {}, { 
+        tenantRouter.get('user-loans', { page: page.toString() }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -62,7 +64,7 @@ export default function UserLoans({ loans }: Props) {
     const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
         setIsLoading(true);
         setError(null);
-        router.get(route('user-loans'), { sort, direction }, { 
+        tenantRouter.get('user-loans', { sort, direction }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -81,7 +83,7 @@ export default function UserLoans({ loans }: Props) {
         setError(null);
         
         if (search.trim()) {
-            router.get(route('user-loans'), { search }, { 
+            tenantRouter.get('user-loans', { search }, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['loans'],
@@ -94,7 +96,7 @@ export default function UserLoans({ loans }: Props) {
                 }
             });
         } else {
-            router.get(route('user-loans'), {}, { 
+            tenantRouter.get('user-loans', {}, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['loans'],
@@ -112,7 +114,7 @@ export default function UserLoans({ loans }: Props) {
     const handlePerPageChange = (perPage: number) => {
         setIsLoading(true);
         setError(null);
-        router.get(route('user-loans'), { per_page: perPage }, { 
+        tenantRouter.get('user-loans', { per_page: perPage }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -130,7 +132,7 @@ export default function UserLoans({ loans }: Props) {
         if (!selectedLoan) return;
 
         setIsLoading(true);
-        router.delete(route('loans.destroy', selectedLoan.id), {
+        tenantRouter.delete('loans.destroy', { loan: selectedLoan.id }, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -138,7 +140,7 @@ export default function UserLoans({ loans }: Props) {
                 setIsDeleteDialogOpen(false);
                 setSelectedLoan(null);
                 setKey(prev => prev + 1);
-                router.reload({
+                tenantRouter.reload({
                     only: ['loans'],
                     onSuccess: () => {
                         setIsLoading(false);
@@ -175,7 +177,7 @@ export default function UserLoans({ loans }: Props) {
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                     </div>
-                    <Link href={route('loan-packages.browse')}>
+                    <Link href={tenantRouter.route('loan-packages.browse')}>
                         <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
                             Apply for Loan

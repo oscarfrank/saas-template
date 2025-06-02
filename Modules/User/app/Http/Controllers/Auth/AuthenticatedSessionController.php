@@ -107,7 +107,28 @@ class AuthenticatedSessionController extends Controller
                 ]);
             }
 
-            return redirect()->intended(route('dashboard', absolute: false));
+            // Get user preferences
+            $preferences = $user->getPreferences();
+            $lastTenantId = $preferences->getLastTenantId();
+
+            // Try to find the last used tenant
+            $tenant = null;
+            if ($lastTenantId) {
+                $tenant = \App\Models\Tenant::where('id', $lastTenantId)->first();
+            }
+
+            // If no last tenant or it doesn't exist, get the first available tenant for the user
+            if (!$tenant) {
+                $tenant = $user->tenants()->first();
+            }
+
+            // If we have a tenant, redirect to its dashboard
+            if ($tenant) {
+                return redirect()->to("/{$tenant->slug}/dashboard");
+            }
+
+            // If no tenant is available, redirect to settings
+            return redirect()->route('tenants.create');
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::info('Validation exception during authentication', [
                 'errors' => $e->errors()

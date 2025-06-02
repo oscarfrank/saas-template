@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { type Product } from './components/table-columns';
 import { ArrowLeft, Edit } from 'lucide-react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -22,18 +23,19 @@ interface ShowProps {
 }
 
 export default function Show({ product }: ShowProps) {
+    const tenantRouter = useTenantRouter();
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`View Product - ${product.name}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('products.index')}>
+                    <Link href={tenantRouter.route('products.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Products
                         </Button>
                     </Link>
-                    <Link href={route('products.edit', product.id)}>
+                    <Link href={tenantRouter.route('products.edit', { product: product.id })}>
                         <Button className="cursor-pointer">
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Product

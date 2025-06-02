@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +85,10 @@ const getInterestTypeColor = (type: string) => {
 };
 
 export default function Browse({ loanPackages, user, loanSettings }: Props) {
+
+    const { tenant } = usePage().props;
+
+
     const [selectedPackage, setSelectedPackage] = useState<LoanPackage | null>(null);
     const [isActivating, setIsActivating] = useState(false);
     const [loanAmount, setLoanAmount] = useState<string>('');
@@ -130,7 +134,7 @@ export default function Browse({ loanPackages, user, loanSettings }: Props) {
 
         setIsActivating(true);
         try {
-            router.post(route('user-loans.store'), {
+            router.post(route('user-loans.store', { tenant }), {
                 package_id: selectedPackage.id,
                 amount: numericAmount,
                 duration_days: selectedPackage.min_duration_days,

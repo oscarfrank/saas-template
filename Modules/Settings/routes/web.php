@@ -2,44 +2,66 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Modules\Settings\Http\Controllers\SettingsController;
+use Modules\Settings\Http\Controllers\ProfileController;
+use Modules\Settings\Http\Controllers\PasswordController;
+use Modules\Settings\Http\Controllers\TwoFactorAuthController;
 
 
 // Local Modular Dependencies
 use Modules\Settings\Http\Controllers\SiteSettingsController; 
 use Modules\Settings\Http\Controllers\ApiSettingsController;
-use Modules\Settings\Http\Controllers\ProfileController;
-use Modules\Settings\Http\Controllers\PasswordController;
-use Modules\Settings\Http\Controllers\TwoFactorAuthController;
 
 
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
-
-
+Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function () {
+    // Redirect /settings to profile by default
     Route::redirect('settings', 'settings/profile');
 
-    Route::get('settings/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('settings/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('settings/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // User Settings
+    Route::prefix('settings')->group(function () {
+        // Profile
+        Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
+        Route::delete('profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::get('settings/password', [PasswordController::class, 'edit'])->name('password.edit');
-    Route::put('settings/password', [PasswordController::class, 'update'])->name('password.update');
+        // Password
+        Route::get('password', [PasswordController::class, 'edit'])->name('password.edit');
+        Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 
-    Route::get('settings/two-factor-auth', [TwoFactorAuthController::class, 'edit'])->name('two-factor-auth.edit');
-    Route::post('settings/two-factor-auth/enable', [TwoFactorAuthController::class, 'enable'])->name('two-factor-auth.enable');
-    Route::post('settings/two-factor-auth/disable', [TwoFactorAuthController::class, 'disable'])->name('two-factor-auth.disable');
-    Route::post('settings/two-factor-auth/confirm-disable', [TwoFactorAuthController::class, 'confirmDisable'])->name('two-factor-auth.confirm-disable');
-    Route::post('settings/two-factor-auth/confirm', [TwoFactorAuthController::class, 'confirm'])->name('two-factor-auth.confirm');
-    Route::post('settings/two-factor-auth/recovery-codes', [TwoFactorAuthController::class, 'generateRecoveryCodes'])->name('two-factor-auth.recovery-codes');
-    Route::post('settings/two-factor-auth/send-code', [TwoFactorAuthController::class, 'sendCode'])->name('two-factor-auth.send-code');
+        // Two Factor Auth
+        Route::get('two-factor-auth', [TwoFactorAuthController::class, 'edit'])->name('two-factor-auth.edit');
+        Route::post('two-factor-auth/enable', [TwoFactorAuthController::class, 'enable'])->name('two-factor-auth.enable');
+        Route::post('two-factor-auth/disable', [TwoFactorAuthController::class, 'disable'])->name('two-factor-auth.disable');
+        Route::post('two-factor-auth/confirm-disable', [TwoFactorAuthController::class, 'confirmDisable'])->name('two-factor-auth.confirm-disable');
+        Route::post('two-factor-auth/confirm', [TwoFactorAuthController::class, 'confirm'])->name('two-factor-auth.confirm');
+        Route::post('two-factor-auth/recovery-codes', [TwoFactorAuthController::class, 'generateRecoveryCodes'])->name('two-factor-auth.recovery-codes');
+        Route::post('two-factor-auth/send-code', [TwoFactorAuthController::class, 'sendCode'])->name('two-factor-auth.send-code');
 
-    Route::get('settings/appearance', function () {
-        return Inertia::render('settings/appearance');
-    })->name('appearance');
+        // User Settings
+        Route::get('preferences', [SettingsController::class, 'preferences'])->name('settings.preferences');
+        Route::patch('preferences', [SettingsController::class, 'updatePreferences'])->name('preferences.update');
+        Route::get('connections', [SettingsController::class, 'connections'])->name('settings.connections');
+        Route::get('appearance', [SettingsController::class, 'appearance'])->name('settings.appearance');
 
+        // Organization Settings
+        Route::prefix('organization')->group(function () {
+            Route::get('general', [SettingsController::class, 'organizationGeneral'])->name('settings.organization.general');
+            Route::patch('general', [SettingsController::class, 'updateOrganization'])->name('settings.organization.update');
+            Route::get('people', [SettingsController::class, 'organizationPeople'])->name('settings.organization.people');
+            Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
+        });
+
+        // Other Settings
+        Route::get('api-keys', [SettingsController::class, 'apiKeys'])->name('settings.api-keys');
+        Route::post('api-keys', [SettingsController::class, 'createApiKey'])->name('settings.api-keys.create');
+        Route::get('webhooks', [SettingsController::class, 'webhooks'])->name('settings.webhooks');
+        Route::post('webhooks', [SettingsController::class, 'createWebhook'])->name('settings.webhooks.create');
+        Route::get('audit-logs', [SettingsController::class, 'auditLogs'])->name('settings.audit-logs');
+    });
 
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================

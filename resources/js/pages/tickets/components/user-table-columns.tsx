@@ -1,5 +1,5 @@
 import { type ColumnDef } from '@tanstack/react-table';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Eye, MoreHorizontal, Copy, Share2 } from 'lucide-react';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { formatDate } from "@/lib/utils";
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 export type Ticket = {
     id: number;
@@ -47,9 +48,10 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Ticket
         enableHiding: true,
         cell: ({ row }) => {
             const ticket = row.original;
+            const tenantRouter = useTenantRouter();
             return (
                 <Link 
-                    href={route('tickets.user.show', ticket.id)}
+                    href={tenantRouter.route('tickets.user.show', { ticket: ticket.id })}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("subject")}
@@ -131,6 +133,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Ticket
         id: "actions",
         cell: ({ row }) => {
             const ticket = row.original;
+            const tenantRouter = useTenantRouter();
 
             const handleCopyId = () => {
                 navigator.clipboard.writeText(String(ticket.id));
@@ -138,14 +141,14 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Ticket
             };
 
             const handleShare = () => {
-                const url = route('tickets.user.show', ticket.id);
+                const url = tenantRouter.route('tickets.user.show', { ticket: ticket.id });
                 navigator.clipboard.writeText(url);
                 toast.success('Ticket URL copied to clipboard');
             };
 
             return (
                 <div className="flex items-center gap-2">
-                    <Link href={route('tickets.user.show', ticket.id)}>
+                    <Link href={tenantRouter.route('tickets.user.show', { ticket: ticket.id })}>
                         <Button variant="outline" size="icon" className="cursor-pointer">
                             <Eye className="h-4 w-4" />
                         </Button>

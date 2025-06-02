@@ -132,11 +132,11 @@ class LoanPaymentController extends Controller
 
             // For manual payments, return to the appropriate loan page with success message
             if (request()->route()->getName() === 'user-loans.payments.submit') {
-                return redirect()->route('user-loans.show', $loan)
+                return redirect()->route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
                     ->with('success', 'Payment submitted successfully');
             }
 
-            return redirect()->route('user-loans.show', $loan)
+            return redirect()->route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
                 ->with('success', 'Payment submitted successfully');
 
         } catch (\Exception $e) {
@@ -499,6 +499,6 @@ class LoanPaymentController extends Controller
      */
     public function redirectToLoan(Loan $loan)
     {
-        return redirect()->route('user-loans.show', $loan);
+        return redirect()->route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan]);
     }
 }

@@ -50,6 +50,7 @@ export interface SharedData {
         footer_text: string;
         maintenance_mode: boolean;
     };
+    tenant: Tenant | null;
     [key: string]: unknown;
 }
 
@@ -140,3 +141,12 @@ export interface SiteSettings {
     created_at: string;
     updated_at: string;
 }
+
+export interface Tenant {
+    id: string;
+    name: string;
+    slug: string;
+    data?: Record<string, any>;
+    created_at?: string;
+    updated_at?: string;
+} 

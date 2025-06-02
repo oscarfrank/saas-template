@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { ArrowLeft, Save } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { router } from '@inertiajs/react';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -20,6 +20,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Create() {
+    const tenantRouter = useTenantRouter();
     const [formData, setFormData] = useState({
         subject: '',
         description: '',
@@ -40,7 +41,7 @@ export default function Create() {
             return;
         }
 
-        router.post(route('tickets.store'), formData, {
+        tenantRouter.post('tickets.store', formData, {}, {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
@@ -57,7 +58,7 @@ export default function Create() {
             <Head title="Create Ticket" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between">
-                    <Link href={route('tickets.user')}>
+                    <Link href={tenantRouter.route('tickets.user')}>
                         <Button variant="outline" className="cursor-pointer">
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back to Tickets

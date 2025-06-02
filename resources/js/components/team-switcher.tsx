@@ -4,6 +4,7 @@ import { router } from "@inertiajs/react"
 import { useAuth } from "@/hooks/use-auth"
 import { useRole } from "@/hooks/use-role"
 import { Button } from '@/components/ui/button';
+import { useSidebar } from "@/components/ui/sidebar"
 
 import {
   DropdownMenu,
@@ -18,7 +19,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar"
 
 export interface Team {
@@ -35,7 +35,7 @@ interface TeamSwitcherProps {
 }
 
 export function TeamSwitcher({ teams = [], onTeamSwitch, defaultTeam }: TeamSwitcherProps) {
-  const { isMobile } = useSidebar()
+  const { isMobile, state } = useSidebar()
   const { user } = useAuth()
   const { hasRole } = useRole()
   
@@ -73,12 +73,14 @@ export function TeamSwitcher({ teams = [], onTeamSwitch, defaultTeam }: TeamSwit
             <Button variant="ghost" className="w-full justify-between">
               <div className="flex items-center gap-2">
                 <currentTeam.logo />
-                <div className="flex flex-col items-start">
-                  <span className="text-sm font-medium">{currentTeam.name}</span>
-                  <span className="text-xs text-muted-foreground">{currentTeam.plan}</span>
-                </div>
+                {state === "expanded" && (
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium">{currentTeam.name}</span>
+                    <span className="text-xs text-muted-foreground">{currentTeam.plan}</span>
+                  </div>
+                )}
               </div>
-              <ChevronDown className="h-4 w-4" />
+              {state === "expanded" && <ChevronDown className="h-4 w-4" />}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56">

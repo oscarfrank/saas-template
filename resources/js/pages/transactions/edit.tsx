@@ -15,6 +15,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 
 interface Props extends PageProps {
     transaction: {
@@ -46,6 +48,7 @@ interface Props extends PageProps {
 }
 
 export default function Edit({ transaction, currencies, payment_methods }: Props) {
+    const tenantRouter = useTenantRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -75,7 +78,7 @@ export default function Edit({ transaction, currencies, payment_methods }: Props
             <div className="container mx-auto py-6">
                 <div className="flex items-center gap-4 mb-6">
                     <Button variant="outline" size="icon" asChild>
-                        <Link href={route('transactions.index')}>
+                        <Link href={tenantRouter.route('transactions.index')}>
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
                     </Button>
@@ -230,7 +233,7 @@ export default function Edit({ transaction, currencies, payment_methods }: Props
 
                     <div className="flex justify-end gap-4">
                         <Button variant="outline" asChild>
-                            <Link href={route('transactions.index')}>
+                            <Link href={tenantRouter.route('transactions.index')}>
                                 Cancel
                             </Link>
                         </Button>

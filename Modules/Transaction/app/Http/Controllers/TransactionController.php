@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Modules\Transaction\Models\Transaction;
 use Modules\Payment\Models\Currency;
 use Modules\Payment\Models\PaymentMethod;
+use Modules\User\Models\User;
 
 
 use Inertia\Inertia;
@@ -57,6 +58,7 @@ class TransactionController extends Controller
         return Inertia::render('transactions/create', [
             'currencies' => Currency::all(),
             'payment_methods' => PaymentMethod::all(),
+            'users' => User::all(['id', 'first_name', 'last_name', 'email']),
         ]);
     }
 
@@ -73,14 +75,25 @@ class TransactionController extends Controller
             'status' => 'required|string',
             'payment_method_id' => 'nullable|exists:payment_methods,id',
             'external_reference' => 'nullable|string',
-            'category' => 'nullable|string',
             'failure_reason' => 'nullable|string',
             'failure_details' => 'nullable|string',
+            'user_id' => 'required|exists:users,id',
         ]);
 
-        $transaction = Transaction::create($validated);
+        // Calculate net amount (amount - fees - taxes)
+        $amount = $validated['amount'];
+        $feeAmount = 0; // You might want to calculate this based on your business logic
+        $taxAmount = 0; // You might want to calculate this based on your business logic
+        $netAmount = $amount - $feeAmount - $taxAmount;
 
-        return redirect()->route('transactions.show', $transaction);
+        $transaction = Transaction::create([
+            ...$validated,
+            'fee_amount' => $feeAmount,
+            'tax_amount' => $taxAmount,
+            'net_amount' => $netAmount,
+        ]);
+
+        return redirect()->route('transactions.show', ['tenant' => tenant('id'), 'transaction' => $transaction]);
     }
 
     /**
@@ -125,7 +138,7 @@ class TransactionController extends Controller
 
         $transaction->update($validated);
 
-        return redirect()->route('transactions.show', $transaction);
+        return redirect()->route('transactions.show', ['tenant' => tenant('id'), 'transaction' => $transaction]);
     }
 
     /**
@@ -135,7 +148,7 @@ class TransactionController extends Controller
     {
         $transaction->delete();
 
-        return redirect()->route('transactions.index');
+        return redirect()->route('transactions.index', ['tenant' => tenant('id')]);
     }
 
     /**
@@ -150,7 +163,7 @@ class TransactionController extends Controller
 
         Transaction::whereIn('id', $request->ids)->delete();
 
-        return redirect()->route('transactions.index');
+        return redirect()->route('transactions.index', ['tenant' => tenant('id')]);
     }
 
     /**
@@ -165,7 +178,7 @@ class TransactionController extends Controller
 
         Transaction::whereIn('id', $request->ids)->update(['status' => 'archived']);
 
-        return redirect()->route('transactions.index');
+        return redirect()->route('transactions.index', ['tenant' => tenant('id')]);
     }
 
     /**

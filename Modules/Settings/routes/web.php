@@ -45,7 +45,6 @@ Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function ()
         Route::get('preferences', [SettingsController::class, 'preferences'])->name('settings.preferences');
         Route::patch('preferences', [SettingsController::class, 'updatePreferences'])->name('preferences.update');
         Route::get('connections', [SettingsController::class, 'connections'])->name('settings.connections');
-        Route::get('appearance', [SettingsController::class, 'appearance'])->name('settings.appearance');
 
         // Organization Settings
         Route::prefix('organization')->group(function () {

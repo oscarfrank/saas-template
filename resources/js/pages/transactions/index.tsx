@@ -12,6 +12,8 @@ import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 import { formatCurrency } from "@/lib/utils";
 import { PageProps } from '@inertiajs/core';
 
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Transactions',
@@ -36,6 +38,7 @@ interface Props extends PageProps {
 
 export default function Index({ transactions, filters }: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
+    const tenantRouter = useTenantRouter();
 
     const handleDelete = (selectedRows: Transaction[]) => {
         setIsDeleting(true);
@@ -93,7 +96,7 @@ export default function Index({ transactions, filters }: Props) {
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                     </div>
-                    <Link href={route('transactions.create')}>
+                    <Link href={tenantRouter.route('transactions.create')}>
                         <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
                             New Transaction
@@ -115,7 +118,7 @@ export default function Index({ transactions, filters }: Props) {
                         total: transactions.total
                     }}
                     onPageChange={(page) => {
-                        router.get(route('transactions.index'), {
+                        router.get(tenantRouter.route('transactions.index'), {
                             ...filters,
                             page
                         }, {
@@ -124,7 +127,7 @@ export default function Index({ transactions, filters }: Props) {
                         });
                     }}
                     onSortChange={(sort, direction) => {
-                        router.get(route('transactions.index'), {
+                        router.get(tenantRouter.route('transactions.index'), {
                             ...filters,
                             sort,
                             direction
@@ -134,7 +137,7 @@ export default function Index({ transactions, filters }: Props) {
                         });
                     }}
                     onSearchChange={(search) => {
-                        router.get(route('transactions.index'), {
+                        router.get(tenantRouter.route('transactions.index'), {
                             ...filters,
                             search,
                             page: 1
@@ -144,7 +147,7 @@ export default function Index({ transactions, filters }: Props) {
                         });
                     }}
                     onPerPageChange={(perPage) => {
-                        router.get(route('transactions.index'), {
+                        router.get(tenantRouter.route('transactions.index'), {
                             ...filters,
                             per_page: perPage,
                             page: 1

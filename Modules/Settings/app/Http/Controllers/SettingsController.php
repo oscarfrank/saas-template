@@ -102,14 +102,6 @@ class SettingsController extends Controller
     }
 
     /**
-     * Display user connections settings.
-     */
-    public function appearance()
-    {
-        return Inertia::render('settings/appearance');
-    }
-
-    /**
      * Display organization general settings.
      */
     public function organizationGeneral()

@@ -15,6 +15,9 @@ use Illuminate\Support\Str;
 
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
+use App\Traits\TenantAwareModelBinding;
+
+
 
 use Modules\Loan\Models\Loan;
 use Modules\Loan\Models\LoanPayment;
@@ -27,7 +30,7 @@ use Modules\Payment\Models\Currency;
 
 class Transaction extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, TenantAwareModelBinding;
 
     protected $fillable = [
         'tenant_id',

@@ -204,14 +204,13 @@ class LoanController extends Controller
     public function edit(Loan $loan)
     {
         $this->authorizeLevel(AccessLevel::USER, $loan);
-        $loan->load(['user', 'currency', 'package', 'customPackage']);
+        $loan->load(['user', 'currency', 'package']);
         
         return Inertia::render('loans/edit', [
             'loan' => $loan,
             'users' => \Modules\User\Models\User::select('id', 'first_name', 'last_name', 'email')->get(),
             'currencies' => Currency::select('id', 'code', 'symbol')->get(),
             'packages' => LoanPackage::select('id', 'name')->get(),
-            'customPackages' => \App\Models\CustomPackage::select('id', 'name')->get(),
         ]);
     }
 
@@ -350,6 +349,7 @@ class LoanController extends Controller
      */
     public function documents(Loan $loan)
     {
+    
         $loan->load(['documents']);
         
         return Inertia::render('loans/documents', [
@@ -362,6 +362,7 @@ class LoanController extends Controller
      */
     public function uploadDocument(Request $request, Loan $loan)
     {
+        
         $this->authorizeLevel(AccessLevel::USER, $loan);
         $validated = $request->validate([
             'file' => 'required|file|max:10240', // 10MB max
@@ -409,6 +410,7 @@ class LoanController extends Controller
      */
     public function notes(Loan $loan)
     {
+
         $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load(['notes.user']);
@@ -423,6 +425,7 @@ class LoanController extends Controller
      */
     public function addNote(Request $request, Loan $loan)
     {
+        
         $this->authorizeLevel(AccessLevel::EDIT);
 
         $validated = $request->validate([
@@ -443,6 +446,7 @@ class LoanController extends Controller
      */
     public function updateNote(Request $request, Loan $loan, $noteId)
     {
+
         $this->authorizeLevel(AccessLevel::EDIT);
 
         $validated = $request->validate([
@@ -476,6 +480,7 @@ class LoanController extends Controller
      */
     public function downloadDocument(Loan $loan, $documentId)
     {
+        
         $document = $loan->documents()->findOrFail($documentId);
         
         // Check if the file exists
@@ -729,6 +734,7 @@ class LoanController extends Controller
      */
     public function userIndex()
     {
+        
         $loans = auth()->user()->loans()
             ->with(['currency', 'user'])
             ->latest()
@@ -744,6 +750,7 @@ class LoanController extends Controller
      */
     public function userShow(Loan $loan)
     {
+        
         $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load([
@@ -768,6 +775,7 @@ class LoanController extends Controller
      */
     public function userDocuments(Loan $loan)
     {
+        
         $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load('documents');
@@ -782,6 +790,7 @@ class LoanController extends Controller
      */
     public function userNotes(Loan $loan)
     {
+
         $this->authorizeLevel(AccessLevel::USER, $loan);
 
         $loan->load(['notes' => function ($query) {
@@ -841,6 +850,7 @@ class LoanController extends Controller
      */
     public function userSubmitPayment(Request $request, Loan $loan)
     {
+
         $this->authorizeLevel(AccessLevel::USER, $loan);
 
         if ($loan->status !== 'active') {

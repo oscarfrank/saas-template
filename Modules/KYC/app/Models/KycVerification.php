@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
+use App\Traits\TenantAwareModelBinding;
+
+
 use Modules\User\Models\User;
 
 class KycVerification extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, TenantAwareModelBinding;
 
     protected $fillable = [
         'user_id',

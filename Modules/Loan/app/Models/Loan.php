@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+use App\Traits\TenantAwareModelBinding;
+
+
 use Modules\User\Models\User;
 use Modules\Loan\Models\LoanPackage;
 use Modules\Payment\Models\Currency;
@@ -22,7 +25,7 @@ use Modules\Loan\Models\LoanPayment;
 
 class Loan extends Model
 {
-    use BelongsToTenant;
+    use BelongsToTenant, TenantAwareModelBinding;
 
     protected $fillable = [
         'user_id',

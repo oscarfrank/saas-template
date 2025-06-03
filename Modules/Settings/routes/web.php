@@ -6,6 +6,9 @@ use Modules\Settings\Http\Controllers\SettingsController;
 use Modules\Settings\Http\Controllers\ProfileController;
 use Modules\Settings\Http\Controllers\PasswordController;
 use Modules\Settings\Http\Controllers\TwoFactorAuthController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
+use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
+
 
 
 // Local Modular Dependencies
@@ -16,6 +19,31 @@ use Modules\Settings\Http\Controllers\ApiSettingsController;
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
 
+
+
+// Tenant Routes - These should be tenant-aware
+Route::middleware([
+    'auth',
+    'verified',
+    InitializeTenancyByPath::class,
+    'ensure.tenant.access',
+    // PreventAccessFromCentralDomains::class,
+])->prefix('{tenant}')->group(function () {
+
+            // Organization Settings
+            Route::prefix('settings/organization')->group(function () {
+                Route::get('general', [SettingsController::class, 'organizationGeneral'])->name('settings.organization.general');
+                Route::patch('general', [SettingsController::class, 'updateOrganization'])->name('settings.organization.update');
+                Route::get('people', [SettingsController::class, 'organizationPeople'])->name('settings.organization.people');
+                Route::post('invites', [SettingsController::class, 'sendInvite'])->name('settings.organization.invites.send');
+                Route::post('invites/{invite}/cancel', [SettingsController::class, 'cancelInvite'])->name('settings.organization.invites.cancel');
+                Route::post('invites/{invite}/resend', [SettingsController::class, 'resendInvite'])->name('settings.organization.invites.resend');
+                Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
+                Route::post('members/{member}/update-role', [SettingsController::class, 'updateMemberRole'])->name('settings.organization.members.update-role');
+                Route::post('/members/{member}/remove', [SettingsController::class, 'removeMember'])->name('settings.organization.members.remove');
+            });
+
+});
 
 Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function () {
     // Redirect /settings to profile by default
@@ -46,13 +74,6 @@ Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function ()
         Route::patch('preferences', [SettingsController::class, 'updatePreferences'])->name('preferences.update');
         Route::get('connections', [SettingsController::class, 'connections'])->name('settings.connections');
 
-        // Organization Settings
-        Route::prefix('organization')->group(function () {
-            Route::get('general', [SettingsController::class, 'organizationGeneral'])->name('settings.organization.general');
-            Route::patch('general', [SettingsController::class, 'updateOrganization'])->name('settings.organization.update');
-            Route::get('people', [SettingsController::class, 'organizationPeople'])->name('settings.organization.people');
-            Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
-        });
 
         // Other Settings
         Route::get('api-keys', [SettingsController::class, 'apiKeys'])->name('settings.api-keys');
@@ -94,3 +115,8 @@ Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function ()
 // Two-factor authentication routes
 Route::post('two-factor-challenge/send-code', [TwoFactorAuthController::class, 'sendChallengeCode'])
     ->name('two-factor-challenge.send-code');
+
+// Public invite acceptance route
+Route::get('organization/invite/{token}', [SettingsController::class, 'acceptInvite'])
+    ->name('organization.invite.accept')
+    ->middleware(['web']);

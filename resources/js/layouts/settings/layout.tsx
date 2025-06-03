@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
+
+import { useEffectiveTenant } from '@/hooks/use-effective-tenant';
+
 import {
     User,
     Key,
@@ -27,90 +30,95 @@ interface SettingsGroup {
     items: NavItem[];
 }
 
-const settingsGroups: SettingsGroup[] = [
-    {
-        title: 'User Settings',
-        items: [
-            {
-                title: 'Profile',
-                href: '/settings/profile',
-                icon: User,
-            },
-            {
-                title: 'Password',
-                href: '/settings/password',
-                icon: Key,
-            },
-            {
-                title: 'Two Factor Authentication',
-                href: '/settings/two-factor-auth',
-                icon: Shield,
-            },
-            {
-                title: 'Preferences',
-                href: '/settings/preferences',
-                icon: Settings,
-            },
-            {
-                title: 'Connections',
-                href: '/settings/connections',
-                icon: LinkIcon,
-            },
-            {
-                title: 'Billing',
-                href: '/settings/billing',
-                icon: CreditCard,
-            },
-        ],
-    },
-    {
-        title: 'Organization',
-        items: [
-            {
-                title: 'General',
-                href: '/settings/organization/general',
-                icon: Building2,
-            },
-            {
-                title: 'People',
-                href: '/settings/organization/people',
-                icon: Users,
-            },
-            {
-                title: 'Teamspaces',
-                href: '/settings/organization/teamspaces',
-                icon: LayoutGrid,
-            },
-            {
-                title: 'Invites',
-                href: '/settings/organization/invites',
-                icon: UserPlus,
-            },
-        ],
-    },
-    {
-        title: 'Other',
-        items: [
-            {
-                title: 'API Keys',
-                href: '/settings/api-keys',
-                icon: KeyRound,
-            },
-            {
-                title: 'Webhooks',
-                href: '/settings/webhooks',
-                icon: Webhook,
-            },
-            {
-                title: 'Audit Logs',
-                href: '/settings/audit-logs',
-                icon: History,
-            },
-        ],
-    },
-];
+
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
+    const { effectiveTenant } = useEffectiveTenant();
+
+
+    const settingsGroups: SettingsGroup[] = [
+        {
+            title: 'User Settings',
+            items: [
+                {
+                    title: 'Profile',
+                    href: '/settings/profile',
+                    icon: User,
+                },
+                {
+                    title: 'Password',
+                    href: '/settings/password',
+                    icon: Key,
+                },
+                {
+                    title: 'Two Factor Authentication',
+                    href: '/settings/two-factor-auth',
+                    icon: Shield,
+                },
+                {
+                    title: 'Preferences',
+                    href: '/settings/preferences',
+                    icon: Settings,
+                },
+                {
+                    title: 'Connections',
+                    href: '/settings/connections',
+                    icon: LinkIcon,
+                },
+                {
+                    title: 'Billing',
+                    href: '/settings/billing',
+                    icon: CreditCard,
+                },
+            ],
+        },
+        {
+            title: 'Organization',
+            items: [
+                {
+                    title: 'General',
+                    href: `/${effectiveTenant?.slug}/settings/organization/general`,
+                    icon: Building2,
+                },
+                {
+                    title: 'People',
+                    href: `/${effectiveTenant?.slug}/settings/organization/people`,
+                    icon: Users,
+                },
+                {
+                    title: 'Teamspaces',
+                    href: `/${effectiveTenant?.slug}/settings/organization/teamspaces`,
+                    icon: LayoutGrid,
+                },
+                {
+                    title: 'Invites',
+                    href: route('tenants.invites'),
+                    icon: UserPlus,
+                },
+            ],
+        },
+        {
+            title: 'Other',
+            items: [
+                {
+                    title: 'API Keys',
+                    href: '/settings/api-keys',
+                    icon: KeyRound,
+                },
+                {
+                    title: 'Webhooks',
+                    href: '/settings/webhooks',
+                    icon: Webhook,
+                },
+                {
+                    title: 'Audit Logs',
+                    href: '/settings/audit-logs',
+                    icon: History,
+                },
+            ],
+        },
+    ];
+
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {
         return null;

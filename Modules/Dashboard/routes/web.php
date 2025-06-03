@@ -16,6 +16,15 @@ use App\Helpers\AccessLevel;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
+    Route::get('/dashboard', function () {
+
+        $user = auth()->user();
+
+        $tenant = $user->preferences->preferences['last_tenant_id'] ?? 'home';
+
+        return redirect()->route('dashboard', $tenant);
+
+    });
     
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
@@ -44,9 +53,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware([
     'auth',
     'verified',
-    'track.last.visited',
-    'track.tenancy',
+    // 'track.last.visited',
+    // 'track.tenancy',
     InitializeTenancyByPath::class,
+    'ensure.tenant.access',
     // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 

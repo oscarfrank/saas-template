@@ -17,6 +17,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'id',
         'name',
         'slug',
+        'created_by',
         'data',
     ];
 
@@ -26,6 +27,8 @@ class Tenant extends BaseTenant implements TenantWithDatabase
             'id',
             'name',
             'slug',
+            'created_by',
+            'data',
             'created_at',
             'updated_at',
         ];

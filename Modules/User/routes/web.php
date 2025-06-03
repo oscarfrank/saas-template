@@ -20,6 +20,7 @@ use Modules\User\Http\Controllers\Auth\NewPasswordController;
 use Modules\User\Http\Controllers\Auth\PasswordResetLinkController;
 use Modules\User\Http\Controllers\Auth\RegisteredUserController;
 use Modules\User\Http\Controllers\Auth\VerifyEmailController;
+use Modules\User\Http\Controllers\Auth\SocialAuthCallbackController;
 
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
@@ -64,153 +65,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 
 Route::middleware('guest')->group(function () {
-
+    // Social Auth Routes
     Route::get('auth/google/redirect', function(){
         return Socialite::driver('google')->redirect();
     })->name('auth.google');
 
-    Route::get('auth/google/callback', function(){
-        $googleUser = Socialite::driver('google')->user();
-
-        // Split the name into first and last name
-        $nameParts = explode(' ', $googleUser->name);
-        $firstName = $nameParts[0];
-        $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
-
-        $user = User::updateOrCreate([
-            'email' => $googleUser->email,
-        ], [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'password' => bcrypt(Str::random(10)),
-            'email_verified_at' => now(),
-            'google_id' => $googleUser->id,
-            'oauth_provider' => 'google',
-        ]);
-
-        // Store OAuth tokens
-        $user->setOAuthTokens('google', [
-            'access_token' => $googleUser->token,
-            'refresh_token' => $googleUser->refreshToken,
-            'expires_at' => now()->addSeconds($googleUser->expiresIn),
-        ]);
-
-        $user->assignRole('user');
-
-        Auth::login($user);
-
-        // Check if 2FA is required
-        if ($user->two_factor_secret) {
-            return Inertia::render('auth/login', [
-                'canResetPassword' => true,
-                'status' => session('status'),
-                'requiresTwoFactor' => true,
-                'email' => $user->email,
-                'password' => '',
-                'remember' => false,
-            ]);
-        }
-
-        return redirect()->route('dashboard');
-    })->name('auth.google.callback');
+    Route::get('auth/google/callback', [SocialAuthCallbackController::class, 'handleGoogleCallback'])
+        ->name('auth.google.callback');
 
     Route::get('auth/facebook/redirect', function(){
         return Socialite::driver('facebook')->redirect();
     })->name('auth.facebook');
 
-    Route::get('auth/facebook/callback', function(){
-        $facebookUser = Socialite::driver('facebook')->user();
-
-        // Split the name into first and last name
-        $nameParts = explode(' ', $facebookUser->name);
-        $firstName = $nameParts[0];
-        $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
-
-        $user = User::updateOrCreate([
-            'email' => $facebookUser->email,
-        ], [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'password' => bcrypt(Str::random(10)),
-            'email_verified_at' => now(),
-            'facebook_id' => $facebookUser->id,
-            'oauth_provider' => 'facebook',
-        ]);
-
-        // Store OAuth tokens
-        $user->setOAuthTokens('facebook', [
-            'access_token' => $facebookUser->token,
-            'refresh_token' => $facebookUser->refreshToken,
-            'expires_at' => now()->addSeconds($facebookUser->expiresIn),
-        ]);
-
-        $user->assignRole('user');
-
-        Auth::login($user);
-
-        // Check if 2FA is required
-        if ($user->two_factor_secret) {
-            return Inertia::render('auth/login', [
-                'canResetPassword' => true,
-                'status' => session('status'),
-                'requiresTwoFactor' => true,
-                'email' => $user->email,
-                'password' => '',
-                'remember' => false,
-            ]);
-        }
-
-        return redirect()->route('dashboard');
-    })->name('auth.facebook.callback');
+    Route::get('auth/facebook/callback', [SocialAuthCallbackController::class, 'handleFacebookCallback'])
+        ->name('auth.facebook.callback');
 
     Route::get('auth/github/redirect', function(){
         return Socialite::driver('github')->redirect();
     })->name('auth.github');
 
-    Route::get('auth/github/callback', function(){
-        $githubUser = Socialite::driver('github')->user();
-
-        // GitHub might not provide a full name, so we'll use the nickname
-        $nameParts = explode(' ', $githubUser->name ?? $githubUser->nickname);
-        $firstName = $nameParts[0];
-        $lastName = count($nameParts) > 1 ? implode(' ', array_slice($nameParts, 1)) : '';
-
-        $user = User::updateOrCreate([
-            'email' => $githubUser->email,
-        ], [
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'password' => bcrypt(Str::random(10)),
-            'email_verified_at' => now(),
-            'github_id' => $githubUser->id,
-            'oauth_provider' => 'github',
-        ]);
-
-        // Store OAuth tokens
-        $user->setOAuthTokens('github', [
-            'access_token' => $githubUser->token,
-            'refresh_token' => $githubUser->refreshToken,
-            'expires_at' => now()->addSeconds($githubUser->expiresIn),
-        ]);
-
-        $user->assignRole('user');
-
-        Auth::login($user);
-
-        // Check if 2FA is required
-        if ($user->two_factor_secret) {
-            return Inertia::render('auth/login', [
-                'canResetPassword' => true,
-                'status' => session('status'),
-                'requiresTwoFactor' => true,
-                'email' => $user->email,
-                'password' => '',
-                'remember' => false,
-            ]);
-        }
-
-        return redirect()->route('dashboard');
-    })->name('auth.github.callback');
+    Route::get('auth/github/callback', [SocialAuthCallbackController::class, 'handleGithubCallback'])
+        ->name('auth.github.callback');
 
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');

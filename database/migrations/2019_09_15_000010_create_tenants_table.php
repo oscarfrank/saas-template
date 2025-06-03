@@ -17,11 +17,12 @@ class CreateTenantsTable extends Migration
     {
         Schema::create('tenants', function (Blueprint $table) {
             $table->string('id')->primary();
+            $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
 
             // your custom columns may go here
 
-            $table->timestamps();
             $table->json('data')->nullable();
+            $table->timestamps();
         });
     }
 

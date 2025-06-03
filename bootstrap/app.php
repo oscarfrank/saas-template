@@ -35,6 +35,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'except.user' => \App\Http\Middleware\ExceptUser::class,
             'level' => \App\Http\Middleware\RequireLevel::class,
+            'ensure.tenant.access' => \App\Http\Middleware\EnsureTenantAccess::class,
+        ]);
+
+        // Set middleware priority
+        $middleware->priority([
+            \App\Http\Middleware\EnsureTenantAccess::class,
+            \Stancl\Tenancy\Middleware\InitializeTenancyByPath::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

@@ -9,6 +9,12 @@ import { useState } from 'react';
 
 interface Props {
     errors?: Record<string, string>;
+    pendingInvites?: Array<{
+        id: string;
+        organization: string;
+        role: string;
+        invited_at: string;
+    }>;
 }
 
 interface Invite {
@@ -16,7 +22,7 @@ interface Invite {
     role: 'admin' | 'member';
 }
 
-export default function Create({ errors = {} }: Props) {
+export default function Create({ errors = {}, pendingInvites = [] }: Props) {
     const [step, setStep] = useState(1);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
     const [invites, setInvites] = useState<Invite[]>([]);
@@ -48,29 +54,65 @@ export default function Create({ errors = {} }: Props) {
         setInvites(invites.filter(invite => invite.email !== email));
     };
 
+    const handleAcceptInvite = (inviteId: string) => {
+        router.post(route('tenants.invites.accept', { invite: inviteId }), {}, {
+            onSuccess: () => {
+                toast.success('Invite accepted successfully');
+                // Refresh the page to update the invites list
+                router.reload();
+            },
+            onError: (errors) => {
+                toast.error(errors.message || 'Failed to accept invite');
+            },
+        });
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Only proceed with submission if we're on the final step
+        if (step !== 3) {
+            e.preventDefault();
+            return;
+        }
+
+        // Create the data object first
+        const data = {
+            name: formData.name,
+            slug: formData.slug,
+            invites: invites || []
+        };
+
+        console.log('Data before submission:', data); // Debug log
+
+        // Create FormData
         const submitData = new FormData();
         
-        // Add the required fields from our state
-        submitData.append('name', formData.name);
-        submitData.append('slug', formData.slug);
+        // Add the required fields
+        submitData.append('name', data.name);
+        submitData.append('slug', data.slug);
+        submitData.append('invites', JSON.stringify(data.invites));
         
-        // Add the logo if it exists
+        // Add logo if it exists
         const logoInput = document.getElementById('logo') as HTMLInputElement;
         if (logoInput?.files?.[0]) {
             submitData.append('logo', logoInput.files[0]);
         }
-        
-        // Add invites to formData
-        submitData.append('invites', JSON.stringify(invites));
-        
+
+        // Log the actual data being sent
+        console.log('FormData entries:', {
+            name: submitData.get('name'),
+            slug: submitData.get('slug'),
+            invites: submitData.get('invites'),
+            hasLogo: !!submitData.get('logo')
+        });
+
         router.post(route('tenants.store'), submitData, {
             onSuccess: () => {
                 toast.success('Organization created successfully');
-                router.visit(route('tenants.index'));
             },
             onError: (errors) => {
+                console.error('Submission errors:', errors); // Debug log
                 toast.error('Failed to create organization');
             },
         });
@@ -81,7 +123,11 @@ export default function Create({ errors = {} }: Props) {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const nextStep = () => {
+    const nextStep = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+        }
+        
         if (step === 1 && (!formData.name || !formData.slug)) {
             toast.error('Please fill in all required fields');
             return;
@@ -89,7 +135,12 @@ export default function Create({ errors = {} }: Props) {
         setStep(step + 1);
     };
 
-    const prevStep = () => setStep(step - 1);
+    const prevStep = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+        }
+        setStep(step - 1);
+    };
 
     const canProceed = () => {
         switch (step) {
@@ -109,6 +160,35 @@ export default function Create({ errors = {} }: Props) {
             <Head title="Create Organization" />
             
             <div className="container max-w-3xl mx-auto py-12 px-4">
+                {pendingInvites.length > 0 && (
+                    <div className="mb-8 rounded-lg border bg-card p-4">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-semibold">You have pending invites</h3>
+                            <p className="text-sm text-muted-foreground">
+                                You've been invited to join {pendingInvites.length} organization{pendingInvites.length > 1 ? 's' : ''}
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            {pendingInvites.map((invite) => (
+                                <div key={invite.id} className="flex items-center justify-between rounded-md border p-3">
+                                    <div>
+                                        <p className="font-medium">{invite.organization}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {invite.role.charAt(0).toUpperCase() + invite.role.slice(1)} • Invited {invite.invited_at}
+                                        </p>
+                                    </div>
+                                    <Button 
+                                        size="sm"
+                                        onClick={() => handleAcceptInvite(invite.id)}
+                                    >
+                                        Accept
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold tracking-tight">Create Your Organization</h1>
                     <p className="mt-2 text-muted-foreground">
@@ -121,7 +201,11 @@ export default function Create({ errors = {} }: Props) {
                         {[1, 2, 3].map((stepNumber) => (
                             <div key={stepNumber} className="flex items-center">
                                 <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                                    step >= stepNumber ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                                    step === stepNumber 
+                                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/20' 
+                                        : step > stepNumber 
+                                            ? 'bg-primary/20 text-primary' 
+                                            : 'bg-muted text-muted-foreground'
                                 }`}>
                                     {stepNumber}
                                 </div>
@@ -154,7 +238,7 @@ export default function Create({ errors = {} }: Props) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form onSubmit={handleSubmit} className="space-y-6">
+                        <form id="create-organization-form" onSubmit={handleSubmit} className="space-y-6">
                             {step === 1 && (
                                 <div className="space-y-4">
                                     <div className="space-y-2">

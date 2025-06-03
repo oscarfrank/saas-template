@@ -19,8 +19,9 @@ use App\Helpers\AccessLevel;
 Route::middleware([
     'auth',
     'verified',
-    'track.last.visited',
+    // 'track.last.visited',
     InitializeTenancyByPath::class,
+    'ensure.tenant.access',
     // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 

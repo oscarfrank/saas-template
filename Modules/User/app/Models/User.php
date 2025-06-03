@@ -483,4 +483,14 @@ class User extends Authenticatable
     {
         return $this->preferences ?? UserPreference::getForUser($this->id);
     }
+
+    /**
+     * Get the user's last visited tenant ID.
+     *
+     * @return string|null
+     */
+    public function getLastTenantId(): ?string
+    {
+        return $this->getPreferences()->preferences['last_tenant_id'] ?? null;
+    }
 }

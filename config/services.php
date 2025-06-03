@@ -72,4 +72,10 @@ return [
         'client_secret' => env('AUTH_FACEBOOK_CLIENT_SECRET'),
         'redirect' => env('AUTH_FACEBOOK_REDIRECT', env('APP_URL') . ':8000/auth/facebook/callback'),
     ],
+
+
+    // Tenancy Mode
+    'tenancy' => [
+        'mode' => env('TENANCY_MODE', 'multi'),
+    ],
 ];

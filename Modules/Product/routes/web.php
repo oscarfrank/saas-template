@@ -20,6 +20,7 @@ Route::middleware([
     'auth',
     'verified',
     InitializeTenancyByPath::class,
+    'ensure.tenant.access',
     // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 

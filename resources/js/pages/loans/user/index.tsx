@@ -2,9 +2,9 @@ import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { Table } from './components/table';
-import { createColumns } from './components/table-columns';
-import { type Loan } from './components/table-columns';
+import { Table } from '../components/table';
+import { createUserColumns } from '../components/user-table-columns';
+import { type Loan } from '../components/table-columns';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useState, useCallback } from 'react';
@@ -16,11 +16,7 @@ import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Admin',
-        href: '/admin/dashboard',
-    },
-    {
-        title: 'Loans',
+        title: 'My Loans',
         href: '/loans',
     },
 ];
@@ -43,8 +39,6 @@ export default function Index({ loans }: Props) {
     const [key, setKey] = useState(0);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
-    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
-    const [selectedLoans, setSelectedLoans] = useState<Loan[]>([]);
 
     const handlePageChange = (page: number) => {
         setIsLoading(true);
@@ -52,7 +46,7 @@ export default function Index({ loans }: Props) {
         const params = new URLSearchParams(window.location.search);
         params.set('page', page.toString());
         
-        tenantRouter.get('loans.index', {}, { 
+        tenantRouter.get('user-loans', { page: page.toString() }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -70,7 +64,7 @@ export default function Index({ loans }: Props) {
     const handleSortChange = (sort: string, direction: 'asc' | 'desc') => {
         setIsLoading(true);
         setError(null);
-        tenantRouter.get('loans.index', { sort, direction }, { 
+        tenantRouter.get('user-loans', { sort, direction }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -88,9 +82,8 @@ export default function Index({ loans }: Props) {
         setIsLoading(true);
         setError(null);
         
-        // Only trigger search if there's actual input
         if (search.trim()) {
-            tenantRouter.get('loans.index', { search }, { 
+            tenantRouter.get('user-loans', { search }, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['loans'],
@@ -103,8 +96,7 @@ export default function Index({ loans }: Props) {
                 }
             });
         } else {
-            // If search is empty, just reload the page without search parameter
-            tenantRouter.get('loans.index', {}, { 
+            tenantRouter.get('user-loans', {}, { 
                 preserveState: true,
                 preserveScroll: true,
                 only: ['loans'],
@@ -122,7 +114,7 @@ export default function Index({ loans }: Props) {
     const handlePerPageChange = (perPage: number) => {
         setIsLoading(true);
         setError(null);
-        tenantRouter.get('loans.index', { per_page: perPage }, { 
+        tenantRouter.get('user-loans', { per_page: perPage }, { 
             preserveState: true,
             preserveScroll: true,
             only: ['loans'],
@@ -136,50 +128,6 @@ export default function Index({ loans }: Props) {
         });
     };
 
-    const handleBulkDelete = useCallback(async (loans: Loan[]) => {
-        setSelectedLoans(loans);
-        setIsBulkDeleteDialogOpen(true);
-    }, []);
-
-    const handleBulkDeleteConfirm = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-            await tenantRouter.post('loans.bulk-delete', {
-                ids: selectedLoans.map(loan => loan.id)
-            }, {}, {
-                preserveState: true,
-                preserveScroll: true,
-                onSuccess: () => {
-                    toast.success('Selected loans deleted successfully');
-                    setIsBulkDeleteDialogOpen(false);
-                    setSelectedLoans([]);
-                    // Force a complete table reset
-                    setKey(prev => prev + 1);
-                    // Reload the data
-                    tenantRouter.reload({
-                        only: ['loans'],
-                        onSuccess: () => {
-                            setIsLoading(false);
-                        },
-                        onError: () => {
-                            setIsLoading(false);
-                            toast.error('Failed to refresh data after deletion');
-                        }
-                    });
-                },
-                onError: () => {
-                    toast.error('Failed to delete selected loans');
-                    setIsLoading(false);
-                }
-            });
-        } catch (error) {
-            toast.error('Failed to delete some loans');
-            setIsLoading(false);
-        }
-    }, [selectedLoans]);
-
     const handleDelete = useCallback(async () => {
         if (!selectedLoan) return;
 
@@ -188,12 +136,10 @@ export default function Index({ loans }: Props) {
             preserveState: true,
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('Loan deleted successfully');
+                toast.success('Loan application cancelled successfully');
                 setIsDeleteDialogOpen(false);
                 setSelectedLoan(null);
-                // Force a complete table reset
                 setKey(prev => prev + 1);
-                // Reload the data
                 tenantRouter.reload({
                     only: ['loans'],
                     onSuccess: () => {
@@ -201,12 +147,12 @@ export default function Index({ loans }: Props) {
                     },
                     onError: () => {
                         setIsLoading(false);
-                        toast.error('Failed to refresh data after deletion');
+                        toast.error('Failed to refresh data after cancellation');
                     }
                 });
             },
             onError: () => {
-                toast.error('Failed to delete loan');
+                toast.error('Failed to cancel loan application');
                 setIsLoading(false);
             }
         });
@@ -220,26 +166,21 @@ export default function Index({ loans }: Props) {
         }
     }, [loans.data]);
 
-    const handleDialogClose = useCallback(() => {
-        setIsDeleteDialogOpen(false);
-        setSelectedLoan(null);
-    }, []);
-
-    const columns = createColumns({
+    const columns = createUserColumns({
         onDelete: handleDeleteClick
     });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Loans Management" />
+            <Head title="My Loans" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
                     </div>
-                    <Link href={tenantRouter.route('loans.create')}>
+                    <Link href={tenantRouter.route('loan-packages.browse')}>
                         <Button className="cursor-pointer">
                             <Plus className="mr-2 h-4 w-4" />
-                            Add Loan
+                            Apply for Loan
                         </Button>
                     </Link>
                 </div>
@@ -247,8 +188,8 @@ export default function Index({ loans }: Props) {
                     key={key}
                     columns={columns}
                     data={loans.data}
-                    searchPlaceholder="Search loans..."
-                    searchColumns={['reference_number', 'user.name', 'status']}
+                    searchPlaceholder="Search my loans..."
+                    searchColumns={['reference_number', 'status']}
                     pagination={{
                         current_page: loans.current_page,
                         last_page: loans.last_page,
@@ -261,32 +202,17 @@ export default function Index({ loans }: Props) {
                     onPerPageChange={handlePerPageChange}
                     isLoading={isLoading}
                     error={error ?? undefined}
-                    onBulkDelete={handleBulkDelete}
-                    resetSelection={true}
                 />
 
                 <CustomAlertDialog
                     isOpen={isDeleteDialogOpen}
                     onClose={() => setIsDeleteDialogOpen(false)}
                     onConfirm={handleDelete}
-                    title="Are you sure?"
-                    description={`This action cannot be undone. This will permanently delete the loan "${selectedLoan?.reference_number}".`}
-                    isLoading={isLoading}
-                />
-
-                <CustomAlertDialog
-                    isOpen={isBulkDeleteDialogOpen}
-                    onClose={() => {
-                        setIsBulkDeleteDialogOpen(false);
-                        setSelectedLoans([]);
-                    }}
-                    onConfirm={handleBulkDeleteConfirm}
-                    title="Are you sure?"
-                    description={`This action cannot be undone. This will permanently delete ${selectedLoans.length} selected loan(s).`}
-                    confirmText="Delete Selected"
+                    title="Cancel Loan Application?"
+                    description={`Are you sure you want to cancel your loan application "${selectedLoan?.reference_number}"? This action cannot be undone.`}
                     isLoading={isLoading}
                 />
             </div>
         </AppLayout>
     );
-}
+} 

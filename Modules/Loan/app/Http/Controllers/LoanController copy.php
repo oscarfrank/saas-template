@@ -43,46 +43,17 @@ class LoanController extends Controller
     use LevelBasedAuthorization;
 
     /**
-     * Get common loan relationships to load
-     */
-    protected function getCommonRelations()
-    {
-        return [
-            'user',
-            'currency',
-            'package',
-            'documents' => function ($query) {
-                $query->with('uploadedBy')
-                      ->orderBy('created_at', 'desc');
-            },
-            'notes' => function ($query) {
-                $query->with(['createdBy', 'updatedBy'])
-                      ->orderBy('created_at', 'desc');
-            },
-            'payments' => function ($query) {
-                $query->orderBy('due_date', 'desc');
-            }
-        ];
-    }
-
-    /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index()
     {
-        $query = Loan::with($this->getCommonRelations());
-        
-        // Filter based on user role
-        if (!$this->hasLevel(AccessLevel::MANAGE)) {
-            $query->where('user_id', auth()->id());
-        }
+        $loans = Loan::with(['user', 'currency', 'package'])
+            ->latest()
+            ->paginate(10);
 
-        $loans = $query->latest()->paginate(10);
-
-        return Inertia::render(
-            $this->hasLevel(AccessLevel::MANAGE) ? 'loans/admin/index' : 'loans/user/index',
-            ['loans' => $loans]
-        );
+        return Inertia::render('loans/admin/index', [
+            'loans' => $loans
+        ]);
     }
 
     /**
@@ -90,7 +61,7 @@ class LoanController extends Controller
      */
     public function userLoans()
     {
-        $loans = Loan::with(['user', 'currency', 'package'])
+        $loans = Loan::with(['user', 'currency', 'package', 'customPackage'])
             ->where('user_id', auth()->id())
             ->latest()
             ->paginate(10);
@@ -110,6 +81,7 @@ class LoanController extends Controller
             'users' => \Modules\User\Models\User::select('id', 'first_name', 'last_name', 'email')->get(),
             'currencies' => Currency::select('id', 'code', 'symbol')->get(),
             'packages' => LoanPackage::select('id', 'name')->get(),
+            'customPackages' => \App\Models\CustomPackage::select('id', 'name')->get(),
         ]);
     }
 
@@ -127,18 +99,73 @@ class LoanController extends Controller
             ], 403);
         }
 
-        $validated = $this->validateLoanData($request);
+        $validated = $request->validate([
+            'package_id' => 'nullable|exists:loan_packages,id',
+            'amount' => 'required|numeric|min:0',
+            'currency_id' => 'required|exists:currencies,id',
+            'interest_rate' => 'required|numeric|min:0',
+            'interest_type' => 'required|in:simple,compound',
+            'interest_calculation' => 'required|in:daily,weekly,monthly,yearly',
+            'interest_payment_frequency' => 'required|in:daily,weekly,biweekly,monthly,quarterly,yearly,end_of_term',
+            'duration_days' => 'required|integer|min:1',
+            'purpose' => 'nullable|string',
+        ]);
+
+        // Get the loan package if package_id is provided
+        $package = null;
+        if ($validated['package_id']) {
+            $package = LoanPackage::findOrFail($validated['package_id']);
+        }
+
+        // Add user_id from authenticated user
         $validated['user_id'] = auth()->id();
         $validated['reference_number'] = 'LOAN-' . strtoupper(Str::random(8));
         $validated['status'] = 'pending';
         $validated['submitted_at'] = now();
 
-        // Handle package-specific fields
-        if ($validated['package_id']) {
-            $validated = $this->handlePackageFields($validated);
+        // Add package-specific fields if package exists
+        if ($package) {
+            // Origination fee
+            $validated['origination_fee_amount'] = $package->origination_fee_type === 'fixed' 
+                ? $package->origination_fee_fixed 
+                : ($validated['amount'] * $package->origination_fee_percentage / 100);
+
+            // Late payment fee
+            if ($package->late_payment_fee_type === 'fixed') {
+                $validated['late_payment_fee_fixed'] = $package->late_payment_fee_fixed;
+                $validated['late_payment_fee_percentage'] = 0;
+            } else {
+                $validated['late_payment_fee_fixed'] = 0;
+                $validated['late_payment_fee_percentage'] = $package->late_payment_fee_percentage;
+            }
+
+            // Grace period
+            $validated['grace_period_days'] = $package->grace_period_days;
+
+            // Early repayment settings
+            $validated['allows_early_repayment'] = $package->allows_early_repayment;
+            if ($package->allows_early_repayment) {
+                if ($package->early_repayment_type === 'fixed') {
+                    $validated['early_repayment_fixed_fee'] = $package->early_repayment_fee_fixed;
+                    $validated['early_repayment_fee_percentage'] = 0;
+                } else {
+                    $validated['early_repayment_fixed_fee'] = 0;
+                    $validated['early_repayment_fee_percentage'] = $package->early_repayment_fee_percentage;
+                }
+                $validated['early_repayment_period_days'] = $package->early_repayment_period_days;
+            } else {
+                $validated['early_repayment_fixed_fee'] = 0;
+                $validated['early_repayment_fee_percentage'] = 0;
+                $validated['early_repayment_period_days'] = 0;
+            }
+
+            // Set has_early_repayment to false initially
+            $validated['has_early_repayment'] = false;
         }
 
         $loan = Loan::create($validated);
+
+        // Dispatch the LoanCreated event
         event(new LoanCreated($loan));
 
         return redirect()->route('user-loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
@@ -151,12 +178,24 @@ class LoanController extends Controller
     public function show(Loan $loan)
     {
         $this->authorizeLevel(AccessLevel::USER, $loan);
-        $loan->load($this->getCommonRelations());
+
+        $loan->load([
+            'user',
+            'currency',
+            'approved_by_user:id,first_name,last_name,email',
+            'documents' => function ($query) {
+                $query->with('uploadedBy')
+                      ->orderBy('created_at', 'desc');
+            },
+            'notes' => function ($query) {
+                $query->with(['createdBy', 'updatedBy'])
+                      ->orderBy('created_at', 'desc');
+            },
+        ]);
         
-        return Inertia::render(
-            $this->hasLevel(AccessLevel::MANAGE) ? 'loans/admin/show' : 'loans/user/show',
-            ['loan' => $loan]
-        );
+        return Inertia::render('loans/admin/show', [
+            'loan' => $loan,
+        ]);
     }
 
     /**
@@ -181,11 +220,34 @@ class LoanController extends Controller
     public function update(Request $request, Loan $loan)
     {
         $this->authorizeLevel(AccessLevel::USER, $loan);
-        $validated = $this->validateLoanData($request, true);
-        
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'package_id' => 'nullable|exists:loan_packages,id',
+            'amount' => 'required|numeric|min:0',
+            'currency_id' => 'required|exists:currencies,id',
+            'interest_rate' => 'required|numeric|min:0',
+            'interest_type' => 'required|in:simple,compound',
+            'interest_calculation' => 'required|in:daily,weekly,monthly,yearly',
+            'interest_payment_frequency' => 'required|in:daily,weekly,biweekly,monthly,quarterly,yearly,end_of_term',
+            'duration_days' => 'required|integer|min:1',
+            'purpose' => 'nullable|string',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after:start_date',
+            'status' => 'required|in:pending,approved,rejected,active,in_arrears,defaulted,paid,cancelled',
+        ]);
+
         $loan->update($validated);
 
-        $this->logLoanActivity($loan, 'updated');
+        // Add Activity
+        activity()
+        ->withProperties([
+            'loan_id' => $loan->id,
+            'user_id' => auth()->id(),
+            'affected_user_id' => $validated['user_id'],
+            'affected_user_name' => User::find($validated['user_id'])->first_name . ' ' . User::find($validated['user_id'])->last_name
+        ])
+        ->log('Loan [' . $loan->reference_number . '] status updated to ' . strtoupper($validated['status']));
 
         return redirect()->route('loans.show', ['tenant' => tenant('id'), 'loan' => $loan])
             ->with('success', 'Loan updated successfully.');
@@ -196,7 +258,7 @@ class LoanController extends Controller
      */
     public function destroy(Loan $loan)
     {
-        $this->authorizeLevel(AccessLevel::MANAGE);
+        
         $loan->delete();
 
         return redirect()->route('loans.index', ['tenant' => tenant('id')])
@@ -208,7 +270,7 @@ class LoanController extends Controller
      */
     public function getAllLoans()
     {
-        $loans = Loan::with(['user', 'currency', 'package'])
+        $loans = Loan::with(['user', 'currency', 'package', 'customPackage'])
             ->get();
 
         return response()->json($loans);
@@ -220,9 +282,12 @@ class LoanController extends Controller
     public function export(Request $request)
     {
         $format = $request->input('format', 'csv');
-        $loans = Loan::with($this->getCommonRelations())->get();
+        $loans = Loan::with(['user', 'currency', 'package', 'customPackage'])
+            ->get();
 
+        // Handle export based on format
         if ($format === 'csv') {
+            // Implement CSV export
             return response()->streamDownload(function () use ($loans) {
                 $file = fopen('php://output', 'w');
                 fputcsv($file, ['ID', 'Reference', 'Amount', 'Currency', 'Status', 'Created At']);
@@ -568,19 +633,98 @@ class LoanController extends Controller
     public function updateStatus(Request $request, Loan $loan)
     {
         $this->authorizeLevel(AccessLevel::MANAGE);
-        $validated = $this->validateStatusUpdate($request);
-        
-        $oldStatus = $loan->status;
-        $newStatus = $validated['status'];
 
-        DB::transaction(function () use ($loan, $validated, $newStatus) {
-            $this->updateLoanStatus($loan, $validated, $newStatus);
-        });
-
-        $this->logLoanActivity($loan, 'status updated', [
-            'old_status' => $oldStatus,
-            'new_status' => $newStatus
+        $request->validate([
+            'status' => ['required', 'string', Rule::in([
+                'pending',
+                'approved',
+                'rejected',
+                'active',
+                'in_arrears',
+                'defaulted',
+                'paid',
+                'cancelled'
+            ])],
+            'approval_notes' => ['nullable', 'string', 'required_if:status,approved'],
+            'rejection_reason' => ['nullable', 'string', 'required_if:status,rejected'],
+            // 'payment_method_id' => ['nullable', 'exists:payment_methods,id', 'required_if:status,active'],
+            'disbursement_transaction_id' => ['nullable', 'string', 'required_if:status,active'],
+            'start_date' => ['nullable', 'date', 'required_if:status,active'],
+            'end_date' => ['nullable', 'date', 'after:start_date', 'required_if:status,active'],
         ]);
+
+        $oldStatus = $loan->status;
+        $newStatus = $request->status;
+
+        // Update the status
+        $loan->status = $newStatus;
+
+        // Update the corresponding timestamp and related information
+        switch ($newStatus) {
+            case 'approved':
+                $loan->approved_at = now();
+                $loan->approved_by = auth()->id();
+                $loan->approval_notes = $request->approval_notes;
+                // Dispatch loan approved event
+                event(new LoanApproved($loan));
+                break;
+            case 'rejected':
+                $loan->rejected_at = now();
+                $loan->rejection_reason = $request->rejection_reason;
+                break;
+            case 'active':
+                $loan->start_date = $request->start_date;
+                $loan->end_date = $request->end_date;
+                // $loan->payment_method_id = $request->payment_method_id;
+                $loan->disbursement_transaction_id = $request->disbursement_transaction_id;
+                // Set current_balance equal to amount when loan is activated
+                $loan->current_balance = $loan->amount;
+
+                // Create transaction record for loan disbursement
+                // $transaction = Transaction::create([
+                //     'reference_number' => 'TRX-' . strtoupper(uniqid()),
+                //     'user_id' => $loan->user_id,
+                //     'transaction_type' => 'loan_disbursement',
+                //     'amount' => $loan->amount,
+                //     'currency_id' => $loan->currency_id,
+                //     'status' => 'completed',
+                //     'payment_method_id' => $request->payment_method_id,
+                //     'loan_id' => $loan->id,
+                // ]);
+
+                // Dispatch loan activated event
+                event(new LoanActivated($loan));
+
+                break;
+            case 'defaulted':
+                $loan->defaulted_at = now();
+                break;
+            case 'paid':
+                $loan->paid_at = now();
+                // Dispatch loan paid event
+                event(new \App\Events\LoanPaid($loan));
+                break;
+            case 'cancelled':
+                $loan->rejected_at = now();
+                break;
+        }
+
+        $loan->save();
+
+        // Log the status change
+        activity()
+            ->performedOn($loan)
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'approval_notes' => $request->approval_notes,
+                'rejection_reason' => $request->rejection_reason,
+                'start_date' => $request->start_date,
+                'end_date' => $request->end_date,
+                'disbursement_transaction_id' => $request->disbursement_transaction_id,
+            ])
+            ->log('Loan [' . $loan->reference_number . '] status updated');
 
         return back()->with('success', 'Loan status updated successfully');
     }
@@ -775,130 +919,5 @@ class LoanController extends Controller
 
         return redirect()->route('user-loans', ['tenant' => tenant('id')])
             ->with('success', 'Loan application cancelled successfully.');
-    }
-
-    /**
-     * Private helper methods
-     */
-    private function validateLoanData(Request $request, $isUpdate = false)
-    {
-        $rules = [
-            'package_id' => 'nullable|exists:loan_packages,id',
-            'amount' => 'required|numeric|min:0',
-            'currency_id' => 'required|exists:currencies,id',
-            'interest_rate' => 'required|numeric|min:0',
-            'interest_type' => 'required|in:simple,compound',
-            'interest_calculation' => 'required|in:daily,weekly,monthly,yearly',
-            'interest_payment_frequency' => 'required|in:daily,weekly,biweekly,monthly,quarterly,yearly,end_of_term',
-            'duration_days' => 'required|integer|min:1',
-            'purpose' => 'nullable|string',
-        ];
-
-        if ($isUpdate) {
-            $rules = array_merge($rules, [
-                'user_id' => 'required|exists:users,id',
-                'start_date' => 'required|date',
-                'end_date' => 'required|date|after:start_date',
-                'status' => ['required', 'string', Rule::in([
-                    'pending', 'approved', 'rejected', 'active',
-                    'in_arrears', 'defaulted', 'paid', 'cancelled'
-                ])],
-            ]);
-        }
-
-        return $request->validate($rules);
-    }
-
-    private function validateStatusUpdate(Request $request)
-    {
-        return $request->validate([
-            'status' => ['required', 'string', Rule::in([
-                'pending', 'approved', 'rejected', 'active',
-                'in_arrears', 'defaulted', 'paid', 'cancelled'
-            ])],
-            'approval_notes' => ['nullable', 'string', 'required_if:status,approved'],
-            'rejection_reason' => ['nullable', 'string', 'required_if:status,rejected'],
-            'disbursement_transaction_id' => ['nullable', 'string', 'required_if:status,active'],
-            'start_date' => ['nullable', 'date', 'required_if:status,active'],
-            'end_date' => ['nullable', 'date', 'after:start_date', 'required_if:status,active'],
-        ]);
-    }
-
-    private function handlePackageFields($validated)
-    {
-        $package = LoanPackage::findOrFail($validated['package_id']);
-
-        // Origination fee
-        $validated['origination_fee_amount'] = $package->origination_fee_type === 'fixed' 
-            ? $package->origination_fee_fixed 
-            : ($validated['amount'] * $package->origination_fee_percentage / 100);
-
-        // Late payment fee
-        $validated['late_payment_fee_fixed'] = $package->late_payment_fee_type === 'fixed' ? $package->late_payment_fee_fixed : 0;
-        $validated['late_payment_fee_percentage'] = $package->late_payment_fee_type === 'percentage' ? $package->late_payment_fee_percentage : 0;
-
-        // Grace period
-        $validated['grace_period_days'] = $package->grace_period_days;
-
-        // Early repayment settings
-        $validated['allows_early_repayment'] = $package->allows_early_repayment;
-        if ($package->allows_early_repayment) {
-            $validated['early_repayment_fixed_fee'] = $package->early_repayment_type === 'fixed' ? $package->early_repayment_fee_fixed : 0;
-            $validated['early_repayment_fee_percentage'] = $package->early_repayment_type === 'percentage' ? $package->early_repayment_fee_percentage : 0;
-            $validated['early_repayment_period_days'] = $package->early_repayment_period_days;
-        } else {
-            $validated['early_repayment_fixed_fee'] = 0;
-            $validated['early_repayment_fee_percentage'] = 0;
-            $validated['early_repayment_period_days'] = 0;
-        }
-
-        $validated['has_early_repayment'] = false;
-        return $validated;
-    }
-
-    private function updateLoanStatus($loan, $validated, $newStatus)
-    {
-        $loan->status = $newStatus;
-
-        switch ($newStatus) {
-            case 'approved':
-                $loan->approved_at = now();
-                $loan->approved_by = auth()->id();
-                $loan->approval_notes = $validated['approval_notes'];
-                event(new LoanApproved($loan));
-                break;
-            case 'rejected':
-                $loan->rejected_at = now();
-                $loan->rejection_reason = $validated['rejection_reason'];
-                break;
-            case 'active':
-                $loan->start_date = $validated['start_date'];
-                $loan->end_date = $validated['end_date'];
-                $loan->disbursement_transaction_id = $validated['disbursement_transaction_id'];
-                $loan->current_balance = $loan->amount;
-                event(new LoanActivated($loan));
-                break;
-            case 'defaulted':
-                $loan->defaulted_at = now();
-                break;
-            case 'paid':
-                $loan->paid_at = now();
-                event(new \App\Events\LoanPaid($loan));
-                break;
-            case 'cancelled':
-                $loan->rejected_at = now();
-                break;
-        }
-
-        $loan->save();
-    }
-
-    private function logLoanActivity($loan, $action, $properties = [])
-    {
-        activity()
-            ->performedOn($loan)
-            ->causedBy(auth()->user())
-            ->withProperties($properties)
-            ->log('Loan [' . $loan->reference_number . '] ' . $action);
     }
 }

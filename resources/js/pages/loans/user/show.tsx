@@ -166,7 +166,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function UserShow({ loan, payment_methods }: Props) {
+export default function Show({ loan, payment_methods }: Props) {
     const tenantRouter = useTenantRouter();
 
     const { data: documentData, setData: setDocumentData, post: postDocument, processing: documentProcessing } = useForm({

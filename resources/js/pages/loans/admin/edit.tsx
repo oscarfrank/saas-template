@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EditForm } from './components/edit-form';
+import { EditForm } from '../components/edit-form';
 import { CheckCircle, XCircle, DollarSign, PlayCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';

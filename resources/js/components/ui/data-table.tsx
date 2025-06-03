@@ -23,7 +23,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
     ArrowUpDown, 
     ChevronLeft, 
@@ -157,6 +157,14 @@ export function DataTable<TData extends Record<string, any>, TValue>({
     onPrint,
     onExport,
 }: DataTableProps<TData, TValue>) {
+    console.log('DataTable render', { 
+        tableName, 
+        dataLength: data.length,
+        pagination,
+        isLoading,
+        error
+    });
+
     const [sorting, setSorting] = useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
     const [globalFilter, setGlobalFilter] = useState("");
@@ -167,65 +175,117 @@ export function DataTable<TData extends Record<string, any>, TValue>({
     const [filters, setFilters] = useState<Filter[]>([]);
     const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const isInitialMount = useRef(true);
+    const prevGlobalFilter = useRef(globalFilter);
 
-    // Reset row selection when resetSelection prop changes
+    // Sync globalFilter with URL search parameter
     useEffect(() => {
-        if (resetSelection) {
-            setRowSelection({});
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchValue = urlParams.get('search');
+        if (searchValue !== null && searchValue !== globalFilter) {
+            setGlobalFilter(searchValue);
         }
-    }, [resetSelection]);
+    }, [window.location.search]);
+
+    // Memoize the table state
+    const tableState = useMemo(() => ({
+        sorting,
+        columnFilters,
+        globalFilter,
+        columnVisibility,
+        rowSelection,
+        pagination: {
+            pageIndex: (pagination?.current_page ?? 1) - 1,
+            pageSize: pagination?.per_page ?? 10,
+        },
+    }), [sorting, columnFilters, globalFilter, columnVisibility, rowSelection, pagination]);
+
+    // Memoize handlers
+    const handleSortingChange = useCallback((updater: any) => {
+        console.log('Sorting changed', { updater });
+        setSorting(updater);
+    }, []);
+
+    const handleColumnFiltersChange = useCallback((updater: any) => {
+        console.log('Column filters changed', { updater });
+        setColumnFilters(updater);
+    }, []);
+
+    const handleColumnVisibilityChange = useCallback((updater: any) => {
+        console.log('Column visibility changed', { updater });
+        setColumnVisibility(updater);
+    }, []);
+
+    const handleRowSelectionChange = useCallback((updater: any) => {
+        console.log('Row selection changed', { updater });
+        setRowSelection(updater);
+    }, []);
+
+    const handleGlobalFilterChange = useCallback((value: string) => {
+        console.log('Global filter changed', { value, currentFilter: globalFilter });
+        // Only update if the value is different and not just whitespace
+        if (value !== globalFilter && (value.trim() || globalFilter.trim())) {
+            prevGlobalFilter.current = globalFilter;
+            setGlobalFilter(value);
+        }
+    }, [globalFilter]);
 
     // Handle search changes
     useEffect(() => {
-        if (globalFilter === undefined) return;
+        if (globalFilter === undefined || !onSearchChange) return;
+        
+        // Skip the initial empty search
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        
+        // Don't trigger search for empty strings
+        if (!globalFilter.trim()) return;
+        
+        // Don't trigger if the value hasn't changed
+        if (globalFilter === prevGlobalFilter.current) return;
+        
+        console.log('Search effect triggered', { globalFilter });
         
         const timeout = setTimeout(() => {
-            if (onSearchChange) {
-                onSearchChange(globalFilter);
-            }
+            onSearchChange(globalFilter);
         }, 500);
         return () => clearTimeout(timeout);
-    }, [globalFilter]);
+    }, [globalFilter, onSearchChange]);
 
     // Handle sort changes
     useEffect(() => {
-        if (sorting.length === 0) return;
+        if (sorting.length === 0 || !onSortChange) return;
         
-        if (onSortChange) {
+        // Skip the initial empty sort
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        
+        console.log('Sort effect triggered', { sorting });
+        
+        const timeout = setTimeout(() => {
             onSortChange(sorting[0].id, sorting[0].desc ? 'desc' : 'asc');
-        }
-    }, [sorting]);
+        }, 100);
+        return () => clearTimeout(timeout);
+    }, [sorting, onSortChange]);
 
-    // Focus search input after data updates
-    useEffect(() => {
-        if (searchInputRef.current) {
-            searchInputRef.current.focus();
-        }
-    }, [data]);
-
+    // Create the table instance
     const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
-        onSortingChange: setSorting,
+        onSortingChange: handleSortingChange,
         getSortedRowModel: getSortedRowModel(),
-        onColumnFiltersChange: setColumnFilters,
+        onColumnFiltersChange: handleColumnFiltersChange,
         getFilteredRowModel: getFilteredRowModel(),
-        onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: setRowSelection,
-        state: {
-            sorting,
-            columnFilters,
-            globalFilter,
-            columnVisibility,
-            rowSelection,
-            pagination: {
-                pageIndex: (pagination?.current_page ?? 1) - 1,
-                pageSize: pagination?.per_page ?? 10,
-            },
-        },
-        onGlobalFilterChange: setGlobalFilter,
+        onColumnVisibilityChange: handleColumnVisibilityChange,
+        onRowSelectionChange: handleRowSelectionChange,
+        state: tableState,
+        onGlobalFilterChange: handleGlobalFilterChange,
         globalFilterFn: (row, columnId, filterValue) => {
             const searchableColumns = searchColumns;
             const value = String(row.getValue(columnId)).toLowerCase();

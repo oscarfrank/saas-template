@@ -27,7 +27,16 @@ interface Props {
 
 export default function Index({ products, pagination }: Props) {
     const tenantRouter = useTenantRouter();
-    const tableConfig = createProductsTableConfig(products, pagination);
+    
+    // Create table config with preserveState option
+    const tableConfig = {
+        ...createProductsTableConfig(products, pagination),
+        api: {
+            ...createProductsTableConfig(products, pagination).api,
+            baseUrl: window.location.pathname,
+            preserveState: ['notifications', 'tenant', 'preferences']
+        }
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>

@@ -1,6 +1,6 @@
 import { DataTable } from './data-table';
 import { type ColumnDef, Row } from '@tanstack/react-table';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { router, Link } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
@@ -121,14 +121,60 @@ export function UltimateTable<TData extends Record<string, any>>({
 }: {
     config: TableConfig<TData>;
 }) {
+    console.log('UltimateTable render', { 
+        configName: config.name,
+        dataLength: config.data.length,
+        pagination: config.pagination
+    });
+
     const tenantRouter = useTenantRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [key, setKey] = useState(0);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<TData | null>(null);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [selectedItems, setSelectedItems] = useState<TData[]>([]);
+    const [lastSearch, setLastSearch] = useState<string>('');
+    const [lastSort, setLastSort] = useState<{id: string, direction: 'asc' | 'desc'} | null>(null);
+    const [lastPage, setLastPage] = useState<number>(config.pagination?.current_page ?? 1);
+    const [lastPerPage, setLastPerPage] = useState<number>(config.pagination?.per_page ?? 10);
+    const isInitialMount = useRef(true);
+    const prevState = useRef({
+        lastSearch,
+        lastSort,
+        lastPage,
+        lastPerPage
+    });
+
+    // Memoize the table state
+    const tableState = useMemo(() => ({
+        isLoading,
+        error,
+        lastSearch,
+        lastSort,
+        lastPage,
+        lastPerPage
+    }), [isLoading, error, lastSearch, lastSort, lastPage, lastPerPage]);
+
+    // Add effect to track state changes
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            prevState.current = tableState;
+            return;
+        }
+
+        // Only log if state actually changed
+        if (
+            prevState.current.lastSearch !== lastSearch ||
+            prevState.current.lastSort !== lastSort ||
+            prevState.current.lastPage !== lastPage ||
+            prevState.current.lastPerPage !== lastPerPage
+        ) {
+            console.log('UltimateTable state changed', tableState);
+            prevState.current = tableState;
+        }
+    }, [tableState, lastSearch, lastSort, lastPage, lastPerPage]);
 
     const handleDelete = useCallback((item: TData) => {
         setSelectedItem(item);
@@ -149,7 +195,6 @@ export function UltimateTable<TData extends Record<string, any>>({
             setIsDeleteDialogOpen(false);
             setSelectedItem(null);
             
-            // Reload the data
             router.reload({
                 only: [config.name.toLowerCase(), 'pagination'],
                 onSuccess: () => {
@@ -212,20 +257,24 @@ export function UltimateTable<TData extends Record<string, any>>({
     }, [selectedItems, config]);
 
     const handlePageChange = useCallback((page: number) => {
-        if (!config.api?.baseUrl) return;
-
-        console.log('handlePageChange is called');
+        console.log('handlePageChange called', { page, lastPage });
+        if (!config.api?.baseUrl || page === lastPage) return;
         
-        setIsLoading(true);
-        setError(null);
-        const params = new URLSearchParams(window.location.search);
-        params.set(config.api.pageParam || 'page', page.toString());
+        // Batch state updates
+        Promise.resolve().then(() => {
+            setIsLoading(true);
+            setError(null);
+            setLastPage(page);
+        });
         
-        router.get(config.api.baseUrl + '?' + params.toString(), {}, { 
+        router.visit(window.location.pathname, {
+            only: [config.name.toLowerCase(), 'pagination'],
             preserveState: true,
             preserveScroll: true,
-            only: [config.name.toLowerCase(), 'pagination'],
-            replace: true,
+            data: {
+                [config.api.pageParam || 'page']: page,
+                [config.api.perPageParam || 'per_page']: lastPerPage
+            },
             onSuccess: () => {
                 setIsLoading(false);
             },
@@ -234,20 +283,30 @@ export function UltimateTable<TData extends Record<string, any>>({
                 setError('Failed to load data. Please try again.');
             }
         });
-    }, [config.api]);
+    }, [config.api, config.name, lastPage, lastPerPage]);
 
     const handleSortChange = useCallback((sort: string, direction: 'asc' | 'desc') => {
+        console.log('handleSortChange called', { sort, direction, lastSort });
         if (!config.api?.baseUrl) return;
         
-        setIsLoading(true);
-        setError(null);
-        router.get(config.api.baseUrl, { 
-            [config.api.sortParam || 'sort']: sort, 
-            [config.api.directionParam || 'direction']: direction 
-        }, { 
+        if (lastSort && lastSort.id === sort && lastSort.direction === direction) return;
+        
+        // Batch state updates
+        Promise.resolve().then(() => {
+            setIsLoading(true);
+            setError(null);
+            setLastSort({ id: sort, direction });
+        });
+        
+        router.visit(window.location.pathname, {
+            only: [config.name.toLowerCase(), 'pagination'],
             preserveState: true,
             preserveScroll: true,
-            only: [config.name.toLowerCase(), 'pagination'],
+            data: {
+                [config.api.sortParam || 'sort']: sort,
+                [config.api.directionParam || 'direction']: direction,
+                [config.api.perPageParam || 'per_page']: lastPerPage
+            },
             onSuccess: () => {
                 setIsLoading(false);
             },
@@ -256,56 +315,41 @@ export function UltimateTable<TData extends Record<string, any>>({
                 setError('Failed to load data. Please try again.');
             }
         });
-    }, [config.api]);
+    }, [config.api, config.name, lastSort, lastPerPage]);
 
     const handleSearchChange = useCallback((search: string) => {
+        console.log('handleSearchChange called', { search, lastSearch });
         if (!config.api?.baseUrl) return;
         
-        setIsLoading(true);
-        setError(null);
+        // Batch state updates
+        Promise.resolve().then(() => {
+            setIsLoading(true);
+            setError(null);
+            setLastSearch(search);
+        });
         
-        if (search.trim()) {
-            router.get(config.api.baseUrl, { 
-                [config.api.searchParam || 'search']: search 
-            }, { 
-                preserveState: true,
-                preserveScroll: true,
-                only: [config.name.toLowerCase(), 'pagination'],
-                onSuccess: () => {
-                    setIsLoading(false);
-                },
-                onError: (errors) => {
-                    setIsLoading(false);
-                    setError('Failed to load data. Please try again.');
-                }
-            });
-        } else {
-            router.get(config.api.baseUrl, {}, { 
-                preserveState: true,
-                preserveScroll: true,
-                only: [config.name.toLowerCase(), 'pagination'],
-                onSuccess: () => {
-                    setIsLoading(false);
-                },
-                onError: (errors) => {
-                    setIsLoading(false);
-                    setError('Failed to load data. Please try again.');
-                }
-            });
+        // Create query params object with all current URL params
+        const currentParams = new URLSearchParams(window.location.search);
+        const queryParams: Record<string, string> = {};
+        const searchParam = config.api.searchParam || 'search';
+        
+        // Preserve existing params except search
+        currentParams.forEach((value, key) => {
+            if (key !== searchParam) {
+                queryParams[key] = value;
+            }
+        });
+        
+        // Add search param if there's a value
+        if (search) {
+            queryParams[searchParam] = search;
         }
-    }, [config.api]);
-
-    const handlePerPageChange = useCallback((perPage: number) => {
-        if (!config.api?.baseUrl) return;
         
-        setIsLoading(true);
-        setError(null);
-        router.get(config.api.baseUrl, { 
-            [config.api.perPageParam || 'per_page']: perPage 
-        }, { 
+        router.visit(window.location.pathname, {
+            only: [config.name.toLowerCase(), 'pagination'],
             preserveState: true,
             preserveScroll: true,
-            only: [config.name.toLowerCase(), 'pagination'],
+            data: queryParams,
             onSuccess: () => {
                 setIsLoading(false);
             },
@@ -314,10 +358,51 @@ export function UltimateTable<TData extends Record<string, any>>({
                 setError('Failed to load data. Please try again.');
             }
         });
-    }, [config.api]);
+    }, [config.api, config.name]);
 
-    // Transform configured columns into Tanstack Table columns
-    const columns: ColumnDef<TData>[] = [
+    // Handle search input changes
+    const handleGlobalFilterChange = useCallback((value: string) => {
+        if (!config.api?.baseUrl) return;
+        
+        // Only update if the value is different
+        if (value !== lastSearch) {
+            handleSearchChange(value);
+        }
+    }, [config.api, lastSearch, handleSearchChange]);
+
+    const handlePerPageChange = useCallback((perPage: number) => {
+        console.log('handlePerPageChange called', { perPage, lastPerPage });
+        if (!config.api?.baseUrl || perPage === lastPerPage) return;
+        
+        // Batch state updates
+        Promise.resolve().then(() => {
+            setIsLoading(true);
+            setError(null);
+            setLastPerPage(perPage);
+            setLastPage(1); // Reset to first page when changing page size
+        });
+        
+        router.visit(window.location.pathname, {
+            only: [config.name.toLowerCase(), 'pagination'],
+            preserveState: true,
+            preserveScroll: true,
+            data: {
+                [config.api.perPageParam || 'per_page']: perPage,
+                [config.api.pageParam || 'page']: 1, // Always go to first page when changing page size
+                ...(lastSearch ? { [config.api.searchParam || 'search']: lastSearch } : {})
+            },
+            onSuccess: () => {
+                setIsLoading(false);
+            },
+            onError: (errors) => {
+                setIsLoading(false);
+                setError('Failed to load data. Please try again.');
+            }
+        });
+    }, [config.api, config.name, lastPerPage, lastSearch]);
+
+    // Memoize columns to prevent unnecessary re-renders
+    const columns = useMemo(() => [
         // Selection column
         ...(config.features?.selection !== false ? [{
             id: "select",
@@ -348,7 +433,6 @@ export function UltimateTable<TData extends Record<string, any>>({
                 enableHiding: column.enableHiding ?? true,
             };
 
-            // If a custom cell renderer is provided, use it
             if (column.cell) {
                 return {
                     ...baseColumn,
@@ -356,7 +440,6 @@ export function UltimateTable<TData extends Record<string, any>>({
                 };
             }
 
-            // Otherwise, use the default cell renderer with link support
             return {
                 ...baseColumn,
                 cell: ({ row }: { row: Row<TData> }): React.ReactNode => {
@@ -380,7 +463,7 @@ export function UltimateTable<TData extends Record<string, any>>({
         {
             id: "actions",
             header: "Actions",
-            cell: ({ row }) => {
+            cell: ({ row }: { row: Row<TData> }) => {
                 const item = row.original;
                 const routeParam = config.routeParam || config.name.toLowerCase().slice(0, -1);
 
@@ -469,54 +552,68 @@ export function UltimateTable<TData extends Record<string, any>>({
                 );
             },
         },
-    ];
+    ], [config, tenantRouter, handleDelete]);
 
-    // Generate print configuration from columns if not provided
-    const printConfig: PrintConfig<TData> = config.printConfig || {
+    // Memoize print configuration
+    const printConfig = useMemo(() => config.printConfig || {
         title: `${config.name} List`,
         columns: columns
             .filter(col => col.id !== 'select' && col.id !== 'actions')
             .map(col => ({
                 header: String(col.header),
                 accessor: col.id || '',
-                format: (value: any) => {
-                    if (col.cell) {
-                        // If there's a custom cell renderer, we'll just convert to string
-                        return String(value);
-                    }
-                    return String(value);
-                }
+                format: (value: any) => String(value)
             }))
-    };
+    }, [config, columns]);
+
+    // Memoize the table configuration
+    const tableConfig = useMemo(() => ({
+        columns,
+        data: config.data,
+        searchPlaceholder: config.searchPlaceholder,
+        searchColumns: config.searchColumns,
+        showSearch: config.features?.search !== false,
+        showExport: config.features?.export !== false,
+        showFilters: config.features?.filters !== false,
+        showPagination: config.features?.pagination !== false,
+        showPrint: config.features?.print !== false,
+        showBulkActions: config.features?.bulkActions !== false,
+        bulkActions: config.bulkActions,
+        onBulkDelete: handleBulkDelete,
+        onBulkArchive: config.onBulkArchive,
+        resetSelection: true,
+        pagination: config.pagination,
+        onPageChange: handlePageChange,
+        onSortChange: handleSortChange,
+        onSearchChange: handleGlobalFilterChange,
+        onPerPageChange: handlePerPageChange,
+        isLoading,
+        error: error ?? undefined,
+        tableName: config.name,
+        printConfig
+    }), [
+        columns,
+        config.data,
+        config.searchPlaceholder,
+        config.searchColumns,
+        config.features,
+        config.bulkActions,
+        config.onBulkArchive,
+        config.pagination,
+        config.name,
+        handleBulkDelete,
+        handlePageChange,
+        handleSortChange,
+        handleGlobalFilterChange,
+        handlePerPageChange,
+        isLoading,
+        error,
+        printConfig
+    ]);
 
     return (
         <>
-            <DataTable
-                key={key}
-                columns={columns}
-                data={config.data}
-                searchPlaceholder={config.searchPlaceholder}
-                searchColumns={config.searchColumns}
-                showSearch={config.features?.search !== false}
-                showExport={config.features?.export !== false}
-                showFilters={config.features?.filters !== false}
-                showPagination={config.features?.pagination !== false}
-                showPrint={config.features?.print !== false}
-                showBulkActions={config.features?.bulkActions !== false}
-                bulkActions={config.bulkActions}
-                onBulkDelete={handleBulkDelete}
-                onBulkArchive={config.onBulkArchive}
-                resetSelection={true}
-                pagination={config.pagination}
-                onPageChange={handlePageChange}
-                onSortChange={handleSortChange}
-                onSearchChange={handleSearchChange}
-                onPerPageChange={handlePerPageChange}
-                isLoading={isLoading}
-                error={error ?? undefined}
-                tableName={config.name}
-                printConfig={printConfig}
-            />
+            <DataTable {...tableConfig} />
 
             <CustomAlertDialog
                 isOpen={isDeleteDialogOpen}

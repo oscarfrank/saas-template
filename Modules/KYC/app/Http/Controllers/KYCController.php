@@ -187,6 +187,7 @@ class KYCController extends Controller
      */
     public function update(Request $request, KycVerification $kycVerification)
     {
+
         $request->validate([
             'status' => 'required|in:pending,approved,rejected',
             'rejection_reason' => 'required_if:status,rejected|nullable|string|max:255',
@@ -216,6 +217,7 @@ class KYCController extends Controller
      */
     public function destroy(KycVerification $kycVerification)
     {
+
         //
     }
 }

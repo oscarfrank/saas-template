@@ -97,7 +97,7 @@ export function EditForm({ entity, onSubmit, processing, errors, fields, entityN
         
         if (entity) {
             formData.append('_method', 'PUT');
-            put(tenantRouter.route('loans.update', { id: entity.id }), {
+            put(tenantRouter.route('loans.update', { loan: entity.id }), {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`${entityName} updated successfully`);

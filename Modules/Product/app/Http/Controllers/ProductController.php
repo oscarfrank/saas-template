@@ -182,6 +182,7 @@ class ProductController extends Controller
      */
     public function getAllProducts()
     {
+        
         \Log::info('getAllProducts method called');
         $products = Product::all()->map(function ($product) {
             if ($product->featured_image) {

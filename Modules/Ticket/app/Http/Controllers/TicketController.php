@@ -77,6 +77,7 @@ class TicketController extends Controller
 
     public function show(Ticket $ticket)
     {
+
         // $this->authorize('view', $ticket);
         $this->authorizeLevel(AccessLevel::USER, $ticket);
 
@@ -89,6 +90,7 @@ class TicketController extends Controller
 
     public function edit(Ticket $ticket)
     {
+
         $this->authorizeLevel(AccessLevel::VIEW, $ticket);
 
         return Inertia::render('tickets/edit', [
@@ -98,6 +100,7 @@ class TicketController extends Controller
 
     public function update(Request $request, Ticket $ticket)
     {
+
         // $this->authorize('update', $ticket);
         $this->authorizeLevel(AccessLevel::USER, $ticket);
 
@@ -131,6 +134,7 @@ class TicketController extends Controller
 
     public function destroy(Ticket $ticket)
     {
+
         $this->authorizeLevel(AccessLevel::MANAGE);
 
         $ticket->delete();
@@ -229,6 +233,7 @@ class TicketController extends Controller
 
     public function userShow(Ticket $ticket)
     {
+
         $this->authorizeLevel(AccessLevel::USER, $ticket);
 
         $ticket->load(['user', 'assignedTo', 'replies.user']);

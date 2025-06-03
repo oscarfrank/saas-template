@@ -7,13 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
+use App\Traits\TenantAwareModelBinding;
+
+
 use Modules\User\Models\User;
 use Modules\Ticket\Models\TicketReply;
 
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes, BelongsToTenant;
+    use HasFactory, SoftDeletes, BelongsToTenant, TenantAwareModelBinding;
 
     protected $fillable = [
         'user_id',

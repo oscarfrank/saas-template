@@ -94,11 +94,10 @@ interface Props {
     }>;
     currencies: Array<{ id: number; code: string; symbol: string }>;
     packages: Array<{ id: number; name: string }>;
-    customPackages: Array<{ id: number; name: string }>;
     payment_methods: Array<{ id: number; name: string }>;
 }
 
-export default function Edit({ loan, users, currencies, packages, customPackages, payment_methods }: Props) {
+export default function Edit({ loan, users, currencies, packages = [], payment_methods }: Props) {
     const tenantRouter = useTenantRouter();
     const [statusDialogOpen, setStatusDialogOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -269,15 +268,6 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             optionValue: 'id'
         },
         { 
-            name: 'custom_package_id', 
-            type: 'select' as const, 
-            label: 'Custom Package', 
-            required: false,
-            options: customPackages.map(pkg => ({ value: pkg.id.toString(), label: pkg.name })),
-            optionLabel: 'name',
-            optionValue: 'id'
-        },
-        { 
             name: 'amount', 
             type: 'number' as const, 
             label: 'Loan Amount', 
@@ -389,7 +379,7 @@ export default function Edit({ loan, users, currencies, packages, customPackages
             <Head title={`Edit Loan - ${loan.reference_number}`} />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between items-center">
-                    <Link href={route('loans.index')}>
+                    <Link href={tenantRouter.route('loans.index')}>
                         <Button variant="outline" className="cursor-pointer">
                             Cancel
                         </Button>

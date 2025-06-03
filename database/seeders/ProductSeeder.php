@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Product;
+use Modules\Product\Models\Product;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -23,6 +23,7 @@ class ProductSeeder extends Seeder
                 'price' => 199.99,
                 'featured_image' => "images/products/smart-fitness-watch-681587dd9d631.jpg",
                 'featured_image_original_name' => "smart-fitness-watch-681587dd9d631.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Professional Camera Kit",
@@ -30,6 +31,7 @@ class ProductSeeder extends Seeder
                 'price' => 899.99,
                 'featured_image' => "images/products/professional-camera-kit-681587de494d3.jpg",
                 'featured_image_original_name' => "professional-camera-kit-681587de494d3.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Ergonomic Office Chair",
@@ -37,6 +39,7 @@ class ProductSeeder extends Seeder
                 'price' => 249.99,
                 'featured_image' => "images/products/ergonomic-office-chair-681587dee0234.jpg",
                 'featured_image_original_name' => "ergonomic-office-chair-681587dee0234.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Mechanical Gaming Keyboard",
@@ -44,6 +47,7 @@ class ProductSeeder extends Seeder
                 'price' => 89.99,
                 'featured_image' => "images/products/mechanical-gaming-keyboard-681587df951a1.jpg",
                 'featured_image_original_name' => "mechanical-gaming-keyboard-681587df951a1.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "4K Ultra HD Monitor",
@@ -51,6 +55,7 @@ class ProductSeeder extends Seeder
                 'price' => 399.99,
                 'featured_image' => "images/products/4k-ultra-hd-monitor-681587e05809d.jpg",
                 'featured_image_original_name' => "4k-ultra-hd-monitor-681587e05809d.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Wireless Charging Pad",
@@ -58,6 +63,7 @@ class ProductSeeder extends Seeder
                 'price' => 49.99,
                 'featured_image' => "images/products/wireless-charging-pad-681587e0e6970.jpg",
                 'featured_image_original_name' => "wireless-charging-pad-681587e0e6970.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Smart Home Security Camera",
@@ -65,6 +71,7 @@ class ProductSeeder extends Seeder
                 'price' => 79.99,
                 'featured_image' => "images/products/smart-home-security-camera-681587e25349b.jpg",
                 'featured_image_original_name' => "smart-home-security-camera-681587e25349b.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Gaming Mouse",
@@ -72,6 +79,7 @@ class ProductSeeder extends Seeder
                 'price' => 59.99,
                 'featured_image' => "images/products/gaming-mouse-681587e35b86d.jpg",
                 'featured_image_original_name' => "gaming-mouse-681587e35b86d.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "External SSD Drive",
@@ -79,6 +87,7 @@ class ProductSeeder extends Seeder
                 'price' => 149.99,
                 'featured_image' => "images/products/external-ssd-drive-681587e40bf18.jpg",
                 'featured_image_original_name' => "external-ssd-drive-681587e40bf18.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Smart LED Light Bulbs",
@@ -86,6 +95,7 @@ class ProductSeeder extends Seeder
                 'price' => 69.99,
                 'featured_image' => "images/products/smart-led-light-bulbs-681587e48f47f.jpg",
                 'featured_image_original_name' => "smart-led-light-bulbs-681587e48f47f.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Laptop Stand",
@@ -93,6 +103,7 @@ class ProductSeeder extends Seeder
                 'price' => 39.99,
                 'featured_image' => "images/products/laptop-stand-681587e52cd30.jpg",
                 'featured_image_original_name' => "laptop-stand-681587e52cd30.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Noise Cancelling Earbuds",
@@ -100,6 +111,7 @@ class ProductSeeder extends Seeder
                 'price' => 179.99,
                 'featured_image' => "images/products/noise-cancelling-earbuds-681587e5c4bfe.jpg",
                 'featured_image_original_name' => "noise-cancelling-earbuds-681587e5c4bfe.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Smart Door Lock",
@@ -107,6 +119,7 @@ class ProductSeeder extends Seeder
                 'price' => 199.99,
                 'featured_image' => "images/products/smart-door-lock-681587e6d0940.jpg",
                 'featured_image_original_name' => "smart-door-lock-681587e6d0940.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Portable Power Bank",
@@ -114,6 +127,7 @@ class ProductSeeder extends Seeder
                 'price' => 49.99,
                 'featured_image' => "images/products/portable-power-bank-681587e772413.jpg",
                 'featured_image_original_name' => "portable-power-bank-681587e772413.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Wireless Gaming Controller",
@@ -121,6 +135,7 @@ class ProductSeeder extends Seeder
                 'price' => 69.99,
                 'featured_image' => "images/products/wireless-gaming-controller-681587e94801e.jpg",
                 'featured_image_original_name' => "wireless-gaming-controller-681587e94801e.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "USB-C Hub",
@@ -128,6 +143,7 @@ class ProductSeeder extends Seeder
                 'price' => 59.99,
                 'featured_image' => "images/products/usb-c-hub-681587eaeb585.jpg",
                 'featured_image_original_name' => "usb-c-hub-681587eaeb585.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Smart Doorbell",
@@ -135,6 +151,7 @@ class ProductSeeder extends Seeder
                 'price' => 149.99,
                 'featured_image' => "images/products/smart-doorbell-681587eb78ac5.jpg",
                 'featured_image_original_name' => "smart-doorbell-681587eb78ac5.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Wireless Charging Stand",
@@ -142,6 +159,7 @@ class ProductSeeder extends Seeder
                 'price' => 39.99,
                 'featured_image' => "images/products/wireless-charging-stand-681587ec05e19.jpg",
                 'featured_image_original_name' => "wireless-charging-stand-681587ec05e19.jpg",
+                'tenant_id' => "oscarmini",
             ],
             [
                 'name' => "Bluetooth Car Kit",
@@ -149,6 +167,7 @@ class ProductSeeder extends Seeder
                 'price' => 49.99,
                 'featured_image' => "images/products/bluetooth-car-kit-681587ed1299c.jpg",
                 'featured_image_original_name' => "bluetooth-car-kit-681587ed1299c.jpg",
+                'tenant_id' => "oscarmini",
             ],
         ];
 

@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { router } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2 } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, Link } from 'lucide-react';
 import AppLogo from './app-logo';
 import { Button } from '@/components/ui/button';
 import { TeamSwitcher } from '@/components/team-switcher';
@@ -193,6 +193,16 @@ export const AppSidebar = memo(function AppSidebar() {
         <Sidebar collapsible="icon" variant="inset" className="border-r border-border">
             <SidebarHeader className="border-b border-border">
                 <SidebarMenu>
+                    
+                    <SidebarMenuItem>
+                        <SidebarMenuButton size="lg" asChild>
+                            <Link href={route('dashboard', effectiveTenant?.slug)}>
+                                <AppLogo /> LastPass
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+
                     <SidebarMenuItem>
                         <MemoizedTeamSwitcher
                             teams={teams}

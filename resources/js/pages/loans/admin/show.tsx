@@ -242,7 +242,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
 
     const handleAddNote = (e: React.FormEvent) => {
         e.preventDefault();
-        post(tenantRouter.route('loans.notes.add', { id: loan.id }), {
+        post(tenantRouter.route('loans.notes.add', { loan: loan.id }), {
             onSuccess: () => {
                 toast.success('Note added successfully');
                 setData('content', '');

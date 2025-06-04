@@ -223,7 +223,7 @@ export default function Show({ loan, payment_methods }: Props) {
     const handlePaymentSubmit = (formData: FormData, paymentType: 'online' | 'offline') => {
         if (paymentType === 'online') {
             // For online payments, we'll redirect to the payment gateway
-            tenantRouter.post('loans.payments.store', formData, { id: loan.id }, {
+            tenantRouter.post('loans.payments.store', formData, { loan: loan.id }, {
                 onSuccess: () => {
                     toast.success('Payment submitted successfully');
                     setShowPaymentForm(false);
@@ -408,8 +408,7 @@ export default function Show({ loan, payment_methods }: Props) {
             return;
         }
 
-        setPaymentDialogOpen(false);
-        setShowPaymentForm(true);
+        setPaymentDialogOpen(true);
     };
 
     return (

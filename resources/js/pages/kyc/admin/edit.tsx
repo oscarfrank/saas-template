@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { EditForm } from './components/edit-form';
+import { EditForm } from '../components/edit-form';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Calendar } from '@/components/ui/calendar';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { RejectDialog } from './components/reject-dialog';
+import { RejectDialog } from '../components/reject-dialog';
 
 const ID_TYPE_MAP: Record<string, string> = {
     'passport': 'Passport',

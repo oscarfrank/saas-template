@@ -56,7 +56,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Transa
             const transaction = row.original;
             return (
                 <Link 
-                    href={route('transactions.show', transaction.id)}
+                    href={route('transactions.show', { transaction: transaction.id })}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("reference_number")}
@@ -153,7 +153,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Transa
 
             return (
                 <div className="flex items-center gap-2">
-                    <Link href={route('transactions.show', transaction.id)}>
+                    <Link href={route('transactions.show', { transaction: transaction.id })}>
                         <Button variant="outline" size="icon" className="cursor-pointer">
                             <Eye className="h-4 w-4" />
                         </Button>

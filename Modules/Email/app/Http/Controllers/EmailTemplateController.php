@@ -17,7 +17,7 @@ class EmailTemplateController extends Controller
         $types = EmailTemplate::getTypes();
         $placeholders = EmailTemplate::getDefaultPlaceholders();
 
-        return Inertia::render('emails/index', [
+        return Inertia::render('emails/admin/index', [
             'templates' => $templates,
             'types' => $types,
             'placeholders' => $placeholders,
@@ -32,7 +32,7 @@ class EmailTemplateController extends Controller
         $types = EmailTemplate::getTypes();
         $placeholders = EmailTemplate::getDefaultPlaceholders();
 
-        return Inertia::render('emails/create', [
+        return Inertia::render('emails/admin/create', [
             'types' => $types,
             'placeholders' => $placeholders,
         ]);
@@ -74,7 +74,7 @@ class EmailTemplateController extends Controller
         $types = EmailTemplate::getTypes();
         $placeholders = EmailTemplate::getDefaultPlaceholders();
 
-        return Inertia::render('emails/edit', [
+        return Inertia::render('emails/admin/edit', [
             'template' => $emailTemplate,
             'types' => $types,
             'placeholders' => $placeholders,

@@ -4,6 +4,11 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\TenantController;
 
+
+Route::get('/taiwo', function () {
+    return "This is the home page";
+});
+
 Route::middleware('web')->group(function () {
     Route::middleware([
         'auth', 

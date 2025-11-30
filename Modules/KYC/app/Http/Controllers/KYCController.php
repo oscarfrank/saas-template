@@ -21,7 +21,7 @@ class KYCController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        return Inertia::render('kyc/index', [
+        return Inertia::render('kyc/admin/index', [
             'kycVerifications' => $kycVerifications
         ]);
     }
@@ -39,7 +39,7 @@ class KYCController extends Controller
         }
 
         // For rejected or pending KYC, show the form with existing data
-        return Inertia::render('kyc/create', [
+        return Inertia::render('kyc/user/create', [
             'existingKyc' => $existingKyc ? [
                 'full_name' => $existingKyc->full_name,
                 'date_of_birth' => $existingKyc->date_of_birth,
@@ -161,7 +161,7 @@ class KYCController extends Controller
                 return redirect()->route('kyc.create', ['tenant' => tenant('id')]);
             }
 
-            return Inertia::render('kyc/show', [
+            return Inertia::render('kyc/user/show', [
                 'kycVerification' => $kycVerification
             ]);
         }

@@ -25,7 +25,7 @@ class ActivityController extends Controller
             ->latest()
             ->paginate(self::PER_PAGE);
 
-        return Inertia::render('activity/admin', [
+        return Inertia::render('activity/admin/index', [
             'activities' => $activities,
         ]);
     }
@@ -40,14 +40,14 @@ class ActivityController extends Controller
             ->latest()
             ->paginate(self::PER_PAGE, ['*'], 'page', $page);
 
-        return Inertia::render('activity/admin', [
+        return Inertia::render('activity/admin/index', [
             'activities' => $activities,
         ]);
     }
 
     public function getLoadMore(Request $request)
     {
-        return Inertia::render('activity/admin', [
+        return Inertia::render('activity/admin/index', [
             'activities' => Activity::with(['causer' => function($query) {
                 $query->select('id', 'first_name', 'last_name', 'email');
             }])
@@ -77,7 +77,7 @@ class ActivityController extends Controller
         ->latest()
         ->paginate(self::PER_PAGE);
 
-        return Inertia::render('activity/user', [
+        return Inertia::render('activity/user/index', [
             'activities' => $activities
         ]);
     }
@@ -102,7 +102,7 @@ class ActivityController extends Controller
         ->latest()
         ->paginate(self::PER_PAGE, ['*'], 'page', $page);
 
-        return Inertia::render('activity/user', [
+        return Inertia::render('activity/user/index', [
             'activities' => $activities
         ]);
     }
@@ -125,7 +125,7 @@ class ActivityController extends Controller
         ->latest()
         ->paginate(self::PER_PAGE, ['*'], 'page', $page);
 
-        return Inertia::render('activity/user', [
+        return Inertia::render('activity/user/index', [
             'activities' => $activities
         ]);
     }

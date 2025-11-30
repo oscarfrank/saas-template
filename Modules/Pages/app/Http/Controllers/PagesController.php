@@ -47,22 +47,22 @@ class PagesController extends Controller
 
     public function adminDashboard(Request $request)
     {
-        return Inertia::render('dashboard/admin-dashboard');
+        return Inertia::render('dashboard/admin/admin-dashboard');
     }
 
     public function lenderDashboard(Request $request)
     {
-        return Inertia::render('dashboard/lender-dashboard');
+        return Inertia::render('dashboard/user/lender-dashboard');
     }
 
     public function borrowerDashboard(Request $request)
     {
-        return Inertia::render('dashboard/borrower-dashboard');
+        return Inertia::render('dashboard/user/borrower-dashboard');
     }
 
     public function youtuberDashboard(Request $request)
     {
-        return Inertia::render('dashboard/youtuber-dashboard');
+        return Inertia::render('dashboard/user/youtuber-dashboard');
     }
     
     

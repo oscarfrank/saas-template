@@ -3,8 +3,8 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { RoleForm } from './role-form';
-import { RoleTable } from './role-table';
+import { RoleForm } from '../admin/role-form';
+import { RoleTable } from '../admin/role-table';
 import { type Permission, type Role } from '@/types';
 import { toast } from 'sonner';
 

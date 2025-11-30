@@ -239,7 +239,7 @@ export default function Show({ loan, payment_methods }: Props) {
             });
         } else {
             // For offline payments, we'll submit normally
-            tenantRouter.post('loans.payments.store', formData, { id: loan.id }, {
+            tenantRouter.post('loans.payments.store', formData, { loan: loan.id }, {
                 onSuccess: () => {
                     toast.success('Payment submitted successfully');
                     setShowPaymentForm(false);

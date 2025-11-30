@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { EditForm } from './components/edit-form';
+import { EditForm } from '../components/edit-form';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Calendar } from '@/components/ui/calendar';

@@ -40,7 +40,7 @@ class LoanPackageController extends Controller
 
         $loanPackages = $query->paginate($request->input('per_page', 10));
 
-        return Inertia::render('loan-packages/index', [
+        return Inertia::render('loan-packages/admin/index', [
             'loanPackages' => $loanPackages
         ]);
     }
@@ -50,7 +50,7 @@ class LoanPackageController extends Controller
      */
     public function create()
     {
-        return Inertia::render('loan-packages/create', [
+        return Inertia::render('loan-packages/admin/create', [
             'currencies' => Currency::select('id', 'code', 'name')->get()
         ]);
     }
@@ -126,7 +126,7 @@ class LoanPackageController extends Controller
     public function show(LoanPackage $loanPackage)
     {
         $loanPackage->load('currency');
-        return Inertia::render('loan-packages/show', [
+        return Inertia::render('loan-packages/admin/show', [
             'loanPackage' => $loanPackage
         ]);
     }
@@ -136,7 +136,7 @@ class LoanPackageController extends Controller
      */
     public function edit(LoanPackage $loanPackage)
     {
-        return Inertia::render('loan-packages/edit', [
+        return Inertia::render('loan-packages/admin/edit', [
             'loanPackage' => $loanPackage,
             'currencies' => Currency::select('id', 'code', 'name')->get()
         ]);
@@ -385,7 +385,7 @@ class LoanPackageController extends Controller
         // Get the allow_loans_without_kyc setting
         $allowLoansWithoutKyc = \Modules\Loan\Models\LoanSetting::getValue('allow_loans_without_kyc', false);
 
-        return Inertia::render('loan-packages/browse', [
+        return Inertia::render('loan-packages/user/browse', [
             'loanPackages' => $loanPackages,
             'user' => $user,
             'loanSettings' => [

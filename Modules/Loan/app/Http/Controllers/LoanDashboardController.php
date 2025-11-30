@@ -54,7 +54,7 @@ class LoanDashboardController extends Controller
             ];
         }
 
-        return Inertia::render('dashboard/borrower-dashboard', [
+        return Inertia::render('dashboard/user/borrower-dashboard', [
             'currentLoan' => $currentLoan ? [
                 'current_balance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
                 'status' => ucfirst($currentLoan->status),

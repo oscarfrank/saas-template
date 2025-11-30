@@ -7,6 +7,8 @@ import { useRole } from '@/hooks/use-role';
 import { useGreeting } from '@/hooks/use-greeting';
 import { Link } from '@inertiajs/react';
 
+import { useTenantRouter } from '@/hooks/use-tenant-router';
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
@@ -15,6 +17,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function Dashboard() {
+    const tenantRouter = useTenantRouter();
     const { user } = useAuth();
     const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
@@ -30,7 +33,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto w-full">
                     {/* Borrower Dashboard Button */}
                     <Link 
-                        href="/dashboard/borrower"
+                        href={tenantRouter.route('borrower-dashboard')}
                         className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-blue-500 hover:border-blue-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
                     >
                         <div className="text-4xl mb-4">💰</div>
@@ -43,7 +46,7 @@ export default function Dashboard() {
 
                     {/* Lender Dashboard Button */}
                     <Link 
-                        href="/dashboard/lender"
+                        href={tenantRouter.route('lender-dashboard')}
                         className="group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 border-green-500 hover:border-green-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
                     >
                         <div className="text-4xl mb-4">💎</div>

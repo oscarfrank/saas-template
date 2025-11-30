@@ -27,16 +27,16 @@ class DashboardController extends Controller
             return (new LoanDashboardController)->index($request);
         }
         
-        return Inertia::render('dashboard/dashboard');
+        return Inertia::render('dashboard/user/dashboard');
     }
 
     public function lenderDashboard(Request $request)
     {
-        return Inertia::render('dashboard/lender-dashboard');
+        return Inertia::render('dashboard/user/lender-dashboard');
     }
 
     public function youtuberDashboard(Request $request)
     {
-        return Inertia::render('dashboard/youtuber-dashboard');
+        return Inertia::render('dashboard/user/youtuber-dashboard');
     }
 }

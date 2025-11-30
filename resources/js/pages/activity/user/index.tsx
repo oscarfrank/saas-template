@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from 'date-fns';
 import { 
-    User, 
+    User as UserIcon, 
     Settings, 
     FileText, 
     DollarSign, 
@@ -20,15 +20,16 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Admin',
-        href: '/admin/dashboard',
+        title: 'Dashboard',
+        href: '/dashboard',
     },
     {
-        title: 'Activity Log',
-        href: '/admin/activity',
+        title: 'My Activity',
+        href: '/activity',
     },
 ];
 
@@ -54,19 +55,10 @@ interface Props {
     };
 }
 
-interface PageProps {
-    activities: {
-        data: Activity[];
-        links: any[];
-        current_page: number;
-        last_page: number;
-    };
-}
-
 const getActivityIcon = (description: string) => {
     const lowerDesc = description.toLowerCase();
     
-    if (lowerDesc.includes('user') || lowerDesc.includes('profile')) return User;
+    if (lowerDesc.includes('user') || lowerDesc.includes('profile')) return UserIcon;
     if (lowerDesc.includes('setting')) return Settings;
     if (lowerDesc.includes('document') || lowerDesc.includes('file')) return FileText;
     if (lowerDesc.includes('loan') || lowerDesc.includes('payment')) return DollarSign;
@@ -106,13 +98,14 @@ const ActivitySkeleton = () => (
     </div>
 );
 
-export default function Admin({ activities: initialActivities }: Props) {
+export default function Index({ activities: initialActivities }: Props) {
     const [activities, setActivities] = useState(initialActivities);
     const [isLoading, setIsLoading] = useState(false);
+    const { user } = useAuth();
 
     const loadMore = () => {
         setIsLoading(true);
-        router.visit('/admin/activity/load-more', {
+        router.visit('/activity/load-more', {
             method: 'post',
             data: {
                 page: activities.current_page + 1
@@ -139,12 +132,12 @@ export default function Admin({ activities: initialActivities }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Activity Log" />
+            <Head title="My Activity" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <ActivityIcon className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-semibold">Activity Log</h1>
+                        <h1 className="text-2xl font-semibold">My Activity</h1>
                     </div>
                 </div>
 
@@ -169,15 +162,12 @@ export default function Admin({ activities: initialActivities }: Props) {
                                             </div>
                                             <div className="flex-1 min-w-0 flex items-center gap-4">
                                                 <p className="text-sm font-medium truncate min-w-[120px]">
-                                                    {activity.causer ? activity.causer.first_name + ' ' + activity.causer.last_name : 'System Action'}
+                                                    {activity.causer ? (
+                                                        activity.causer.id === user.id ? 'You' : 'System (Admin)'
+                                                    ) : 'System (Admin)'}
                                                 </p>
                                                 <p className="text-sm text-muted-foreground truncate flex-1">
                                                     {activity.description}
-                                                    {activity.properties?.affected_user_id && (
-                                                        <span className="ml-1 text-xs text-muted-foreground">
-                                                            (Affected User: {activity.properties.affected_user_name})
-                                                        </span>
-                                                    )}
                                                 </p>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     <Badge variant="outline" className="text-xs">
@@ -228,4 +218,4 @@ export default function Admin({ activities: initialActivities }: Props) {
             </div>
         </AppLayout>
     );
-}
+} 

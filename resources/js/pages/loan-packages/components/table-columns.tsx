@@ -76,7 +76,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
             const loanPackage = row.original;
             return (
                 <Link 
-                    href={route('admin.loan-packages.show', loanPackage.id)}
+                    href={route('admin.loan-packages.show', { loanPackage: loanPackage.id })}
                     className="font-medium hover:underline cursor-pointer"
                 >
                     {row.getValue("name")}

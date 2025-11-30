@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
-import { Table } from './components/table';
-import { createColumns } from './components/table-columns';
+import { Table } from '../components/table';
+import { createColumns } from '../components/table-columns';
 import { Plus } from 'lucide-react';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
 

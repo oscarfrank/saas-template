@@ -1,8 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type KycVerification } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { createKycColumns } from './components/table-columns';
-import { KycTable } from './components/kyc-table';
+import { createKycColumns } from '../components/table-columns';
+import { KycTable } from '../components/kyc-table';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-min-dialog';

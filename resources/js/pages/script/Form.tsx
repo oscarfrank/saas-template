@@ -597,6 +597,26 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         };
     }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, isEdit, initialScript?.id, readOnly]);
 
+    // When only script type changes, trigger a save so it persists without requiring an editor change
+    const scriptTypeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const prevScriptTypeIdRef = useRef<string | null>(initialScript?.script_type_id != null ? String(initialScript.script_type_id) : null);
+    useEffect(() => {
+        if (readOnly || !isEdit || !initialScript) return;
+        if (scriptTypeId === prevScriptTypeIdRef.current) return;
+        prevScriptTypeIdRef.current = scriptTypeId;
+        if (scriptTypeSaveTimeoutRef.current) clearTimeout(scriptTypeSaveTimeoutRef.current);
+        scriptTypeSaveTimeoutRef.current = setTimeout(() => {
+            scriptTypeSaveTimeoutRef.current = null;
+            if (Date.now() >= autosaveReadyAtRef.current) performAutosave();
+        }, 400);
+        return () => {
+            if (scriptTypeSaveTimeoutRef.current) {
+                clearTimeout(scriptTypeSaveTimeoutRef.current);
+                scriptTypeSaveTimeoutRef.current = null;
+            }
+        };
+    }, [scriptTypeId, isEdit, initialScript, readOnly]);
+
     const handleSave = () => {
         setIsSaving(true);
         if (isEdit && initialScript) {

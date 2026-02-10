@@ -93,6 +93,7 @@ return [
             '/',
             '/admin/*',
             '/_debugbar/*',
+            '/script/shared/*',
         ],
     ],
 ];

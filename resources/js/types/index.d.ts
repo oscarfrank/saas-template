@@ -160,4 +160,24 @@ export interface Tenant {
     data?: Record<string, any>;
     created_at?: string;
     updated_at?: string;
+}
+
+// BlockNote Editor Types
+export type { BlockNoteEditor, PartialBlock, Block } from '@blocknote/core';
+
+export interface EditorContent {
+    blocks: PartialBlock[];
+    version?: string;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export interface Document {
+    id?: number | string;
+    title: string;
+    content: EditorContent;
+    userId?: number;
+    tenantId?: string;
+    createdAt?: string;
+    updatedAt?: string;
 } 

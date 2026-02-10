@@ -1,0 +1,23 @@
+{
+    "name": "modules/script",
+    "description": "Script module",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Script\\": "app/",
+            "Modules\\Script\\Database\\Factories\\": "database/factories/",
+            "Modules\\Script\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Script\\Tests\\": "tests/"
+        }
+    }
+}

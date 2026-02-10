@@ -1,8 +1,9 @@
 <?php
 
+use App\Http\Controllers\EditorController;
+use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\TenantController;
 
 
 Route::get('/taiwo', function () {
@@ -28,6 +29,13 @@ Route::middleware('web')->group(function () {
 
 
         });
+
+        // Editor Demo Route
+        Route::get('/editor/demo', function () {
+            return Inertia::render('editor/demo');
+        })->name('editor.demo');
+        Route::post('/editor/generate-title-ideas', [EditorController::class, 'generateTitleIdeas'])->name('editor.generate-title-ideas');
+        Route::post('/editor/generate-description-assets', [EditorController::class, 'generateDescriptionAssets'])->name('editor.generate-description-assets');
 
         // Tenant Management Routes
         Route::get('/organizations', [TenantController::class, 'index'])->name('tenants.index');

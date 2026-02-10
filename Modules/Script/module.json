@@ -1,0 +1,11 @@
+{
+    "name": "Script",
+    "alias": "script",
+    "description": "Script editor and YouTube assets (titles, description, timestamps, meta tags)",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Script\\Providers\\ScriptServiceProvider"
+    ],
+    "files": []
+}

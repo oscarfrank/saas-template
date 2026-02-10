@@ -23,8 +23,13 @@
         "typescript-eslint": "^8.23.0"
     },
     "dependencies": {
+        "@blocknote/core": "^0.46.2",
+        "@blocknote/mantine": "^0.46.2",
+        "@blocknote/react": "^0.46.2",
         "@headlessui/react": "^2.2.0",
         "@inertiajs/react": "^2.0.0",
+        "@mantine/core": "^8.3.10",
+        "@mantine/hooks": "^8.3.10",
         "@radix-ui/react-accordion": "^1.2.8",
         "@radix-ui/react-alert-dialog": "^1.1.11",
         "@radix-ui/react-avatar": "^1.1.10",
@@ -47,6 +52,7 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@tailwindcss/vite": "^4.0.6",
         "@tanstack/react-table": "^8.21.3",
+        "@tiptap/extensions": "^3.14.0",
         "@types/react": "^19.0.3",
         "@types/react-dom": "^19.0.2",
         "@vitejs/plugin-react": "^4.3.4",

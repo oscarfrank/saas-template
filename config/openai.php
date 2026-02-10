@@ -46,4 +46,16 @@ return [
     */
 
     'request_timeout' => env('OPENAI_REQUEST_TIMEOUT', 30),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Chat Model
+    |--------------------------------------------------------------------------
+    |
+    | The model used for chat completions (e.g. title generation). Examples:
+    | gpt-4o-mini, gpt-4o, gpt-4-turbo
+    |
+    */
+
+    'chat_model' => env('OPENAI_CHAT_MODEL', 'gpt-4o-mini'),
 ];

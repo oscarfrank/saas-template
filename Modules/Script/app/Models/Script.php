@@ -28,6 +28,7 @@ class Script extends Model
         'meta_tags',
         'live_video_url',
         'status',
+        'production_status',
         'visibility',
         'share_token',
         'custom_attributes',

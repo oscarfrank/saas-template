@@ -175,6 +175,7 @@ interface ThumbnailRow {
 }
 
 type ScriptWorkflowStatus = 'draft' | 'writing' | 'completed' | 'published';
+type ProductionStatus = 'not_shot' | 'shot' | 'editing' | 'edited';
 
 interface ScriptForEdit {
     id: number;
@@ -187,6 +188,7 @@ interface ScriptForEdit {
     meta_tags: string | null;
     live_video_url: string | null;
     status: string;
+    production_status: string | null;
     scheduled_at: string | null;
     title_options: TitleOptionRow[];
     thumbnails: ThumbnailRow[];
@@ -231,6 +233,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     };
     const [workflowStatus, setWorkflowStatus] = useState<ScriptWorkflowStatus>(() =>
         normalizeStatus(initialScript?.status)
+    );
+    const [productionStatus, setProductionStatus] = useState<ProductionStatus>(
+        (initialScript?.production_status as ProductionStatus) ?? 'not_shot'
     );
     const [scheduledAt, setScheduledAt] = useState<string>(() => {
         const v = initialScript?.scheduled_at;
@@ -284,9 +289,29 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
 
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
     const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const formStateRef = useRef({ content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt });
+    const formStateRef = useRef({
+        content,
+        pageTitle,
+        mainThumbnailText,
+        scriptTypeId,
+        descriptionData,
+        titleOptions,
+        workflowStatus,
+        scheduledAt,
+        productionStatus,
+    });
 
-    formStateRef.current = { content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt };
+    formStateRef.current = {
+        content,
+        pageTitle,
+        mainThumbnailText,
+        scriptTypeId,
+        descriptionData,
+        titleOptions,
+        workflowStatus,
+        scheduledAt,
+        productionStatus,
+    };
 
     const handleContentChange = (blocks: PartialBlock[]) => {
         setContent(blocks);
@@ -559,6 +584,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             meta_tags: state.descriptionData?.metaTags ?? null,
             status: state.workflowStatus,
             scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
+            production_status: state.productionStatus,
             title_options: optionsToSend,
         };
     };
@@ -593,6 +619,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             meta_tags: state.descriptionData?.metaTags ?? null,
             status: state.workflowStatus,
             scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
+            production_status: state.productionStatus,
             title_options: titleOptionsPayload,
         }, {
             preserveScroll: false,
@@ -625,7 +652,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                 autosaveTimeoutRef.current = null;
             }
         };
-    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt, isEdit, initialScript?.id, readOnly]);
+    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt, productionStatus, isEdit, initialScript?.id, readOnly]);
 
     // When only script type changes, trigger a save so it persists without requiring an editor change
     const scriptTypeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1043,6 +1070,24 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                     <SelectItem value="writing">Writing</SelectItem>
                                     <SelectItem value="completed">Completed</SelectItem>
                                     <SelectItem value="published">Published</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-muted-foreground shrink-0 text-sm">Production</Label>
+                            <Select
+                                value={productionStatus}
+                                onValueChange={(v) => setProductionStatus(v as ProductionStatus)}
+                                disabled={readOnly}
+                            >
+                                <SelectTrigger className="w-[160px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="not_shot">Not shot</SelectItem>
+                                    <SelectItem value="shot">Shot</SelectItem>
+                                    <SelectItem value="editing">Editing</SelectItem>
+                                    <SelectItem value="edited">Edited</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

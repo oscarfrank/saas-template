@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -117,6 +118,7 @@ final class ScriptController extends Controller
             'meta_tags' => 'nullable|string|max:600',
             'live_video_url' => 'nullable|url|max:500',
             'status' => 'nullable|string|in:draft,writing,completed,published,in_review,archived',
+            'production_status' => 'nullable|string|in:not_shot,shot,editing,edited',
             'scheduled_at' => 'nullable|date',
             'title_options' => 'nullable|array',
             'title_options.*.title' => 'required_with:title_options|string|max:255',
@@ -139,6 +141,7 @@ final class ScriptController extends Controller
             'meta_tags' => $validated['meta_tags'] ?? null,
             'live_video_url' => $validated['live_video_url'] ?? null,
             'status' => $validated['status'] ?? 'draft',
+            'production_status' => $validated['production_status'] ?? 'not_shot',
             'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : null,
         ]);
 
@@ -207,6 +210,7 @@ final class ScriptController extends Controller
             'meta_tags' => 'nullable|string|max:600',
             'live_video_url' => 'nullable|url|max:500',
             'status' => 'nullable|string|in:draft,writing,completed,published,in_review,archived',
+            'production_status' => 'nullable|string|in:not_shot,shot,editing,edited',
             'scheduled_at' => 'nullable|date',
             'title_options' => 'nullable|array',
             'title_options.*.id' => 'nullable|integer|exists:script_title_options,id',
@@ -225,6 +229,7 @@ final class ScriptController extends Controller
             'meta_tags' => $validated['meta_tags'] ?? $script->meta_tags,
             'live_video_url' => $validated['live_video_url'] ?? $script->live_video_url,
             'status' => $validated['status'] ?? $script->status,
+            'production_status' => $validated['production_status'] ?? $script->production_status,
             'scheduled_at' => array_key_exists('scheduled_at', $validated) ? ($validated['scheduled_at'] ?? null) : $script->scheduled_at,
         ]);
 
@@ -541,6 +546,7 @@ PROMPT;
             'platform' => $platform,
             'updatedAt' => $script->updated_at->diffForHumans(),
             'script_type_id' => $script->script_type_id,
+            'production_status' => $script->production_status,
         ];
         if ($script->trashed()) {
             $row['deleted_at'] = $script->deleted_at?->toIso8601String();
@@ -562,6 +568,7 @@ PROMPT;
             'meta_tags' => $script->meta_tags,
             'live_video_url' => $script->live_video_url,
             'status' => $script->status,
+            'production_status' => $script->production_status,
             'scheduled_at' => $script->scheduled_at?->toIso8601String(),
             'title_options' => $script->titleOptions->map(fn ($o) => [
                 'id' => $o->id,
@@ -625,6 +632,82 @@ PROMPT;
                 'url' => asset('storage/' . $thumb->storage_path),
                 'filename' => $thumb->filename,
                 'sort_order' => $thumb->sort_order,
+            ],
+        ]);
+    }
+
+    /**
+     * Calendar view of scripts by scheduled date.
+     */
+    public function calendar(Request $request): Response
+    {
+        $tenantId = tenant('id');
+        $user = $request->user();
+
+        $query = Script::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at');
+
+        // Optional range filters for future: ?start=YYYY-MM-DD&end=YYYY-MM-DD
+        if ($request->filled('start')) {
+            $start = Carbon::parse($request->query('start'))->startOfDay();
+            $query->whereDate('scheduled_at', '>=', $start);
+        }
+        if ($request->filled('end')) {
+            $end = Carbon::parse($request->query('end'))->endOfDay();
+            $query->whereDate('scheduled_at', '<=', $end);
+        }
+
+        $scripts = $query
+            ->with('scriptType')
+            ->orderBy('scheduled_at')
+            ->orderBy('title')
+            ->get()
+            ->map(fn (Script $script) => [
+                'id' => $script->id,
+                'uuid' => $script->uuid,
+                'title' => $script->title,
+                'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+                'status' => $script->status,
+                'script_type' => $script->scriptType?->name,
+                'production_status' => $script->production_status,
+                'can_edit' => $script->canEdit($user),
+            ]);
+
+        return Inertia::render('script/Calendar', [
+            'scripts' => $scripts,
+        ]);
+    }
+
+    /**
+     * Update a script's scheduled_at via drag-and-drop on the calendar.
+     */
+    public function reschedule(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canEdit($request->user())) {
+            abort(403, 'You do not have permission to edit this script.');
+        }
+
+        $validated = $request->validate([
+            'scheduled_at' => 'nullable|date',
+        ]);
+
+        $script->update([
+            'scheduled_at' => $validated['scheduled_at'] ?? null,
+            'updated_by' => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'script' => [
+                'id' => $script->id,
+                'uuid' => $script->uuid,
+                'title' => $script->title,
+                'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+                'status' => $script->status,
             ],
         ]);
     }
@@ -888,6 +971,44 @@ PROMPT;
 
         return Inertia::render('script/SharedView', [
             'script' => $payload,
+        ]);
+    }
+
+    /**
+     * Public read-only production calendar (no auth, no tenant path).
+     */
+    public function publicCalendar(Request $request): Response
+    {
+        // For now, use the first tenant as the source for the public calendar.
+        $tenant = Tenant::first();
+        if (! $tenant) {
+            abort(404, 'No tenant configured.');
+        }
+
+        tenancy()->initialize($tenant);
+
+        $query = Script::query()
+            ->where('tenant_id', $tenant->id)
+            ->whereNull('deleted_at')
+            ->whereNotNull('scheduled_at');
+
+        $scripts = $query
+            ->with('scriptType')
+            ->orderBy('scheduled_at')
+            ->orderBy('title')
+            ->get()
+            ->map(fn (Script $script) => [
+                'id' => $script->id,
+                'uuid' => $script->uuid,
+                'title' => $script->title,
+                'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+                'status' => $script->status,
+                'script_type' => $script->scriptType?->name,
+                'production_status' => $script->production_status,
+            ]);
+
+        return Inertia::render('script/PublicCalendar', [
+            'scripts' => $scripts,
         ]);
     }
 }

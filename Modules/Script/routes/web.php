@@ -6,6 +6,8 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 // Public published script view: no auth, no tenant in URL. Anyone with the link can view.
 Route::get('script/shared/{token}', [ScriptController::class, 'sharedShow'])->name('script.shared');
+// Public read-only production calendar: no auth, no tenant in URL.
+Route::get('production-calendar', [ScriptController::class, 'publicCalendar'])->name('script.public-calendar');
 
 Route::middleware([
     'auth',
@@ -14,6 +16,7 @@ Route::middleware([
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
     Route::get('script', [ScriptController::class, 'index'])->name('script.index');
+    Route::get('script/calendar', [ScriptController::class, 'calendar'])->name('script.calendar');
     Route::get('script/create', [ScriptController::class, 'create'])->name('script.create');
     Route::post('script', [ScriptController::class, 'store'])->name('script.store');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
@@ -30,6 +33,7 @@ Route::middleware([
     Route::post('script/generate-title-ideas', [ScriptController::class, 'generateTitleIdeas'])->name('script.generate-title-ideas');
     Route::post('script/generate-description-assets', [ScriptController::class, 'generateDescriptionAssets'])->name('script.generate-description-assets');
     Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');
+    Route::patch('script/{script}/reschedule', [ScriptController::class, 'reschedule'])->name('script.reschedule');
     Route::post('script/{script}/thumbnails', [ScriptController::class, 'storeThumbnail'])->name('script.thumbnails.store');
     Route::delete('script/{script}/thumbnails/{thumbnail}', [ScriptController::class, 'destroyThumbnail'])->name('script.thumbnails.destroy');
 });

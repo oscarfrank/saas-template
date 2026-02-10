@@ -22,6 +22,7 @@ import {
     LayoutGrid,
     List,
     RotateCcw,
+    CalendarDays,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -215,12 +216,20 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                         </p>
                     </div>
                     {!trashed && (
-                        <Link href={tenantRouter.route('script.create')}>
-                            <Button className="cursor-pointer gap-2 shadow-sm">
-                                <Plus className="h-4 w-4" />
-                                New script
-                            </Button>
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link href={tenantRouter.route('script.create')}>
+                                <Button className="cursor-pointer gap-2 shadow-sm">
+                                    <Plus className="h-4 w-4" />
+                                    New script
+                                </Button>
+                            </Link>
+                            <Link href={tenantRouter.route('script.calendar')}>
+                                <Button variant="outline" size="sm" className="cursor-pointer gap-1.5">
+                                    <CalendarDays className="h-4 w-4" />
+                                    Calendar
+                                </Button>
+                            </Link>
+                        </div>
                     )}
                 </div>
 

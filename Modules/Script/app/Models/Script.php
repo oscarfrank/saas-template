@@ -32,12 +32,14 @@ class Script extends Model
         'share_token',
         'custom_attributes',
         'published_at',
+        'scheduled_at',
     ];
 
     protected $casts = [
         'content' => 'array',
         'custom_attributes' => 'array',
         'published_at' => 'datetime',
+        'scheduled_at' => 'datetime',
     ];
 
     public function scriptType(): BelongsTo

@@ -174,6 +174,8 @@ interface ThumbnailRow {
     sort_order: number;
 }
 
+type ScriptWorkflowStatus = 'draft' | 'writing' | 'completed' | 'published';
+
 interface ScriptForEdit {
     id: number;
     uuid: string;
@@ -185,6 +187,7 @@ interface ScriptForEdit {
     meta_tags: string | null;
     live_video_url: string | null;
     status: string;
+    scheduled_at: string | null;
     title_options: TitleOptionRow[];
     thumbnails: ThumbnailRow[];
     current_user_role?: string | null;
@@ -220,6 +223,31 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [scriptTypeId, setScriptTypeId] = useState<string | null>(
         initialScript?.script_type_id != null ? String(initialScript.script_type_id) : null
     );
+    const normalizeStatus = (s: string | undefined): ScriptWorkflowStatus => {
+        if (s === 'writing' || s === 'completed' || s === 'published') return s;
+        if (s === 'in_review') return 'writing';
+        if (s === 'archived') return 'completed';
+        return 'draft';
+    };
+    const [workflowStatus, setWorkflowStatus] = useState<ScriptWorkflowStatus>(() =>
+        normalizeStatus(initialScript?.status)
+    );
+    const [scheduledAt, setScheduledAt] = useState<string>(() => {
+        const v = initialScript?.scheduled_at;
+        if (!v) return '';
+        try {
+            const d = new Date(v);
+            if (Number.isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${day}T${h}:${min}`;
+        } catch {
+            return '';
+        }
+    });
     const [titleOptions, setTitleOptions] = useState<TitleOptionRow[]>(
         initialScript?.title_options?.length ? initialScript.title_options : []
     );
@@ -256,9 +284,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
 
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
     const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const formStateRef = useRef({ content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions });
+    const formStateRef = useRef({ content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt });
 
-    formStateRef.current = { content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions };
+    formStateRef.current = { content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt };
 
     const handleContentChange = (blocks: PartialBlock[]) => {
         setContent(blocks);
@@ -529,7 +557,8 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             content: state.content,
             description: state.descriptionData?.descriptionBlock ?? null,
             meta_tags: state.descriptionData?.metaTags ?? null,
-            status: initialScript?.status ?? 'draft',
+            status: state.workflowStatus,
+            scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
             title_options: optionsToSend,
         };
     };
@@ -562,7 +591,8 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             content: state.content,
             description: state.descriptionData?.descriptionBlock ?? null,
             meta_tags: state.descriptionData?.metaTags ?? null,
-            status: 'draft',
+            status: state.workflowStatus,
+            scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
             title_options: titleOptionsPayload,
         }, {
             preserveScroll: false,
@@ -595,7 +625,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                 autosaveTimeoutRef.current = null;
             }
         };
-    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, isEdit, initialScript?.id, readOnly]);
+    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt, isEdit, initialScript?.id, readOnly]);
 
     // When only script type changes, trigger a save so it persists without requiring an editor change
     const scriptTypeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -617,6 +647,47 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         };
     }, [scriptTypeId, isEdit, initialScript, readOnly]);
 
+    const prevWorkflowStatusRef = useRef<ScriptWorkflowStatus>(normalizeStatus(initialScript?.status));
+    useEffect(() => {
+        if (readOnly || !isEdit || !initialScript) return;
+        if (workflowStatus === prevWorkflowStatusRef.current) return;
+        prevWorkflowStatusRef.current = workflowStatus;
+        if (scriptTypeSaveTimeoutRef.current) clearTimeout(scriptTypeSaveTimeoutRef.current);
+        scriptTypeSaveTimeoutRef.current = setTimeout(() => {
+            scriptTypeSaveTimeoutRef.current = null;
+            if (Date.now() >= autosaveReadyAtRef.current) performAutosave();
+        }, 400);
+        return () => {
+            if (scriptTypeSaveTimeoutRef.current) {
+                clearTimeout(scriptTypeSaveTimeoutRef.current);
+                scriptTypeSaveTimeoutRef.current = null;
+            }
+        };
+    }, [workflowStatus, isEdit, initialScript, readOnly]);
+
+    const prevScheduledAtRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (readOnly || !isEdit || !initialScript) return;
+        const current = scheduledAt?.trim() ?? '';
+        if (prevScheduledAtRef.current === null) {
+            prevScheduledAtRef.current = current;
+            return;
+        }
+        if (current === prevScheduledAtRef.current) return;
+        prevScheduledAtRef.current = current;
+        if (scriptTypeSaveTimeoutRef.current) clearTimeout(scriptTypeSaveTimeoutRef.current);
+        scriptTypeSaveTimeoutRef.current = setTimeout(() => {
+            scriptTypeSaveTimeoutRef.current = null;
+            if (Date.now() >= autosaveReadyAtRef.current) performAutosave();
+        }, 400);
+        return () => {
+            if (scriptTypeSaveTimeoutRef.current) {
+                clearTimeout(scriptTypeSaveTimeoutRef.current);
+                scriptTypeSaveTimeoutRef.current = null;
+            }
+        };
+    }, [scheduledAt, isEdit, initialScript, readOnly]);
+
     const handleSave = () => {
         setIsSaving(true);
         if (isEdit && initialScript) {
@@ -637,7 +708,8 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                 content,
                 description: descriptionData?.descriptionBlock ?? null,
                 meta_tags: descriptionData?.metaTags ?? null,
-                status: 'draft',
+                status: workflowStatus,
+                scheduled_at: scheduledAt?.trim() ? scheduledAt.trim() : null,
                 title_options: titleOptionsPayload,
             }, {
                 preserveScroll: true,
@@ -928,23 +1000,53 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             )}
                         </div>
                     </div>
-                    {scriptTypes.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-4">
+                        {scriptTypes.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <Label className="text-muted-foreground shrink-0 text-sm">Type</Label>
+                                <Select value={scriptTypeId ?? ''} onValueChange={setScriptTypeId} disabled={readOnly}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {scriptTypes.map((t) => (
+                                            <SelectItem key={t.id} value={String(t.id)}>
+                                                {t.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <div className="flex items-center gap-2">
-                            <Label className="text-muted-foreground shrink-0 text-sm">Type</Label>
-                            <Select value={scriptTypeId ?? ''} onValueChange={setScriptTypeId} disabled={readOnly}>
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Select type" />
+                            <Label className="text-muted-foreground shrink-0 text-sm">Scheduled for</Label>
+                            <Input
+                                type="datetime-local"
+                                value={scheduledAt}
+                                onChange={(e) => setScheduledAt(e.target.value)}
+                                disabled={readOnly}
+                                className="w-[190px]"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-muted-foreground shrink-0 text-sm">Status</Label>
+                            <Select
+                                value={workflowStatus}
+                                onValueChange={(v) => setWorkflowStatus(v as ScriptWorkflowStatus)}
+                                disabled={readOnly}
+                            >
+                                <SelectTrigger className="w-[150px]">
+                                    <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {scriptTypes.map((t) => (
-                                        <SelectItem key={t.id} value={String(t.id)}>
-                                            {t.name}
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="draft">Draft</SelectItem>
+                                    <SelectItem value="writing">Writing</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                    <SelectItem value="published">Published</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {!readOnly && (

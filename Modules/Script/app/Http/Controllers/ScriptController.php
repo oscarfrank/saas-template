@@ -116,7 +116,8 @@ final class ScriptController extends Controller
             'description' => 'nullable|string',
             'meta_tags' => 'nullable|string|max:600',
             'live_video_url' => 'nullable|url|max:500',
-            'status' => 'nullable|string|in:draft,in_review,published,archived',
+            'status' => 'nullable|string|in:draft,writing,completed,published,in_review,archived',
+            'scheduled_at' => 'nullable|date',
             'title_options' => 'nullable|array',
             'title_options.*.title' => 'required_with:title_options|string|max:255',
             'title_options.*.thumbnail_text' => 'nullable|string|max:255',
@@ -138,6 +139,7 @@ final class ScriptController extends Controller
             'meta_tags' => $validated['meta_tags'] ?? null,
             'live_video_url' => $validated['live_video_url'] ?? null,
             'status' => $validated['status'] ?? 'draft',
+            'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : null,
         ]);
 
         if (! empty($validated['title_options'])) {
@@ -204,7 +206,8 @@ final class ScriptController extends Controller
             'description' => 'nullable|string',
             'meta_tags' => 'nullable|string|max:600',
             'live_video_url' => 'nullable|url|max:500',
-            'status' => 'nullable|string|in:draft,in_review,published,archived',
+            'status' => 'nullable|string|in:draft,writing,completed,published,in_review,archived',
+            'scheduled_at' => 'nullable|date',
             'title_options' => 'nullable|array',
             'title_options.*.id' => 'nullable|integer|exists:script_title_options,id',
             'title_options.*.title' => 'required_with:title_options|string|max:255',
@@ -222,6 +225,7 @@ final class ScriptController extends Controller
             'meta_tags' => $validated['meta_tags'] ?? $script->meta_tags,
             'live_video_url' => $validated['live_video_url'] ?? $script->live_video_url,
             'status' => $validated['status'] ?? $script->status,
+            'scheduled_at' => array_key_exists('scheduled_at', $validated) ? ($validated['scheduled_at'] ?? null) : $script->scheduled_at,
         ]);
 
         if (array_key_exists('title_options', $validated)) {
@@ -558,6 +562,7 @@ PROMPT;
             'meta_tags' => $script->meta_tags,
             'live_video_url' => $script->live_video_url,
             'status' => $script->status,
+            'scheduled_at' => $script->scheduled_at?->toIso8601String(),
             'title_options' => $script->titleOptions->map(fn ($o) => [
                 'id' => $o->id,
                 'title' => $o->title,

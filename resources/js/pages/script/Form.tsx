@@ -82,6 +82,7 @@ interface EditorProps {
     onChange?: (content: PartialBlock[]) => void;
     placeholder?: string;
     editable?: boolean;
+    onAiEditRequest?: (selectedText: string, instruction: string) => Promise<string | null>;
 }
 
 function ClientOnlyBlockNoteEditor(props: EditorProps) {
@@ -261,6 +262,40 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
 
     const handleContentChange = (blocks: PartialBlock[]) => {
         setContent(blocks);
+    };
+
+    const handleAiEditSelection = async (
+        selectedText: string,
+        instruction: string
+    ): Promise<string | null> => {
+        const url = tenantRouter.route('script.ai-edit-selection');
+        const csrfToken =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    content: blocksToPlainText(content) || '',
+                    selected_text: selectedText,
+                    instruction,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'AI edit failed');
+                return null;
+            }
+            return typeof data.rewritten === 'string' ? data.rewritten : null;
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'AI edit failed');
+            return null;
+        }
     };
 
     const toggleTitleStyle = (id: string) => {
@@ -1275,6 +1310,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                         onChange={handleContentChange}
                         placeholder="Start typing your script or press '/' for commands..."
                         editable={!readOnly}
+                        onAiEditRequest={readOnly ? undefined : handleAiEditSelection}
                     />
                 </EditorErrorBoundary>
 

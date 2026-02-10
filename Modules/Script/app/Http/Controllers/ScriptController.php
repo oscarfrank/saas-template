@@ -381,6 +381,57 @@ PROMPT;
     }
 
     /**
+     * AI edit: rewrite a selected portion of the script based on user instruction.
+     */
+    public function aiEditSelection(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'content' => 'required|string|max:100000',
+            'selected_text' => 'required|string|max:50000',
+            'instruction' => 'required|string|max:2000',
+        ]);
+
+        $content = $validated['content'];
+        $selectedText = $validated['selected_text'];
+        $instruction = $validated['instruction'];
+
+        $systemPrompt = <<<'PROMPT'
+You are an expert editor. The user will give you:
+1. A full script (for context)
+2. A selected excerpt from that script
+3. An instruction (e.g. "rewrite to be more conversational", "make the intro punchier")
+
+Your task: apply the instruction ONLY to the selected excerpt. Return ONLY the rewritten excerpt as plain text. Do not include the rest of the script, no markdown, no quotes, no explanation. Preserve the same general length and structure unless the instruction asks otherwise.
+PROMPT;
+
+        $userPrompt = "Full script (for context):\n\n" . $content . "\n\n---\n\nSelected excerpt to rewrite:\n\n" . $selectedText . "\n\n---\n\nInstruction: " . $instruction;
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_tokens' => 4096,
+            ]);
+
+            $rewritten = trim($response->choices[0]->message->content ?? '');
+            if ($rewritten === '') {
+                return response()->json(['message' => 'No rewrite returned. Try a different instruction.'], 422);
+            }
+
+            return response()->json(['rewritten' => $rewritten]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::aiEditSelection failed', ['error' => $e->getMessage()]);
+            return response()->json(
+                ['message' => 'AI edit failed. Please try again.'],
+                500
+            );
+        }
+    }
+
+    /**
      * Generate YouTube description, timestamps, and meta tags.
      */
     public function generateDescriptionAssets(Request $request): JsonResponse

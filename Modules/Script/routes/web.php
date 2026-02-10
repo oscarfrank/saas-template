@@ -29,6 +29,7 @@ Route::middleware([
     Route::put('script/{script}/collaborators/{user}', [ScriptController::class, 'updateCollaboratorRole'])->name('script.collaborators.update');
     Route::post('script/generate-title-ideas', [ScriptController::class, 'generateTitleIdeas'])->name('script.generate-title-ideas');
     Route::post('script/generate-description-assets', [ScriptController::class, 'generateDescriptionAssets'])->name('script.generate-description-assets');
+    Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');
     Route::post('script/{script}/thumbnails', [ScriptController::class, 'storeThumbnail'])->name('script.thumbnails.store');
     Route::delete('script/{script}/thumbnails/{thumbnail}', [ScriptController::class, 'destroyThumbnail'])->name('script.thumbnails.destroy');
 });

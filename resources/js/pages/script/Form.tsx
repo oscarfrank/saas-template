@@ -814,15 +814,36 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         navigator.clipboard.writeText(text).then(() => toast.success(label)).catch(() => {});
     };
 
-    const handleExport = () => {
-        const json = JSON.stringify(content, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'script.json';
-        a.click();
-        URL.revokeObjectURL(url);
+    const handleExport = async (format: 'json' | 'csv') => {
+        if (!initialScript) return;
+        const url = tenantRouter.route('script.export', { script: initialScript.uuid, format });
+        const csrfToken =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: format === 'csv' ? 'text/csv' : 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ content }),
+            });
+            if (!res.ok) {
+                toast.error('Failed to export script.');
+                return;
+            }
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = `script-${initialScript.uuid}.${format}`;
+            a.click();
+            URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+            toast.error('Network error while exporting.');
+        }
     };
 
     const handleLoad = () => {
@@ -1014,9 +1035,13 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                             </>
                                         )}
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={handleExport}>
+                                        <DropdownMenuItem onClick={() => handleExport('json')}>
                                             <Download className="mr-2 h-4 w-4" />
-                                            Export
+                                            Export JSON
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Export CSV
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={handleLoad}>
                                             <Upload className="mr-2 h-4 w-4" />

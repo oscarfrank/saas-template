@@ -23,6 +23,7 @@ import {
     List,
     RotateCcw,
     CalendarDays,
+    Download,
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -30,6 +31,16 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Scripts', href: '/script' },
@@ -44,6 +55,7 @@ export interface ScriptItem {
     platform: 'youtube' | 'tiktok' | 'instagram' | 'general' | 'podcast';
     updatedAt: string;
     script_type_id?: number | null;
+    production_status?: string | null;
     deleted_at?: string;
     deleted_at_human?: string;
 }
@@ -145,6 +157,28 @@ function ScriptCard({
                                     Duplicate
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                    className="cursor-pointer gap-2"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        const url = tenantRouter.route('script.export', { script: script.uuid, format: 'json' });
+                                        window.location.href = url;
+                                    }}
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export JSON
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="cursor-pointer gap-2"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        const url = tenantRouter.route('script.export', { script: script.uuid, format: 'csv' });
+                                        window.location.href = url;
+                                    }}
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                     className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                                     onClick={(e) => {
                                         e.preventDefault();
@@ -177,6 +211,8 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
     const tenantRouter = useTenantRouter();
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+    const [emptyTrashOpen, setEmptyTrashOpen] = useState(false);
 
     const scripts = Array.isArray(scriptsFromServer) ? scriptsFromServer : [];
     const filteredScripts = useMemo(() => filterScripts(scripts, searchQuery), [scripts, searchQuery]);
@@ -184,6 +220,28 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
     const noSearchResults = !isEmpty && filteredScripts.length === 0;
     const scriptsIndexUrl = tenantRouter.route('script.index');
     const recycleBinUrl = tenantRouter.route('script.index', { trashed: 1 });
+
+    const handleImportCsv = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv,text/csv';
+        input.onchange = (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            router.post(tenantRouter.route('script.import-csv'), formData, {
+                forceFormData: true,
+                preserveScroll: true,
+            });
+        };
+        input.click();
+    };
+
+    const handleExportAllCsv = () => {
+        const url = tenantRouter.route('script.export-all');
+        window.location.href = url;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -223,12 +281,58 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                                     New script
                                 </Button>
                             </Link>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="cursor-pointer gap-1.5"
+                                onClick={handleImportCsv}
+                            >
+                                <FileText className="h-4 w-4" />
+                                Import CSV
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="cursor-pointer gap-1.5"
+                                onClick={handleExportAllCsv}
+                            >
+                                <Download className="h-4 w-4" />
+                                Export all CSV
+                            </Button>
                             <Link href={tenantRouter.route('script.calendar')}>
                                 <Button variant="outline" size="sm" className="cursor-pointer gap-1.5">
                                     <CalendarDays className="h-4 w-4" />
                                     Calendar
                                 </Button>
                             </Link>
+                            {scripts.length > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="cursor-pointer gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() => setDeleteAllOpen(true)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete all
+                                </Button>
+                            )}
+                        </div>
+                    )}
+                    {trashed && scripts.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="cursor-pointer gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => setEmptyTrashOpen(true)}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Empty recycle bin
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -363,6 +467,46 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                     </div>
                 )}
             </div>
+
+            <AlertDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete all scripts?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            All scripts will be moved to the recycle bin. You can restore them from there before they are permanently removed after 30 days.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => router.post(tenantRouter.route('script.delete-all'))}
+                        >
+                            Delete all
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={emptyTrashOpen} onOpenChange={setEmptyTrashOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Empty recycle bin?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            All scripts in the recycle bin will be permanently deleted. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => router.post(tenantRouter.route('script.empty-trash'))}
+                        >
+                            Empty recycle bin
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

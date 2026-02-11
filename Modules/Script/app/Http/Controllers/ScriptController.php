@@ -294,6 +294,50 @@ final class ScriptController extends Controller
     }
 
     /**
+     * Soft-delete all scripts for the current tenant (move all to recycle bin). Only scripts the user can delete are affected.
+     */
+    public function deleteAll(Request $request): RedirectResponse
+    {
+        $tenantId = tenant('id');
+        $user = $request->user();
+        $scripts = Script::where('tenant_id', $tenantId)->get();
+        $toDelete = $scripts->filter(fn (Script $s) => $s->canDelete($user));
+        $count = 0;
+        foreach ($toDelete as $script) {
+            $script->delete();
+            $count++;
+        }
+        $message = $count > 0
+            ? "{$count} script(s) moved to recycle bin."
+            : 'No scripts were deleted.';
+
+        return redirect()->route('script.index', ['tenant' => tenant('slug')])
+            ->with('success', $message);
+    }
+
+    /**
+     * Permanently delete all scripts in the recycle bin for the current tenant. Cannot be undone.
+     */
+    public function emptyTrash(Request $request): RedirectResponse
+    {
+        $tenantId = tenant('id');
+        $user = $request->user();
+        $scripts = Script::onlyTrashed()->where('tenant_id', $tenantId)->get();
+        $toDelete = $scripts->filter(fn (Script $s) => $s->canDelete($user));
+        $count = 0;
+        foreach ($toDelete as $script) {
+            $script->forceDelete();
+            $count++;
+        }
+        $message = $count > 0
+            ? "{$count} script(s) permanently deleted."
+            : 'Recycle bin was already empty.';
+
+        return redirect()->route('script.index', ['tenant' => tenant('slug'), 'trashed' => 1])
+            ->with('success', $message);
+    }
+
+    /**
      * Generate YouTube-style title ideas + thumbnail text using OpenAI.
      */
     public function generateTitleIdeas(Request $request): JsonResponse
@@ -709,6 +753,331 @@ PROMPT;
                 'scheduled_at' => $script->scheduled_at?->toIso8601String(),
                 'status' => $script->status,
             ],
+        ]);
+    }
+
+    /**
+     * Export a script as JSON or CSV with full details.
+     */
+    public function export(Request $request, Script $script)
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canView($request->user())) {
+            abort(403, 'You do not have permission to export this script.');
+        }
+
+        $format = $request->query('format', 'json');
+
+        $script->loadMissing(['scriptType', 'titleOptions', 'thumbnails']);
+
+        $data = [
+            'id' => $script->id,
+            'uuid' => $script->uuid,
+            'title' => $script->title,
+            'thumbnail_text' => $script->thumbnail_text,
+            'script_type_id' => $script->script_type_id,
+            'script_type' => $script->scriptType?->name,
+            'content' => $script->content,
+            'description' => $script->description,
+            'meta_tags' => $script->meta_tags,
+            'live_video_url' => $script->live_video_url,
+            'status' => $script->status,
+            'production_status' => $script->production_status,
+            'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+            'published_at' => $script->published_at?->toIso8601String(),
+            'title_options' => $script->titleOptions->map(fn ($o) => [
+                'id' => $o->id,
+                'title' => $o->title,
+                'thumbnail_text' => $o->thumbnail_text,
+                'is_primary' => $o->is_primary,
+                'sort_order' => $o->sort_order,
+            ])->values()->all(),
+            'thumbnails' => $script->thumbnails->map(fn ($t) => [
+                'id' => $t->id,
+                'type' => $t->type,
+                'filename' => $t->filename,
+                'storage_path' => $t->storage_path,
+                'url' => $t->storage_path ? asset('storage/' . $t->storage_path) : null,
+                'sort_order' => $t->sort_order,
+            ])->values()->all(),
+            'created_at' => $script->created_at?->toIso8601String(),
+            'updated_at' => $script->updated_at?->toIso8601String(),
+        ];
+
+        // If the request provided an explicit content payload (e.g. from the editor),
+        // prefer that for export without persisting it.
+        $overrideContent = $request->input('content');
+        if (is_array($overrideContent)) {
+            $data['content'] = $overrideContent;
+        }
+
+        $filenameBase = 'script-'.$script->uuid;
+
+        if ($format === 'csv') {
+            $filename = $filenameBase.'.csv';
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ];
+
+            $callback = static function () use ($data): void {
+                $out = fopen('php://output', 'w');
+                // Flatten some nested fields as JSON strings
+                $flat = $data;
+                $flat['content'] = json_encode($data['content']);
+                $flat['title_options'] = json_encode($data['title_options']);
+                $flat['thumbnails'] = json_encode($data['thumbnails']);
+
+                fputcsv($out, array_keys($flat));
+                fputcsv($out, array_map(static fn ($v) => is_scalar($v) || is_null($v) ? $v : json_encode($v), $flat));
+                fclose($out);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        $filename = $filenameBase.'.json';
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        return response()->make(
+            json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            200,
+            $headers
+        );
+    }
+
+    /**
+     * Bulk import scripts from a CSV file.
+     */
+    public function importCsv(Request $request): RedirectResponse
+    {
+        $tenantId = tenant('id');
+        $userId = $request->user()?->id;
+
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt',
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->getRealPath();
+        if (! $path) {
+            return back()->with('error', 'Could not read uploaded file.');
+        }
+
+        $handle = fopen($path, 'r');
+        if (! $handle) {
+            return back()->with('error', 'Could not open uploaded file.');
+        }
+
+        $header = fgetcsv($handle);
+        if (! $header) {
+            fclose($handle);
+            return back()->with('error', 'CSV file is empty.');
+        }
+
+        $header = array_map('trim', $header);
+
+        $created = 0;
+        $headerCount = count($header);
+        while (($row = fgetcsv($handle)) !== false) {
+            if (count($row) === 1 && trim($row[0] ?? '') === '') {
+                continue;
+            }
+            $row = array_map('trim', $row);
+            // Ensure row has same number of columns as header (avoids array_combine error when
+            // a cell contains commas/quotes/newlines and is parsed as extra columns)
+            if (count($row) < $headerCount) {
+                $row = array_pad($row, $headerCount, '');
+            } elseif (count($row) > $headerCount) {
+                $row = array_slice($row, 0, $headerCount);
+            }
+            $data = array_combine($header, $row);
+            if (! $data) {
+                continue;
+            }
+
+            $title = $data['title'] ?? null;
+            if (! $title) {
+                continue;
+            }
+
+            $scriptTypeId = null;
+            if (! empty($data['script_type_slug'])) {
+                // Prefer explicit slug column when present
+                $type = ScriptType::where('tenant_id', $tenantId)
+                    ->where('slug', $data['script_type_slug'])
+                    ->first();
+                $scriptTypeId = $type?->id;
+            } elseif (! empty($data['script_type'])) {
+                // Fallback: try to match exported script_type (name or slug)
+                $type = ScriptType::where('tenant_id', $tenantId)
+                    ->where(function ($q) use ($data) {
+                        $q->where('slug', $data['script_type'])
+                          ->orWhere('name', $data['script_type']);
+                    })
+                    ->first();
+                $scriptTypeId = $type?->id;
+            }
+
+            $status = $data['status'] ?? 'draft';
+            if (! in_array($status, ['draft', 'writing', 'completed', 'published', 'in_review', 'archived'], true)) {
+                $status = 'draft';
+            }
+
+            $productionStatus = $data['production_status'] ?? 'not_shot';
+            if (! in_array($productionStatus, ['not_shot', 'shot', 'editing', 'edited'], true)) {
+                $productionStatus = 'not_shot';
+            }
+
+            $scheduledAt = null;
+            if (! empty($data['scheduled_at'])) {
+                try {
+                    $scheduledAt = Carbon::parse($data['scheduled_at']);
+                } catch (\Throwable) {
+                    $scheduledAt = null;
+                }
+            }
+
+            // Optional content JSON column from exported CSV
+            $content = null;
+            if (! empty($data['content'])) {
+                $decoded = json_decode($data['content'], true);
+                if (is_array($decoded)) {
+                    $content = $decoded;
+                }
+            }
+
+            Script::create([
+                'tenant_id' => $tenantId,
+                'script_type_id' => $scriptTypeId,
+                'created_by' => $userId,
+                'updated_by' => $userId,
+                'title' => $title,
+                'thumbnail_text' => $data['thumbnail_text'] ?? null,
+                'content' => $content,
+                'description' => $data['description'] ?? null,
+                'meta_tags' => $data['meta_tags'] ?? null,
+                'live_video_url' => $data['live_video_url'] ?? null,
+                'status' => $status,
+                'production_status' => $productionStatus,
+                'scheduled_at' => $scheduledAt,
+            ]);
+
+            $created++;
+        }
+
+        fclose($handle);
+
+        return back()->with('success', "Imported {$created} scripts from CSV.");
+    }
+
+    /**
+     * Export all scripts for the current tenant as a single CSV.
+     */
+    public function exportAll(Request $request)
+    {
+        $tenantId = tenant('id');
+        $user = $request->user();
+
+        // Reuse the same visibility rules as index(): creator or collaborator
+        $scripts = Script::query()
+            ->with(['scriptType', 'titleOptions', 'thumbnails'])
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($user) {
+                $q->where('created_by', $user?->id);
+                $q->orWhereHas('collaborators', fn ($c) => $c->where('user_id', $user?->id));
+            })
+            ->orderBy('created_at')
+            ->get();
+
+        $headers = [
+            'id',
+            'uuid',
+            'title',
+            'thumbnail_text',
+            'script_type_id',
+            'script_type',
+            'content',
+            'description',
+            'meta_tags',
+            'live_video_url',
+            'status',
+            'production_status',
+            'scheduled_at',
+            'published_at',
+            'title_options',
+            'thumbnails',
+            'created_at',
+            'updated_at',
+        ];
+
+        $callback = static function () use ($scripts, $headers): void {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+
+            foreach ($scripts as $script) {
+                /** @var \Modules\Script\Models\Script $script */
+                $row = [
+                    'id' => $script->id,
+                    'uuid' => $script->uuid,
+                    'title' => $script->title,
+                    'thumbnail_text' => $script->thumbnail_text,
+                    'script_type_id' => $script->script_type_id,
+                    'script_type' => $script->scriptType?->name,
+                    'content' => json_encode($script->content),
+                    'description' => $script->description,
+                    'meta_tags' => $script->meta_tags,
+                    'live_video_url' => $script->live_video_url,
+                    'status' => $script->status,
+                    'production_status' => $script->production_status,
+                    'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+                    'published_at' => $script->published_at?->toIso8601String(),
+                    'title_options' => json_encode(
+                        $script->titleOptions->map(fn ($o) => [
+                            'id' => $o->id,
+                            'title' => $o->title,
+                            'thumbnail_text' => $o->thumbnail_text,
+                            'is_primary' => $o->is_primary,
+                            'sort_order' => $o->sort_order,
+                        ])->values()->all()
+                    ),
+                    'thumbnails' => json_encode(
+                        $script->thumbnails->map(fn ($t) => [
+                            'id' => $t->id,
+                            'type' => $t->type,
+                            'filename' => $t->filename,
+                            'storage_path' => $t->storage_path,
+                            'url' => $t->storage_path ? asset('storage/' . $t->storage_path) : null,
+                            'sort_order' => $t->sort_order,
+                        ])->values()->all()
+                    ),
+                    'created_at' => $script->created_at?->toIso8601String(),
+                    'updated_at' => $script->updated_at?->toIso8601String(),
+                ];
+
+                fputcsv(
+                    $file,
+                    array_map(
+                        static fn ($v) => is_scalar($v) || is_null($v) ? $v : json_encode($v),
+                        $row
+                    )
+                );
+            }
+
+            fclose($file);
+        };
+
+        $filename = 'scripts_'.date('Y-m-d').'.csv';
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 

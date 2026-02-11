@@ -16,12 +16,17 @@ Route::middleware([
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
     Route::get('script', [ScriptController::class, 'index'])->name('script.index');
+    Route::get('script/export-all', [ScriptController::class, 'exportAll'])->name('script.export-all');
     Route::get('script/calendar', [ScriptController::class, 'calendar'])->name('script.calendar');
     Route::get('script/create', [ScriptController::class, 'create'])->name('script.create');
     Route::post('script', [ScriptController::class, 'store'])->name('script.store');
+    Route::post('script/import-csv', [ScriptController::class, 'importCsv'])->name('script.import-csv');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
+    Route::match(['GET', 'POST'], 'script/{script}/export', [ScriptController::class, 'export'])->name('script.export');
     Route::put('script/{script}', [ScriptController::class, 'update'])->name('script.update');
     Route::delete('script/{script}', [ScriptController::class, 'destroy'])->name('script.destroy');
+    Route::post('script/delete-all', [ScriptController::class, 'deleteAll'])->name('script.delete-all');
+    Route::post('script/empty-trash', [ScriptController::class, 'emptyTrash'])->name('script.empty-trash');
     Route::post('script/{script}/restore', [ScriptController::class, 'restore'])->name('script.restore')->where('script', '[0-9a-fA-F-]{36}');
     Route::delete('script/{script}/permanent', [ScriptController::class, 'forceDestroy'])->name('script.force-destroy')->where('script', '[0-9a-fA-F-]{36}');
     Route::get('script/{script}/share', [ScriptController::class, 'shareData'])->name('script.share');

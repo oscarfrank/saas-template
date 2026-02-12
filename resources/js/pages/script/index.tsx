@@ -501,13 +501,20 @@ export default function ScriptIndex({
     const [emptyTrashOpen, setEmptyTrashOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSentSearchRef = useRef<string | undefined>(undefined);
 
     const filters = filtersFromServer ?? defaultFilters;
     const sort = trashed ? (sortFromServer === 'updated_desc' || sortFromServer === 'updated_asc' ? 'deleted_desc' : sortFromServer) : sortFromServer;
 
     const [searchInput, setSearchInput] = useState(filters.search ?? '');
     useEffect(() => {
-        setSearchInput(filters.search ?? '');
+        const serverSearch = filters.search ?? '';
+        if (lastSentSearchRef.current === undefined) {
+            lastSentSearchRef.current = serverSearch;
+            setSearchInput(serverSearch);
+        } else if (serverSearch === lastSentSearchRef.current) {
+            setSearchInput(serverSearch);
+        }
     }, [filters.search]);
 
     const scripts = Array.isArray(scriptsFromServer) ? scriptsFromServer : [];
@@ -550,18 +557,24 @@ export default function ScriptIndex({
     const applyQuery = (overrides: Record<string, unknown> = {}) => {
         const url = tenantRouter.route('script.index');
         const params = buildQuery(overrides);
+        const searchSent = (params.search as string) ?? '';
+        lastSentSearchRef.current = searchSent;
         router.get(url, params as Record<string, string | number | number[] | string[]>, {
-            preserveState: false,
+            preserveState: true,
+            preserveScroll: true,
+            only: ['scripts', 'filters', 'sort', 'scriptTypes'],
             onStart: () => setIsLoading(true),
             onFinish: () => setIsLoading(false),
         });
     };
 
     const handleSearchChange = (value: string) => {
+        const trimmed = value.trim() || '';
+        lastSentSearchRef.current = trimmed;
         setSearchInput(value);
         if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
         searchDebounceRef.current = setTimeout(() => {
-            applyQuery({ search: value.trim() || undefined });
+            applyQuery({ search: trimmed || undefined });
         }, 350);
     };
 

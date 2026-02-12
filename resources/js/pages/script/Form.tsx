@@ -39,6 +39,34 @@ import { useTenantRouter } from '@/hooks/use-tenant-router';
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_DELAY_AFTER_MOUNT_MS = 2000;
 
+/** Extract all text from BlockNote blocks and count words */
+function countWordsInBlocks(blocks: PartialBlock[]): number {
+    const extractText = (items: unknown[]): string => {
+        let text = '';
+        for (const item of items) {
+            if (typeof item !== 'object' || item === null) continue;
+            const obj = item as Record<string, unknown>;
+            // Extract text from inline content
+            if (obj.type === 'text' && typeof obj.text === 'string') {
+                text += ' ' + obj.text;
+            }
+            // Recurse into content array (inline elements)
+            if (Array.isArray(obj.content)) {
+                text += ' ' + extractText(obj.content);
+            }
+            // Recurse into children array (nested blocks)
+            if (Array.isArray(obj.children)) {
+                text += ' ' + extractText(obj.children);
+            }
+        }
+        return text;
+    };
+    const allText = extractText(blocks);
+    // Split by whitespace, filter empty strings
+    const words = allText.trim().split(/\s+/).filter(w => w.length > 0);
+    return words.length;
+}
+
 /** Catches editor render errors so the rest of the page still shows. */
 class EditorErrorBoundary extends Component<
     { children: ReactNode; fallback?: ReactNode },
@@ -341,6 +369,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
 
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
     const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const saveInProgressRef = useRef(false);
     const formStateRef = useRef({
         content,
         pageTitle,
@@ -649,6 +678,8 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     }, [titleOptions, titleSuggestions]);
     const hasIdeasToView = displayIdeas.length > 0;
 
+    const wordCount = useMemo(() => countWordsInBlocks(content), [content]);
+
     const buildUpdatePayload = () => {
         const state = formStateRef.current;
         type OptionPayload = { id?: number; title: string; thumbnail_text: string | null; is_primary: boolean };
@@ -677,43 +708,86 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         };
     };
 
-    const performAutosave = () => {
+    const performAutosave = async () => {
         if (!initialScript || !tenantRouter) return;
+        if (saveInProgressRef.current) return;
+        saveInProgressRef.current = true;
         setAutosaveStatus('saving');
         const payload = buildUpdatePayload();
-        router.put(tenantRouter.route('script.update', { script: initialScript.uuid }), payload, {
-            preserveScroll: true,
-            onFinish: () => {
+        try {
+            const response = await fetch(tenantRouter.route('script.update', { script: initialScript.uuid }), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
+                },
+                body: JSON.stringify(payload),
+            });
+            if (response.ok) {
                 setAutosaveStatus('saved');
                 setTimeout(() => setAutosaveStatus('idle'), 2000);
-            },
-            onError: () => setAutosaveStatus('idle'),
-        });
+            } else {
+                setAutosaveStatus('idle');
+            }
+        } catch {
+            setAutosaveStatus('idle');
+        } finally {
+            saveInProgressRef.current = false;
+        }
     };
 
-    const performCreateSave = () => {
+    const performCreateSave = async () => {
         if (isEdit || !tenantRouter) return;
+        if (saveInProgressRef.current) return;
+        saveInProgressRef.current = true;
         setAutosaveStatus('saving');
         const state = formStateRef.current;
         const titleOptionsPayload = state.pageTitle.trim()
             ? [{ title: state.pageTitle.trim(), thumbnail_text: state.mainThumbnailText ?? null, is_primary: true }]
             : [];
-        router.post(tenantRouter.route('script.store'), {
-            title: state.pageTitle.trim() || 'Untitled script',
-            thumbnail_text: state.mainThumbnailText ?? null,
-            script_type_id: state.scriptTypeId ? Number(state.scriptTypeId) : null,
-            content: state.content,
-            description: state.descriptionData?.descriptionBlock ?? null,
-            meta_tags: state.descriptionData?.metaTags ?? null,
-            status: state.workflowStatus,
-            scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
-            production_status: state.productionStatus,
-            title_options: titleOptionsPayload,
-        }, {
-            preserveScroll: false,
-            onFinish: () => setAutosaveStatus('idle'),
-            onError: () => setAutosaveStatus('idle'),
-        });
+        try {
+            const response = await fetch(tenantRouter.route('script.store'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-XSRF-TOKEN': decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? ''),
+                },
+                body: JSON.stringify({
+                    title: state.pageTitle.trim() || 'Untitled script',
+                    thumbnail_text: state.mainThumbnailText ?? null,
+                    script_type_id: state.scriptTypeId ? Number(state.scriptTypeId) : null,
+                    content: state.content,
+                    description: state.descriptionData?.descriptionBlock ?? null,
+                    meta_tags: state.descriptionData?.metaTags ?? null,
+                    status: state.workflowStatus,
+                    scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
+                    production_status: state.productionStatus,
+                    title_options: titleOptionsPayload,
+                }),
+            });
+            if (response.ok) {
+                // Backend returns a redirect - get the URL from the response
+                const data = await response.json().catch(() => null);
+                if (data?.redirect_url) {
+                    router.visit(data.redirect_url, { preserveScroll: false });
+                } else {
+                    // Fallback: follow the redirect location header or reload
+                    const redirectUrl = response.headers.get('X-Inertia-Location') || response.url;
+                    if (redirectUrl && redirectUrl !== window.location.href) {
+                        router.visit(redirectUrl, { preserveScroll: false });
+                    }
+                }
+            }
+            setAutosaveStatus('idle');
+        } catch {
+            setAutosaveStatus('idle');
+        } finally {
+            saveInProgressRef.current = false;
+        }
     };
 
     useEffect(() => {
@@ -1068,15 +1142,15 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             disabled={readOnly}
                             className="min-w-[200px] max-w-2xl flex-1 border-0 bg-transparent text-2xl font-semibold shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-3xl disabled:opacity-80"
                         />
-                        <div className="ml-auto flex shrink-0 items-center gap-1">
-                            {isEdit && autosaveStatus !== 'idle' && (
-                                <span className="text-muted-foreground text-xs">
-                                    {autosaveStatus === 'saving' ? 'Saving…' : 'Saved'}
-                                </span>
-                            )}
-                            {!isEdit && autosaveStatus === 'saving' && (
-                                <span className="text-muted-foreground text-xs">Saving…</span>
-                            )}
+                        <div className="ml-auto flex shrink-0 items-center gap-2">
+                            <span className="text-muted-foreground text-xs tabular-nums">
+                                {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
+                                {((isEdit && autosaveStatus !== 'idle') || (!isEdit && autosaveStatus === 'saving')) && (
+                                    <span className="mx-1">·</span>
+                                )}
+                                {isEdit && autosaveStatus !== 'idle' && (autosaveStatus === 'saving' ? 'Saving…' : 'Saved')}
+                                {!isEdit && autosaveStatus === 'saving' && 'Saving…'}
+                            </span>
                             {canManageAccess && (
                                 <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setShareSheetOpen(true)}>
                                     <Share2 className="mr-2 h-4 w-4" />

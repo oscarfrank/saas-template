@@ -195,7 +195,7 @@ final class ScriptController extends Controller
     /**
      * Store a new script.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -244,8 +244,18 @@ final class ScriptController extends Controller
             ]);
         }
 
-        return redirect()->route('script.edit', ['tenant' => tenant('slug'), 'script' => $script->uuid])
-            ->with('success', 'Script created.');
+        $editUrl = route('script.edit', ['tenant' => tenant('slug'), 'script' => $script->uuid]);
+
+        // Return JSON for AJAX/autosave requests
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'redirect_url' => $editUrl,
+                'uuid' => $script->uuid,
+            ]);
+        }
+
+        return redirect($editUrl)->with('success', 'Script created.');
     }
 
     /**
@@ -279,7 +289,7 @@ final class ScriptController extends Controller
     /**
      * Update the script.
      */
-    public function update(Request $request, Script $script): RedirectResponse
+    public function update(Request $request, Script $script): RedirectResponse|JsonResponse
     {
         $tenantId = tenant('id');
         if ($script->tenant_id !== $tenantId) {
@@ -323,6 +333,11 @@ final class ScriptController extends Controller
 
         if (array_key_exists('title_options', $validated)) {
             $script->syncTitleOptionsFromArray($validated['title_options'] ?? []);
+        }
+
+        // Return JSON for AJAX/autosave requests
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
         }
 
         return back()->with('success', 'Script updated.');
@@ -1567,6 +1582,52 @@ PROMPT;
 
             return response()->json(
                 ['message' => 'Failed to generate script. Please try again.'],
+                500
+            );
+        }
+    }
+
+    /**
+     * Generate YouTube script/video ideas from a topic using OpenAI.
+     */
+    public function generateScriptIdeas(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'topic' => 'required|string|max:2000',
+            'count' => 'nullable|integer|min:3|max:20',
+            'tone' => 'nullable|string|max:100',
+        ]);
+
+        $topic = trim($validated['topic']);
+        $count = (int) ($validated['count'] ?? 10);
+        $tone = trim($validated['tone'] ?? 'conversational and engaging');
+
+        $systemPrompt = 'You are a creative YouTube content strategist. Generate video or script ideas that would work well on YouTube. Output a numbered list only: no intro, no outro, no extra commentary. Each idea should be one clear title or one-line concept.';
+
+        $userPrompt = "Topic or niche: {$topic}\n\nGenerate exactly {$count} YouTube video/script ideas. Tone: {$tone}. Reply with only the numbered list (e.g. 1. Idea one\n2. Idea two).";
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_tokens' => 2048,
+                'temperature' => 0.8,
+            ]);
+
+            $ideas = trim($response->choices[0]->message->content ?? '');
+            if ($ideas === '') {
+                return response()->json(['message' => 'No ideas generated. Try again.'], 422);
+            }
+
+            return response()->json(['ideas' => $ideas]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::generateScriptIdeas failed', ['error' => $e->getMessage()]);
+
+            return response()->json(
+                ['message' => 'Failed to generate ideas. Please try again.'],
                 500
             );
         }

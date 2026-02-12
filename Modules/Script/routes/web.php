@@ -21,6 +21,7 @@ Route::middleware([
     Route::get('script/transcripts', [ScriptController::class, 'transcripts'])->name('script.transcripts');
     Route::post('script/transcripts/fetch', [ScriptController::class, 'fetchTranscripts'])->name('script.transcripts.fetch');
     Route::post('script/transcripts/generate', [ScriptController::class, 'generateScriptFromTranscripts'])->name('script.transcripts.generate');
+    Route::post('script/transcripts/generate-ideas', [ScriptController::class, 'generateScriptIdeas'])->name('script.transcripts.generate-ideas');
     Route::post('script/transcripts/create-script', [ScriptController::class, 'createScriptFromGenerated'])->name('script.transcripts.create-script');
     Route::post('script/transcripts/fetch-specs', [ScriptController::class, 'fetchSpecsFromUrl'])->name('script.transcripts.fetch-specs');
     Route::get('script/transcripts/search-my-scripts', [ScriptController::class, 'searchMyScripts'])->name('script.transcripts.search-my-scripts');

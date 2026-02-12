@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Copy, FileText, Loader2, Plus, Sparkles, Youtube } from 'lucide-react';
+import { ArrowLeft, Copy, FileText, Lightbulb, Loader2, Plus, ScrollText, Sparkles, Wand2, Youtube } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ScriptSearchItem {
@@ -71,6 +71,12 @@ export default function TranscriptsPage() {
     const [scriptContentLoading, setScriptContentLoading] = useState(false);
     const [creatingScript, setCreatingScript] = useState(false);
     const scriptSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Script ideas tab
+    const [ideasTopic, setIdeasTopic] = useState('');
+    const [ideasTone, setIdeasTone] = useState('conversational and engaging');
+    const [ideasCount, setIdeasCount] = useState(10);
+    const [ideasResult, setIdeasResult] = useState('');
+    const [ideasLoading, setIdeasLoading] = useState(false);
 
     const handleFetch = async () => {
         const trimmed = urls.trim();
@@ -266,6 +272,45 @@ export default function TranscriptsPage() {
         }
     };
 
+    const handleGenerateIdeas = async () => {
+        if (!ideasTopic.trim()) {
+            toast.error('Enter a topic or niche first.');
+            return;
+        }
+        setIdeasLoading(true);
+        setIdeasResult('');
+        try {
+            const url = tenantRouter.route('script.transcripts.generate-ideas');
+            const csrfToken =
+                document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    topic: ideasTopic.trim(),
+                    count: ideasCount,
+                    tone: ideasTone.trim() || undefined,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                toast.error(data.message ?? 'Failed to generate ideas.');
+                return;
+            }
+            setIdeasResult(data.ideas ?? '');
+            toast.success('Ideas generated.');
+        } catch (e) {
+            toast.error('Could not generate ideas. Try again.');
+        } finally {
+            setIdeasLoading(false);
+        }
+    };
+
     const fetchScriptSearch = useCallback(
         async (q: string) => {
             const base = tenantRouter.route('script.transcripts.search-my-scripts');
@@ -387,32 +432,50 @@ export default function TranscriptsPage() {
                             YouTube transcripts
                         </h1>
                         <p className="text-muted-foreground max-w-xl text-sm md:text-base">
-                            Fetch transcripts from YouTube, then build a single prompt (review or comparison) with specs and observations to paste into AI.
+                            Fetch transcripts, build review or comparison prompts with specs, generate scripts with AI, or brainstorm video ideas—all in one place.
                         </p>
                     </div>
                 </div>
 
-                <Tabs defaultValue="fetch" className="w-full">
-                    <TabsList className="grid w-full max-w-md grid-cols-2">
-                        <TabsTrigger value="fetch">1. Get transcripts</TabsTrigger>
-                        <TabsTrigger value="build">2. Build for AI</TabsTrigger>
+                <Tabs defaultValue="fetch" className="w-full space-y-6">
+                    <TabsList className="grid w-full max-w-2xl grid-cols-3 h-auto gap-1 p-1">
+                        <TabsTrigger value="fetch" className="gap-2 py-2.5 data-[state=active]:bg-background">
+                            <ScrollText className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">1.</span> Get transcripts
+                        </TabsTrigger>
+                        <TabsTrigger value="build" className="gap-2 py-2.5 data-[state=active]:bg-background">
+                            <Wand2 className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">2.</span> Build for AI
+                        </TabsTrigger>
+                        <TabsTrigger value="ideas" className="gap-2 py-2.5 data-[state=active]:bg-background">
+                            <Lightbulb className="h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">3.</span> Script ideas
+                        </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="fetch" className="mt-6 space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <Label htmlFor="urls">YouTube URLs (one per line)</Label>
+                    <TabsContent value="fetch" className="mt-0 space-y-6">
+                        <Card className="border-border/80 shadow-sm">
+                            <CardHeader className="space-y-1">
+                                <Label htmlFor="urls">YouTube URLs</Label>
+                                <p className="text-muted-foreground text-sm font-normal">
+                                    Paste one or more video URLs (one per line). We&apos;ll fetch captions and combine them for your prompt.
+                                </p>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <textarea
                                     id="urls"
-                                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[160px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...\n...'}
+                                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[160px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    placeholder={'https://www.youtube.com/watch?v=...\nhttps://youtu.be/...'}
                                     value={urls}
                                     onChange={(e) => setUrls(e.target.value)}
                                     disabled={loading}
                                     rows={6}
                                 />
+                                {!urls.trim() && (
+                                    <p className="text-muted-foreground text-xs">
+                                        Tip: Use videos that have captions enabled (most public videos do).
+                                    </p>
+                                )}
                                 <Button
                                     onClick={handleFetch}
                                     disabled={loading || !urls.trim()}
@@ -431,7 +494,7 @@ export default function TranscriptsPage() {
                         </Card>
 
                         {(transcript || errors.length > 0 || summary) && (
-                            <Card>
+                            <Card className="border-border/80 shadow-sm">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                                     <Label>Transcripts</Label>
                                     {summary && (
@@ -459,10 +522,13 @@ export default function TranscriptsPage() {
                         )}
                     </TabsContent>
 
-                    <TabsContent value="build" className="mt-6 space-y-6">
-                        <Card>
-                            <CardHeader>
+                    <TabsContent value="build" className="mt-0 space-y-6">
+                        <Card className="border-border/80 shadow-sm">
+                            <CardHeader className="space-y-1">
                                 <Label>Mode</Label>
+                                <p className="text-muted-foreground text-sm font-normal">
+                                    Choose a single device review or a two-device comparison, then add specs and observations.
+                                </p>
                             </CardHeader>
                             <CardContent>
                                 <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
@@ -792,9 +858,14 @@ export default function TranscriptsPage() {
                             </CardContent>
                         </Card>
 
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <Label>Output for AI</Label>
+                        <Card className="border-border/80 shadow-sm">
+                            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <Label>Output for AI</Label>
+                                    <p className="text-muted-foreground text-sm font-normal">
+                                        Build the prompt below, then copy it or generate a script with OpenAI.
+                                    </p>
+                                </div>
                                 <div className="flex gap-2">
                                     <Button onClick={buildForAI} variant="default" size="sm">
                                         Build for AI
@@ -844,9 +915,14 @@ export default function TranscriptsPage() {
                         </Card>
 
                         {generatedScript && (
-                            <Card>
+                            <Card className="border-border/80 shadow-sm">
                                 <CardHeader className="flex flex-row items-center justify-between">
-                                    <Label>Generated script</Label>
+                                    <div className="space-y-1">
+                                        <Label>Generated script</Label>
+                                        <p className="text-muted-foreground text-sm font-normal">
+                                            Create a new script from this or copy to use elsewhere.
+                                        </p>
+                                    </div>
                                     <div className="flex gap-2">
                                         <Button
                                             onClick={handleCreateScript}
@@ -880,6 +956,107 @@ export default function TranscriptsPage() {
                                         value={generatedScript}
                                         rows={18}
                                     />
+                                </CardContent>
+                            </Card>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="ideas" className="mt-0 space-y-6">
+                        <Card className="border-border/80 shadow-sm">
+                            <CardHeader className="space-y-1">
+                                <Label>Generate video ideas</Label>
+                                <p className="text-muted-foreground text-sm font-normal">
+                                    Describe your channel topic or niche. We&apos;ll suggest YouTube video or script ideas you can turn into content.
+                                </p>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="ideas-topic">Topic or niche</Label>
+                                    <textarea
+                                        id="ideas-topic"
+                                        className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                                        placeholder="e.g. Tech reviews, productivity for students, cooking on a budget..."
+                                        value={ideasTopic}
+                                        onChange={(e) => setIdeasTopic(e.target.value)}
+                                        rows={3}
+                                    />
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ideas-count">Number of ideas</Label>
+                                        <select
+                                            id="ideas-count"
+                                            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                                            value={ideasCount}
+                                            onChange={(e) => setIdeasCount(Number(e.target.value))}
+                                        >
+                                            {[5, 10, 15, 20].map((n) => (
+                                                <option key={n} value={n}>{n} ideas</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ideas-tone">Tone</Label>
+                                        <input
+                                            id="ideas-tone"
+                                            type="text"
+                                            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                                            placeholder="e.g. conversational, educational"
+                                            value={ideasTone}
+                                            onChange={(e) => setIdeasTone(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={handleGenerateIdeas}
+                                    disabled={!ideasTopic.trim() || ideasLoading}
+                                    className="gap-2"
+                                >
+                                    {ideasLoading ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Generating…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Lightbulb className="h-4 w-4" />
+                                            Generate ideas
+                                        </>
+                                    )}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        {ideasResult && (
+                            <Card className="border-border/80 shadow-sm">
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <div>
+                                        <Label>Your ideas</Label>
+                                        <p className="text-muted-foreground text-sm font-normal mt-0.5">
+                                            Copy what you like or use one as a starting point for a script.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 shrink-0"
+                                        onClick={async () => {
+                                            try {
+                                                await navigator.clipboard.writeText(ideasResult);
+                                                toast.success('Copied to clipboard.');
+                                            } catch {
+                                                toast.error('Could not copy.');
+                                            }
+                                        }}
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                        Copy
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    <pre className="text-muted-foreground whitespace-pre-wrap rounded-md border bg-muted/30 p-4 font-sans text-sm">
+                                        {ideasResult}
+                                    </pre>
                                 </CardContent>
                             </Card>
                         )}

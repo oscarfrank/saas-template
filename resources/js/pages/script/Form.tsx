@@ -19,6 +19,7 @@ import {
     SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     DropdownMenu,
@@ -342,6 +343,8 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [ideasSheetOpen, setIdeasSheetOpen] = useState(false);
     const [editingTitleKey, setEditingTitleKey] = useState<string | null>(null);
     const [editingTitleDraft, setEditingTitleDraft] = useState({ title: '', thumbnailText: '' });
+    const [showManualTitleForm, setShowManualTitleForm] = useState(false);
+    const [manualTitleDraft, setManualTitleDraft] = useState({ title: '', thumbnailText: '' });
     const [generateError, setGenerateError] = useState<string | null>(null);
     const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
     const [descriptionData, setDescriptionData] = useState<DescriptionAssets | null>(
@@ -549,6 +552,24 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             }
             return [...prev.map((o) => ({ ...o, is_primary: false })), { id: undefined, title: suggestion.text, thumbnail_text: suggestion.thumbnailText ?? null, is_primary: isFirst }];
         });
+    };
+
+    const handleAddManualTitle = () => {
+        const title = manualTitleDraft.title.trim();
+        if (!title) return;
+        setTitleOptions((prev) => {
+            const exists = prev.some((o) => o.title === title && (o.thumbnail_text ?? null) === (manualTitleDraft.thumbnailText?.trim() ?? null));
+            if (exists) return prev;
+            const isFirst = prev.length === 0;
+            if (isFirst) {
+                setPageTitle(title);
+                setMainThumbnailText(manualTitleDraft.thumbnailText?.trim() ?? null);
+            }
+            const thumbnail = manualTitleDraft.thumbnailText?.trim() || null;
+            return [...prev.map((o) => ({ ...o, is_primary: false })), { id: undefined, title, thumbnail_text: thumbnail, is_primary: isFirst }];
+        });
+        setManualTitleDraft({ title: '', thumbnailText: '' });
+        setShowManualTitleForm(false);
     };
 
     const handleRemoveSuggestion = (id: string) => {
@@ -1256,68 +1277,84 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
 
                 {!readOnly && (
                 <div className="mb-4 flex flex-wrap items-center gap-2">
-                    {/* Title ideas: show Generate only when no ideas yet; otherwise only View ideas (includes saved title options) */}
-                    {!hasIdeasToView ? (
-                        <Popover
-                            open={generatePopoverOpen}
-                            onOpenChange={(open) => {
-                                setGeneratePopoverOpen(open);
-                                if (open) setGenerateError(null);
-                            }}
-                        >
-                            <PopoverTrigger asChild>
-                                <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={isGenerating}>
-                                    <Sparkles className="mr-2 h-4 w-4" />
-                                    {isGenerating ? 'Generating…' : 'Generate title ideas'}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80" align="start" side="bottom">
-                                <div className="space-y-3">
-                                    <div>
-                                        <h4 className="font-medium leading-none">Choose title style</h4>
-                                        <p className="text-muted-foreground mt-1 text-sm">
-                                            Pick one or more. We’ll use your script content to generate ideas.
-                                        </p>
-                                    </div>
-                                    <div className="grid gap-2 py-2">
-                                        {TITLE_STYLE_OPTIONS.map((opt) => (
-                                            <label
-                                                key={opt.id}
-                                                className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent px-2 py-1.5 hover:bg-muted/50 has-[:checked]:bg-muted/30"
-                                            >
-                                                <Checkbox
-                                                    checked={selectedTitleStyles.includes(opt.id)}
-                                                    onCheckedChange={() => toggleTitleStyle(opt.id)}
-                                                />
-                                                <div className="grid gap-0.5 leading-none">
-                                                    <span className="text-sm font-medium">{opt.label}</span>
-                                                    <span className="text-muted-foreground text-xs">{opt.description}</span>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() => handleGenerateTitleIdeas()}
-                                        disabled={selectedTitleStyles.length === 0}
-                                    >
-                                        Generate ideas
+                    {/* Title ideas: always show both Generate (AI) and View ideas (sidebar for manual add too) */}
+                    <Popover
+                        open={generatePopoverOpen}
+                        onOpenChange={(open) => {
+                            setGeneratePopoverOpen(open);
+                            if (open) setGenerateError(null);
+                        }}
+                    >
+                        <PopoverTrigger asChild>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" disabled={isGenerating}>
+                                        <Sparkles className="h-4 w-4" />
                                     </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">{isGenerating ? 'Generating…' : 'Generate title ideas'}</TooltipContent>
+                            </Tooltip>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="start" side="bottom">
+                            <div className="space-y-3">
+                                <div>
+                                    <h4 className="font-medium leading-none">Choose title style</h4>
+                                    <p className="text-muted-foreground mt-1 text-sm">
+                                        Pick one or more. We’ll use your script content to generate ideas.
+                                    </p>
                                 </div>
-                            </PopoverContent>
-                        </Popover>
-                    ) : (
-                        <Sheet open={ideasSheetOpen} onOpenChange={setIdeasSheetOpen}>
+                                <div className="grid gap-2 py-2">
+                                    {TITLE_STYLE_OPTIONS.map((opt) => (
+                                        <label
+                                            key={opt.id}
+                                            className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent px-2 py-1.5 hover:bg-muted/50 has-[:checked]:bg-muted/30"
+                                        >
+                                            <Checkbox
+                                                checked={selectedTitleStyles.includes(opt.id)}
+                                                onCheckedChange={() => toggleTitleStyle(opt.id)}
+                                            />
+                                            <div className="grid gap-0.5 leading-none">
+                                                <span className="text-sm font-medium">{opt.label}</span>
+                                                <span className="text-muted-foreground text-xs">{opt.description}</span>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => handleGenerateTitleIdeas()}
+                                    disabled={selectedTitleStyles.length === 0}
+                                >
+                                    Generate ideas
+                                </Button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    <Sheet
+                        open={ideasSheetOpen}
+                        onOpenChange={(open) => {
+                            setIdeasSheetOpen(open);
+                            if (open && displayIdeas.length === 0) setShowManualTitleForm(true);
+                        }}
+                    >
                                 <SheetTrigger asChild>
-                                    <Button type="button" variant="ghost" size="sm" className="shrink-0">
-                                        <List className="mr-2 h-4 w-4" />
-                                        View ideas
-                                        <span className="ml-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                                            {displayIdeas.length}
-                                        </span>
-                                    </Button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 relative">
+                                                <List className="h-4 w-4" />
+                                                {displayIdeas.length > 0 && (
+                                                    <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium">
+                                                        {displayIdeas.length}
+                                                    </span>
+                                                )}
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom">
+                                            {displayIdeas.length > 0 ? `Title ideas (${displayIdeas.length})` : 'View title ideas'}
+                                        </TooltipContent>
+                                    </Tooltip>
                                 </SheetTrigger>
                                 <SheetContent side="right" className="w-full sm:max-w-md">
                                     <SheetHeader>
@@ -1325,7 +1362,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                         <SheetDescription>
                                             Checkmark sets one as the current title; the rest stay. Remove only the ones you don’t want. Regenerate adds new ideas below. Edit with the pencil. Changes save with the script.
                                         </SheetDescription>
-                                        <div className="flex gap-2 pt-2">
+                                        <div className="flex flex-wrap gap-2 pt-2">
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -1336,9 +1373,43 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                                 <Sparkles className="mr-2 h-4 w-4" />
                                                 {isGenerating ? 'Generating…' : 'Regenerate'}
                                             </Button>
+                                            <Button
+                                                type="button"
+                                                variant={showManualTitleForm ? 'secondary' : 'outline'}
+                                                size="sm"
+                                                onClick={() => {
+                                                    setShowManualTitleForm((v) => !v);
+                                                    if (showManualTitleForm) setManualTitleDraft({ title: '', thumbnailText: '' });
+                                                }}
+                                            >
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                {showManualTitleForm ? 'Cancel' : 'Add title'}
+                                            </Button>
                                         </div>
                                     </SheetHeader>
                                 <div className="flex flex-1 flex-col gap-2 overflow-auto py-4">
+                                    {showManualTitleForm && (
+                                        <div className="flex flex-col gap-2 rounded-lg border border-dashed bg-muted/20 p-3">
+                                            <Label className="text-xs">Title</Label>
+                                            <Input
+                                                value={manualTitleDraft.title}
+                                                onChange={(e) => setManualTitleDraft((d) => ({ ...d, title: e.target.value }))}
+                                                placeholder="Enter your title"
+                                                className="h-9"
+                                                autoFocus
+                                            />
+                                            <Label className="text-xs">Thumbnail text (optional)</Label>
+                                            <Input
+                                                value={manualTitleDraft.thumbnailText}
+                                                onChange={(e) => setManualTitleDraft((d) => ({ ...d, thumbnailText: e.target.value }))}
+                                                placeholder="Short text for thumbnail"
+                                                className="h-9"
+                                            />
+                                            <Button type="button" size="sm" onClick={handleAddManualTitle} disabled={!manualTitleDraft.title.trim()}>
+                                                Add title
+                                            </Button>
+                                        </div>
+                                    )}
                                     {displayIdeas.map((item) =>
                                         item.kind === 'suggestion' ? (() => {
                                             const { suggestion } = item;
@@ -1452,65 +1523,84 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                 </div>
                             </SheetContent>
                         </Sheet>
-                    )}
                     {generateError && (
                         <p className="text-destructive text-sm" role="alert">{generateError}</p>
                     )}
 
-                    {/* Description: show Generate only when none yet; otherwise only View */}
-                    {!descriptionData ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="shrink-0"
-                            disabled={isGeneratingDescription}
-                            onClick={handleGenerateDescriptionAssets}
-                        >
-                            <FileText className="mr-2 h-4 w-4" />
-                            {isGeneratingDescription ? 'Generating…' : 'Description & more'}
-                        </Button>
-                    ) : (
-                        <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => setDescriptionSheetOpen(true)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View description & tags
-                        </Button>
-                    )}
+                    {/* Description: one button opens sheet — write manually or generate with AI inside */}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                type="button"
+                                variant={descriptionData && (descriptionData.descriptionBlock || descriptionData.metaTags) ? 'ghost' : 'outline'}
+                                size="icon"
+                                className="h-9 w-9 shrink-0"
+                                onClick={() => setDescriptionSheetOpen(true)}
+                            >
+                                <FileText className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Description & tags</TooltipContent>
+                    </Tooltip>
                     {descriptionError && (
                         <p className="text-destructive text-sm" role="alert">{descriptionError}</p>
                     )}
                     {/* Thumbnails: only for existing scripts; view/add/delete images in a side sheet */}
                     {isEdit && (
-                        <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => setThumbnailsSheetOpen(true)}>
-                            <ImagePlus className="mr-2 h-4 w-4" />
-                            {thumbnails.length > 0 ? `Thumbnails (${thumbnails.length})` : 'Thumbnails'}
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 relative" onClick={() => setThumbnailsSheetOpen(true)}>
+                                    <ImagePlus className="h-4 w-4" />
+                                    {thumbnails.length > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium">
+                                            {thumbnails.length}
+                                        </span>
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">{thumbnails.length > 0 ? `Thumbnails (${thumbnails.length})` : 'Thumbnails'}</TooltipContent>
+                        </Tooltip>
                     )}
-                    <Sheet open={descriptionSheetOpen} onOpenChange={(open) => { setDescriptionSheetOpen(open); if (open) setDescriptionError(null); }}>
+                    <Sheet
+                        open={descriptionSheetOpen}
+                        onOpenChange={(open) => {
+                            setDescriptionSheetOpen(open);
+                            if (open) {
+                                setDescriptionError(null);
+                                if (descriptionData === null) setDescriptionData({ descriptionBlock: '', metaTags: '' });
+                            }
+                        }}
+                    >
                         <SheetContent side="right" className="flex w-full flex-col gap-0 sm:max-w-xl">
                             <SheetHeader className="px-6 pt-6 pb-4">
                                 <SheetTitle>Description, timestamps & tags</SheetTitle>
                                 <SheetDescription>
-                                    Edit below — changes are saved automatically with the script. Copy description or meta tags as needed.
+                                    Edit below — changes are saved automatically with the script. Generate with AI or write your own.
                                 </SheetDescription>
-                                {descriptionData && (
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                        <Button type="button" variant="secondary" size="sm" onClick={() => copyToClipboard(descriptionData.descriptionBlock)}>
-                                            <Copy className="mr-2 h-4 w-4" />
-                                            Copy description
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={isGeneratingDescription}
-                                            onClick={handleGenerateDescriptionAssets}
-                                        >
-                                            <FileText className="mr-2 h-4 w-4" />
-                                            {isGeneratingDescription ? 'Generating…' : 'Regenerate'}
-                                        </Button>
-                                    </div>
-                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    {descriptionData && (descriptionData.descriptionBlock || descriptionData.metaTags) && (
+                                        <>
+                                            <Button type="button" variant="secondary" size="sm" onClick={() => copyToClipboard(descriptionData.descriptionBlock)}>
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                Copy description
+                                            </Button>
+                                            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => copyToClipboard(descriptionData.metaTags, 'Tags copied!')}>
+                                                <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                                Copy tags
+                                            </Button>
+                                        </>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isGeneratingDescription}
+                                        onClick={handleGenerateDescriptionAssets}
+                                    >
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        {isGeneratingDescription ? 'Generating…' : descriptionData && (descriptionData.descriptionBlock || descriptionData.metaTags) ? 'Regenerate with AI' : 'Generate with AI'}
+                                    </Button>
+                                </div>
                             </SheetHeader>
                             {descriptionData && (
                                 <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8 pt-2">

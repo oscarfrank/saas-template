@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -12,6 +12,7 @@ import {
     Plus,
     ScrollText,
     MoreHorizontal,
+    MoreVertical,
     Pencil,
     Copy,
     Trash2,
@@ -24,11 +25,14 @@ import {
     RotateCcw,
     CalendarDays,
     Download,
+    ArrowDownAZ,
+    Filter,
 } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -41,6 +45,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Scripts', href: '/script' },
@@ -55,9 +63,282 @@ export interface ScriptItem {
     platform: 'youtube' | 'tiktok' | 'instagram' | 'general' | 'podcast';
     updatedAt: string;
     script_type_id?: number | null;
+    status?: string | null;
     production_status?: string | null;
+    created_at?: string | null;
+    scheduled_at?: string | null;
     deleted_at?: string;
     deleted_at_human?: string;
+}
+
+export interface ScriptTypeOption {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+export interface ScriptFilters {
+    search: string | null;
+    script_type_id: number[];
+    status: string[];
+    production_status: string[];
+    date_field: string | null;
+    date_from: string | null;
+    date_to: string | null;
+}
+
+const SORT_OPTIONS = [
+    { value: 'updated_desc', label: 'Newest updated' },
+    { value: 'updated_asc', label: 'Oldest updated' },
+    { value: 'created_desc', label: 'Newest first' },
+    { value: 'created_asc', label: 'Oldest first' },
+    { value: 'title_asc', label: 'Title A–Z' },
+    { value: 'title_desc', label: 'Title Z–A' },
+    { value: 'scheduled_desc', label: 'Scheduled (latest)' },
+    { value: 'scheduled_asc', label: 'Scheduled (earliest)' },
+] as const;
+
+const TRASHED_SORT_OPTIONS = [
+    { value: 'deleted_desc', label: 'Deleted (newest)' },
+    { value: 'deleted_asc', label: 'Deleted (oldest)' },
+];
+
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'writing', label: 'Writing' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'published', label: 'Published' },
+    { value: 'in_review', label: 'In review' },
+    { value: 'archived', label: 'Archived' },
+];
+
+const PRODUCTION_OPTIONS: { value: string; label: string }[] = [
+    { value: 'not_shot', label: 'Not shot' },
+    { value: 'shot', label: 'Shot' },
+    { value: 'editing', label: 'Editing' },
+    { value: 'edited', label: 'Edited' },
+];
+
+const DATE_FIELD_OPTIONS: { value: string; label: string }[] = [
+    { value: 'created_at', label: 'Created' },
+    { value: 'updated_at', label: 'Updated' },
+    { value: 'scheduled_at', label: 'Scheduled' },
+];
+
+function ensureNumberArray(v: unknown): number[] {
+    if (Array.isArray(v)) return v.map((x) => Number(x)).filter((n) => !Number.isNaN(n));
+    if (typeof v === 'number' && !Number.isNaN(v)) return [v];
+    return [];
+}
+function ensureStringArray(v: unknown): string[] {
+    if (Array.isArray(v)) return v.filter((x) => typeof x === 'string');
+    if (typeof v === 'string' && v !== '') return [v];
+    return [];
+}
+
+function FilterPopover({
+    scriptTypes,
+    filters,
+    trashed,
+    onApply,
+}: {
+    scriptTypes: ScriptTypeOption[];
+    filters: ScriptFilters;
+    trashed: boolean;
+    onApply: (next: Record<string, unknown>) => void;
+    hasActiveFilters: boolean;
+}) {
+    const appliedCategoryIds = useMemo(() => ensureNumberArray(filters.script_type_id), [filters.script_type_id]);
+    const appliedStatuses = useMemo(() => ensureStringArray(filters.status), [filters.status]);
+    const appliedProductionStatuses = useMemo(() => ensureStringArray(filters.production_status), [filters.production_status]);
+
+    const [open, setOpen] = useState(false);
+    const [categoryIds, setCategoryIds] = useState<number[]>(appliedCategoryIds);
+    const [statuses, setStatuses] = useState<string[]>(appliedStatuses);
+    const [productionStatuses, setProductionStatuses] = useState<string[]>(appliedProductionStatuses);
+    const [dateField, setDateField] = useState<string | null>(filters.date_field ?? null);
+    const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
+    const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+
+    useEffect(() => {
+        if (open) {
+            setCategoryIds(appliedCategoryIds);
+            setStatuses(appliedStatuses);
+            setProductionStatuses(appliedProductionStatuses);
+            setDateField(filters.date_field ?? null);
+            setDateFrom(filters.date_from ?? '');
+            setDateTo(filters.date_to ?? '');
+        }
+    }, [open, appliedCategoryIds, appliedStatuses, appliedProductionStatuses, filters.date_field, filters.date_from, filters.date_to]);
+
+    const toggleCategory = (id: number) => {
+        setCategoryIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
+    const toggleStatus = (value: string) => {
+        setStatuses((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
+    };
+    const toggleProduction = (value: string) => {
+        setProductionStatuses((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
+    };
+
+    const handleApply = () => {
+        onApply({
+            script_type_id: categoryIds,
+            status: statuses,
+            production_status: productionStatuses,
+            date_field: dateField || null,
+            date_from: dateFrom || null,
+            date_to: dateTo || null,
+        });
+        setOpen(false);
+    };
+
+    if (trashed) return null;
+
+    const activeCount =
+        (appliedCategoryIds.length > 0 ? 1 : 0) +
+        (appliedStatuses.length > 0 ? 1 : 0) +
+        (appliedProductionStatuses.length > 0 ? 1 : 0) +
+        (filters.date_field && (filters.date_from || filters.date_to) ? 1 : 0);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5" aria-label="Filter">
+                    <Filter className="h-4 w-4" />
+                    Filter
+                    {activeCount > 0 && (
+                        <span className="bg-primary text-primary-foreground rounded-full px-1.5 py-0 text-xs">
+                            {activeCount}
+                        </span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80">
+                <div className="space-y-4">
+                    {scriptTypes.length > 0 && (
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium">Category</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {scriptTypes.map((t) => (
+                                    <label key={t.id} className="flex cursor-pointer items-center gap-2">
+                                        <Checkbox
+                                            checked={categoryIds.includes(t.id)}
+                                            onCheckedChange={() => toggleCategory(t.id)}
+                                        />
+                                        <span className="text-sm">{t.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium">Status</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {STATUS_OPTIONS.map((o) => (
+                                <label key={o.value} className="flex cursor-pointer items-center gap-2">
+                                    <Checkbox
+                                        checked={statuses.includes(o.value)}
+                                        onCheckedChange={() => toggleStatus(o.value)}
+                                    />
+                                    <span className="text-sm">{o.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium">Production</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {PRODUCTION_OPTIONS.map((o) => (
+                                <label key={o.value} className="flex cursor-pointer items-center gap-2">
+                                    <Checkbox
+                                        checked={productionStatuses.includes(o.value)}
+                                        onCheckedChange={() => toggleProduction(o.value)}
+                                    />
+                                    <span className="text-sm">{o.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium">Date range</Label>
+                        <select
+                            className="border-input bg-background ring-offset-background focus-visible:ring-ring h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                            value={dateField ?? ''}
+                            onChange={(e) => setDateField(e.target.value || null)}
+                        >
+                            <option value="">Any date</option>
+                            {DATE_FIELD_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                    {o.label}
+                                </option>
+                            ))}
+                        </select>
+                        {(dateField ?? '') !== '' && (
+                            <div className="flex gap-2">
+                                <Input
+                                    type="date"
+                                    placeholder="From"
+                                    value={dateFrom}
+                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    className="text-sm"
+                                />
+                                <Input
+                                    type="date"
+                                    placeholder="To"
+                                    value={dateTo}
+                                    onChange={(e) => setDateTo(e.target.value)}
+                                    className="text-sm"
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleApply}>
+                            Apply
+                        </Button>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+/** Skeleton for one script card in grid view */
+function ScriptCardSkeleton() {
+    return (
+        <Card className="overflow-hidden">
+            <CardHeader className="space-y-2 pb-2">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+            </CardHeader>
+            <CardContent className="pt-0">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="mt-3 h-3 w-24" />
+            </CardContent>
+        </Card>
+    );
+}
+
+/** Skeleton for one script row in list view */
+function ScriptListRowSkeleton() {
+    return (
+        <Card>
+            <CardContent className="flex flex-row items-center gap-4 py-4">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-1/4" />
+                </div>
+                <Skeleton className="h-6 w-20 rounded-full" />
+            </CardContent>
+        </Card>
+    );
 }
 
 const platformConfig: Record<string, { label: string; icon: typeof Youtube; className: string }> = {
@@ -71,19 +352,9 @@ const platformConfig: Record<string, { label: string; icon: typeof Youtube; clas
 interface Props {
     scripts: ScriptItem[];
     trashed?: boolean;
-}
-
-function filterScripts(scripts: ScriptItem[], query: string): ScriptItem[] {
-    const q = query.trim().toLowerCase();
-    if (!q) return scripts;
-    return scripts.filter((s) => {
-        const label = platformConfig[s.platform].label.toLowerCase();
-        return (
-            s.title.toLowerCase().includes(q) ||
-            s.excerpt.toLowerCase().includes(q) ||
-            label.includes(q)
-        );
-    });
+    scriptTypes?: ScriptTypeOption[];
+    filters?: ScriptFilters;
+    sort?: string;
 }
 
 function ScriptCard({
@@ -207,19 +478,111 @@ function ScriptCard({
     return <Link href={editUrl}>{card}</Link>;
 }
 
-export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed = false }: Props) {
+const defaultFilters: ScriptFilters = {
+    search: null,
+    script_type_id: [],
+    status: [],
+    production_status: [],
+    date_field: null,
+    date_from: null,
+    date_to: null,
+};
+
+export default function ScriptIndex({
+    scripts: scriptsFromServer = [],
+    trashed = false,
+    scriptTypes = [],
+    filters: filtersFromServer,
+    sort: sortFromServer = 'updated_desc',
+}: Props) {
     const tenantRouter = useTenantRouter();
-    const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [deleteAllOpen, setDeleteAllOpen] = useState(false);
     const [emptyTrashOpen, setEmptyTrashOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const filters = filtersFromServer ?? defaultFilters;
+    const sort = trashed ? (sortFromServer === 'updated_desc' || sortFromServer === 'updated_asc' ? 'deleted_desc' : sortFromServer) : sortFromServer;
+
+    const [searchInput, setSearchInput] = useState(filters.search ?? '');
+    useEffect(() => {
+        setSearchInput(filters.search ?? '');
+    }, [filters.search]);
 
     const scripts = Array.isArray(scriptsFromServer) ? scriptsFromServer : [];
-    const filteredScripts = useMemo(() => filterScripts(scripts, searchQuery), [scripts, searchQuery]);
     const isEmpty = scripts.length === 0;
-    const noSearchResults = !isEmpty && filteredScripts.length === 0;
+    const hasActiveFilters =
+        (filters.search != null && filters.search !== '') ||
+        (filters.script_type_id?.length ?? 0) > 0 ||
+        (filters.status?.length ?? 0) > 0 ||
+        (filters.production_status?.length ?? 0) > 0 ||
+        (filters.date_field != null && (filters.date_from != null || filters.date_to != null));
+    const scriptCount = scripts.length;
+    const noSearchResults = hasActiveFilters && isEmpty;
     const scriptsIndexUrl = tenantRouter.route('script.index');
     const recycleBinUrl = tenantRouter.route('script.index', { trashed: 1 });
+
+    const buildQuery = (overrides: Record<string, unknown> = {}) => {
+        const trashedParam = trashed ? { trashed: 1 } : {};
+        const search = overrides.search !== undefined ? (overrides.search as string) : (filters.search ?? '');
+        const scriptTypeId = overrides.script_type_id !== undefined ? (overrides.script_type_id as number[]) : (filters.script_type_id ?? []);
+        const status = overrides.status !== undefined ? (overrides.status as string[]) : (filters.status ?? []);
+        const productionStatus = overrides.production_status !== undefined ? (overrides.production_status as string[]) : (filters.production_status ?? []);
+        const dateField = overrides.date_field !== undefined ? (overrides.date_field as string | null) : (filters.date_field ?? null);
+        const dateFrom = overrides.date_from !== undefined ? (overrides.date_from as string | null) : (filters.date_from ?? null);
+        const dateTo = overrides.date_to !== undefined ? (overrides.date_to as string | null) : (filters.date_to ?? null);
+        const sortParam = overrides.sort !== undefined ? (overrides.sort as string) : sort;
+
+        const params: Record<string, unknown> = { ...trashedParam, sort: sortParam };
+        if (search) params.search = search;
+        if (scriptTypeId.length > 0) params.script_type_id = scriptTypeId;
+        if (status.length > 0) params.status = status;
+        if (productionStatus.length > 0) params.production_status = productionStatus;
+        if (dateField && (dateFrom || dateTo)) {
+            params.date_field = dateField;
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo) params.date_to = dateTo;
+        }
+        return params;
+    };
+
+    const applyQuery = (overrides: Record<string, unknown> = {}) => {
+        const url = tenantRouter.route('script.index');
+        const params = buildQuery(overrides);
+        router.get(url, params as Record<string, string | number | number[] | string[]>, {
+            preserveState: false,
+            onStart: () => setIsLoading(true),
+            onFinish: () => setIsLoading(false),
+        });
+    };
+
+    const handleSearchChange = (value: string) => {
+        setSearchInput(value);
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = setTimeout(() => {
+            applyQuery({ search: value.trim() || undefined });
+        }, 350);
+    };
+
+    const clearFilters = () => {
+        setSearchInput('');
+        applyQuery({
+            search: '',
+            script_type_id: [],
+            status: [],
+            production_status: [],
+            date_field: null,
+            date_from: null,
+            date_to: null,
+        });
+    };
+
+    const currentSortLabel = useMemo(() => {
+        const opts = trashed ? TRASHED_SORT_OPTIONS : SORT_OPTIONS;
+        const found = opts.find((o) => o.value === sort);
+        return found?.label ?? 'Sort';
+    }, [sort, trashed]);
 
     const handleImportCsv = () => {
         const input = document.createElement('input');
@@ -246,24 +609,22 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={trashed ? 'Recycle bin' : 'Scripts'} />
-            <div className="flex h-full flex-1 flex-col gap-8 p-4 md:p-6 lg:p-8">
+            <div className="relative flex h-full flex-1 flex-col gap-8 p-4 md:p-6 lg:p-8">
                 {/* Header */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
                                 {trashed ? 'Recycle bin' : 'Scripts'}
+                                {scriptCount > 0 && (
+                                    <span className="text-muted-foreground ml-1.5 text-base font-normal md:text-lg">
+                                        ({scriptCount})
+                                    </span>
+                                )}
                             </h1>
-                            {trashed ? (
+                            {trashed && (
                                 <Link href={scriptsIndexUrl}>
                                     <Button variant="ghost" size="sm">Back to Scripts</Button>
-                                </Link>
-                            ) : (
-                                <Link href={recycleBinUrl}>
-                                    <Button variant="outline" size="sm" className="gap-1.5">
-                                        <Trash2 className="h-4 w-4" />
-                                        Recycle bin
-                                    </Button>
                                 </Link>
                             )}
                         </div>
@@ -273,82 +634,131 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                                 : 'Write, refine, and export scripts for YouTube, TikTok, podcasts, and more. One place for all your content.'}
                         </p>
                     </div>
-                    {!trashed && (
-                        <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {!trashed && (
                             <Link href={tenantRouter.route('script.create')}>
                                 <Button className="cursor-pointer gap-2 shadow-sm">
                                     <Plus className="h-4 w-4" />
                                     New script
                                 </Button>
                             </Link>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="cursor-pointer gap-1.5"
-                                onClick={handleImportCsv}
-                            >
-                                <FileText className="h-4 w-4" />
-                                Import CSV
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="cursor-pointer gap-1.5"
-                                onClick={handleExportAllCsv}
-                            >
-                                <Download className="h-4 w-4" />
-                                Export all CSV
-                            </Button>
-                            <Link href={tenantRouter.route('script.calendar')}>
-                                <Button variant="outline" size="sm" className="cursor-pointer gap-1.5">
-                                    <CalendarDays className="h-4 w-4" />
-                                    Calendar
+                        )}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" aria-label="Page menu">
+                                    <MoreVertical className="h-4 w-4" />
                                 </Button>
-                            </Link>
-                            {scripts.length > 0 && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="cursor-pointer gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                    onClick={() => setDeleteAllOpen(true)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete all
-                                </Button>
-                            )}
-                        </div>
-                    )}
-                    {trashed && scripts.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="cursor-pointer gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => setEmptyTrashOpen(true)}
-                            >
-                                <Trash2 className="h-4 w-4" />
-                                Empty recycle bin
-                            </Button>
-                        </div>
-                    )}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[10rem]">
+                                {!trashed && (
+                                    <>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleImportCsv}>
+                                            <FileText className="h-4 w-4" />
+                                            Import CSV
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" onClick={handleExportAllCsv}>
+                                            <Download className="h-4 w-4" />
+                                            Export all CSV
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                                            <Link href={tenantRouter.route('script.calendar')}>
+                                                <CalendarDays className="h-4 w-4" />
+                                                Calendar
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                                            <Link href={recycleBinUrl}>
+                                                <Trash2 className="h-4 w-4" />
+                                                Recycle bin
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        {scripts.length > 0 && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                                                    onSelect={() => {
+                                                        setTimeout(() => setDeleteAllOpen(true), 0);
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    Delete all
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                                {trashed && (
+                                    <>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                                            <Link href={scriptsIndexUrl}>
+                                                <ScrollText className="h-4 w-4" />
+                                                Back to Scripts
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        {scripts.length > 0 && (
+                                            <DropdownMenuItem
+                                                className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                                                onSelect={() => {
+                                                    setTimeout(() => setEmptyTrashOpen(true), 0);
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                                Empty recycle bin
+                                            </DropdownMenuItem>
+                                        )}
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
 
-                {/* Search + view toggle */}
-                {!isEmpty && (
+                {/* Search, sort, filter + view toggle (show when has scripts OR when filters active so user can clear/change) */}
+                {(!isEmpty || hasActiveFilters) && (
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="relative flex-1 sm:max-w-xs lg:max-w-sm">
-                            <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                            <Input
-                                type="search"
-                                placeholder="Search scripts..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9"
+                        <div className="flex flex-1 flex-wrap items-center gap-2">
+                            <div className="relative min-w-0 flex-1 sm:max-w-xs lg:max-w-sm">
+                                <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                                <Input
+                                    type="search"
+                                    placeholder="Search scripts..."
+                                    value={searchInput}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-1.5" aria-label="Sort">
+                                        <ArrowDownAZ className="h-4 w-4" />
+                                        {currentSortLabel}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="min-w-[11rem]">
+                                    {(trashed ? TRASHED_SORT_OPTIONS : SORT_OPTIONS).map((opt) => (
+                                        <DropdownMenuItem
+                                            key={opt.value}
+                                            className="cursor-pointer"
+                                            onSelect={() => applyQuery({ sort: opt.value })}
+                                        >
+                                            {opt.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <FilterPopover
+                                scriptTypes={scriptTypes}
+                                filters={filters}
+                                trashed={trashed}
+                                onApply={(next) => applyQuery(next)}
+                                hasActiveFilters={hasActiveFilters}
                             />
+                            {hasActiveFilters && (
+                                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={clearFilters}>
+                                    Clear filters
+                                </Button>
+                            )}
                         </div>
                         <ToggleGroup
                             type="single"
@@ -367,7 +777,22 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                 )}
 
                 {/* Content */}
-                {isEmpty ? (
+                {isLoading ? (
+                    /* Skeleton loaders while fetching (filter/sort/search) */
+                    viewMode === 'grid' ? (
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <ScriptCardSkeleton key={i} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <ScriptListRowSkeleton key={i} />
+                            ))}
+                        </div>
+                    )
+                ) : isEmpty ? (
                     /* Empty state */
                     <Card className="border-dashed bg-muted/30">
                         <CardContent className="flex flex-col items-center justify-center gap-6 py-16 px-6 text-center">
@@ -408,13 +833,13 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                         <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
                             <Search className="text-muted-foreground h-10 w-10" />
                             <div className="space-y-1">
-                                <h3 className="font-medium">No scripts match your search</h3>
+                                <h3 className="font-medium">No scripts match your filters</h3>
                                 <p className="text-muted-foreground text-sm">
-                                    Try a different term or clear the search to see all scripts.
+                                    Try changing or clearing the search and filters to see more scripts.
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
-                                Clear search
+                            <Button variant="outline" size="sm" onClick={clearFilters}>
+                                Clear filters
                             </Button>
                         </CardContent>
                     </Card>
@@ -434,7 +859,7 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                             </Card>
                         </Link>
                         )}
-                        {filteredScripts.map((script) => (
+                        {scripts.map((script) => (
                             <ScriptCard key={script.id} script={script} tenantRouter={tenantRouter} trashed={trashed} />
                         ))}
                     </div>
@@ -456,14 +881,14 @@ export default function ScriptIndex({ scripts: scriptsFromServer = [], trashed =
                             </Card>
                         </Link>
                         )}
-                        {filteredScripts.map((script) => (
-                            <ScriptCard
-                                key={script.id}
-                                script={script}
-                                tenantRouter={tenantRouter}
-                                trashed={trashed}
-                            />
-                        ))}
+{scripts.map((script) => (
+                                <ScriptCard
+                                    key={script.id}
+                                    script={script}
+                                    tenantRouter={tenantRouter}
+                                    trashed={trashed}
+                                />
+                            ))}
                     </div>
                 )}
             </div>

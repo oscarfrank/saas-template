@@ -31,8 +31,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useState, useEffect, useRef, useMemo, Component, type ErrorInfo, type ReactNode } from 'react';
 import type { PartialBlock } from '@blocknote/core';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Save, Download, Upload, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus } from 'lucide-react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
@@ -199,8 +200,58 @@ interface ScriptForEdit {
 }
 
 interface Props {
-    script: ScriptForEdit | null;
+    /** undefined = edit page with deferred script still loading */
+    script: ScriptForEdit | null | undefined;
     scriptTypes: ScriptTypeOption[];
+}
+
+/** Skeleton shown while script data is loading (deferred prop) on the edit page. */
+function EditorPageSkeleton() {
+    const tenantRouter = useTenantRouter();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Scripts', href: tenantRouter.route('script.index') },
+        { title: 'Loading…', href: '#' },
+    ];
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Loading script…" />
+            <div className="w-full py-8 px-4 sm:px-6 lg:px-8">
+                <div className="mb-6 flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+                        <Skeleton className="h-9 min-w-[200px] max-w-2xl flex-1" />
+                        <div className="ml-auto flex gap-2">
+                            <Skeleton className="h-9 w-20 rounded-md" />
+                            <Skeleton className="h-9 w-9 rounded-md" />
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-10" />
+                            <Skeleton className="h-9 w-[180px]" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-9 w-[190px]" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-12" />
+                            <Skeleton className="h-9 w-[150px]" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-9 w-[160px]" />
+                        </div>
+                    </div>
+                </div>
+                <div className="mb-4 flex gap-2">
+                    <Skeleton className="h-9 w-40 rounded-md" />
+                    <Skeleton className="h-9 w-28 rounded-md" />
+                </div>
+                <Skeleton className="min-h-[60vh] w-full rounded-lg" aria-hidden="true" />
+            </div>
+        </AppLayout>
+    );
 }
 
 interface ShareData {
@@ -213,7 +264,7 @@ interface ShareData {
 
 export default function ScriptForm({ script: initialScript, scriptTypes }: Props) {
     const tenantRouter = useTenantRouter();
-    const isEdit = initialScript !== null;
+    const isEdit = initialScript !== null && initialScript !== undefined;
     const readOnly = isEdit && initialScript?.can_edit === false;
     const canManageAccess = !!(isEdit && initialScript?.can_manage_access);
 
@@ -286,6 +337,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [thumbnailsSheetOpen, setThumbnailsSheetOpen] = useState(false);
     const [thumbnailUploading, setThumbnailUploading] = useState(false);
     const thumbnailInputRef = useRef<HTMLInputElement>(null);
+    const hasHydratedFromDeferredRef = useRef(false);
 
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
     const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -312,6 +364,42 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         scheduledAt,
         productionStatus,
     };
+
+    useEffect(() => {
+        if (initialScript != null && typeof initialScript === 'object' && !hasHydratedFromDeferredRef.current) {
+            hasHydratedFromDeferredRef.current = true;
+            setContent(initialScript.content?.length ? initialScript.content : []);
+            setPageTitle(initialScript.title ?? '');
+            setMainThumbnailText(initialScript.thumbnail_text ?? null);
+            setScriptTypeId(initialScript.script_type_id != null ? String(initialScript.script_type_id) : null);
+            setWorkflowStatus(normalizeStatus(initialScript.status));
+            setProductionStatus((initialScript.production_status as ProductionStatus) ?? 'not_shot');
+            if (initialScript.scheduled_at) {
+                try {
+                    const d = new Date(initialScript.scheduled_at);
+                    if (!Number.isNaN(d.getTime())) {
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const h = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        setScheduledAt(`${y}-${m}-${day}T${h}:${min}`);
+                    }
+                } catch {
+                    setScheduledAt('');
+                }
+            } else {
+                setScheduledAt('');
+            }
+            setTitleOptions(initialScript.title_options?.length ? initialScript.title_options : []);
+            setDescriptionData(
+                initialScript.description || initialScript.meta_tags
+                    ? { descriptionBlock: initialScript.description ?? '', metaTags: initialScript.meta_tags ?? '' }
+                    : null
+            );
+            setThumbnails(initialScript.thumbnails ?? []);
+        }
+    }, [initialScript]);
 
     const handleContentChange = (blocks: PartialBlock[]) => {
         setContent(blocks);
@@ -846,28 +934,6 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         }
     };
 
-    const handleLoad = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'application/json';
-        input.onchange = (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const loadedContent = JSON.parse(event.target?.result as string) as PartialBlock[];
-                        setContent(loadedContent);
-                    } catch (error) {
-                        console.error('Error loading file:', error);
-                    }
-                };
-                reader.readAsText(file);
-            }
-        };
-        input.click();
-    };
-
     const fetchShareData = async () => {
         if (!initialScript) return;
         setShareLoading(true);
@@ -975,6 +1041,10 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         }
     };
 
+    if (initialScript === undefined) {
+        return <EditorPageSkeleton />;
+    }
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Scripts', href: tenantRouter.route('script.index') },
         { title: isEdit ? (initialScript?.title || 'Edit script') : 'New script', href: '#' },
@@ -1021,9 +1091,13 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={handleSave} disabled={isSaving}>
-                                            <Save className="mr-2 h-4 w-4" />
-                                            {isSaving ? (isEdit ? 'Saving…' : 'Saving…') : (isEdit ? 'Save now' : 'Save to create script')}
+                                        <DropdownMenuItem onClick={() => handleExport('json')}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Export JSON
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Export CSV
                                         </DropdownMenuItem>
                                         {isEdit && initialScript?.can_delete && (
                                             <>
@@ -1034,19 +1108,6 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                                 </DropdownMenuItem>
                                             </>
                                         )}
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => handleExport('json')}>
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Export JSON
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleExport('csv')}>
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Export CSV
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleLoad}>
-                                            <Upload className="mr-2 h-4 w-4" />
-                                            Load
-                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}

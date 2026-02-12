@@ -46,6 +46,7 @@ final class ScriptController extends Controller
 
     /**
      * List all scripts for the organization.
+     * Supports sort, filter (category, status, production, date range), and search via query params.
      */
     public function index(Request $request): Response
     {
@@ -66,22 +67,100 @@ final class ScriptController extends Controller
             $query->onlyTrashed();
         }
 
-        $query->orderByDesc($trashed ? 'deleted_at' : 'updated_at');
-
-        if ($request->filled('search')) {
-            $search = $request->search;
+        // Search
+        $search = $request->filled('search') ? trim($request->search) : null;
+        if ($search !== null && $search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhere('meta_tags', 'like', "%{$search}%");
+                $q->where('title', 'like', '%'.$search.'%')
+                    ->orWhere('description', 'like', '%'.$search.'%')
+                    ->orWhere('meta_tags', 'like', '%'.$search.'%');
             });
+        }
+
+        // Filters: category (script_type_id), status, production_status, date range
+        // Normalize array params (Laravel/Inertia may send single value or array)
+        $scriptTypeIds = $request->input('script_type_id', []);
+        $scriptTypeIds = is_array($scriptTypeIds) ? $scriptTypeIds : (is_scalar($scriptTypeIds) && $scriptTypeIds !== '' ? [$scriptTypeIds] : []);
+        $scriptTypeIds = array_values(array_map('intval', array_filter($scriptTypeIds)));
+        if (count($scriptTypeIds) > 0) {
+            $query->whereIn('script_type_id', $scriptTypeIds);
+        }
+        $statuses = $request->input('status', []);
+        $statuses = is_array($statuses) ? $statuses : (is_scalar($statuses) && $statuses !== '' ? [$statuses] : []);
+        $statusAllowed = ['draft', 'writing', 'completed', 'published', 'in_review', 'archived'];
+        $statuses = array_values(array_intersect($statuses, $statusAllowed));
+        if (count($statuses) > 0) {
+            $query->whereIn('status', $statuses);
+        }
+        $productionStatuses = $request->input('production_status', []);
+        $productionStatuses = is_array($productionStatuses) ? $productionStatuses : (is_scalar($productionStatuses) && $productionStatuses !== '' ? [$productionStatuses] : []);
+        $productionAllowed = ['not_shot', 'shot', 'editing', 'edited'];
+        $productionStatuses = array_values(array_intersect($productionStatuses, $productionAllowed));
+        if (count($productionStatuses) > 0) {
+            $query->whereIn('production_status', $productionStatuses);
+        }
+        $dateField = $request->input('date_field');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $dateFields = ['created_at', 'updated_at', 'scheduled_at'];
+        if (in_array($dateField, $dateFields, true) && ($dateFrom !== null || $dateTo !== null)) {
+            if ($dateFrom !== null && $dateFrom !== '') {
+                $query->whereDate($dateField, '>=', $dateFrom);
+            }
+            if ($dateTo !== null && $dateTo !== '') {
+                $query->whereDate($dateField, '<=', $dateTo);
+            }
+        }
+
+        // Sort
+        $sort = $request->input('sort', $trashed ? 'deleted_desc' : 'updated_desc');
+        $sortColumn = 'updated_at';
+        $sortDir = 'desc';
+        $sortMap = [
+            'updated_desc' => ['updated_at', 'desc'],
+            'updated_asc' => ['updated_at', 'asc'],
+            'created_desc' => ['created_at', 'desc'],
+            'created_asc' => ['created_at', 'asc'],
+            'title_asc' => ['title', 'asc'],
+            'title_desc' => ['title', 'desc'],
+            'scheduled_desc' => ['scheduled_at', 'desc'],
+            'scheduled_asc' => ['scheduled_at', 'asc'],
+            'deleted_desc' => ['deleted_at', 'desc'],
+            'deleted_asc' => ['deleted_at', 'asc'],
+        ];
+        if (isset($sortMap[$sort])) {
+            [$sortColumn, $sortDir] = $sortMap[$sort];
+        } elseif ($trashed) {
+            $sortColumn = 'deleted_at';
+            $sortDir = 'desc';
+        }
+        if ($sortColumn === 'scheduled_at') {
+            $query->orderByRaw('scheduled_at IS NULL')->orderBy($sortColumn, $sortDir);
+        } else {
+            $query->orderBy($sortColumn, $sortDir);
         }
 
         $scripts = $query->get()->map(fn (Script $script) => $this->formatScriptForList($script));
 
+        $scriptTypes = ScriptType::where('tenant_id', $tenantId)
+            ->active()
+            ->ordered()
+            ->get(['id', 'name', 'slug']);
+
         return Inertia::render('script/index', [
             'scripts' => $scripts,
             'trashed' => $trashed,
+            'scriptTypes' => $scriptTypes,
+            'filters' => [
+                'search' => $search,
+                'script_type_id' => $scriptTypeIds,
+                'status' => $statuses,
+                'production_status' => $productionStatuses,
+                'date_field' => in_array($dateField, $dateFields, true) ? $dateField : null,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+            'sort' => $sort,
         ]);
     }
 
@@ -183,7 +262,7 @@ final class ScriptController extends Controller
 
         $user = $request->user();
         return Inertia::render('script/Form', [
-            'script' => $this->formatScriptForEdit($script, $user),
+            'script' => Inertia::defer(fn () => $this->formatScriptForEdit($script, $user)),
             'scriptTypes' => $scriptTypes,
         ]);
     }
@@ -590,7 +669,10 @@ PROMPT;
             'platform' => $platform,
             'updatedAt' => $script->updated_at->diffForHumans(),
             'script_type_id' => $script->script_type_id,
+            'status' => $script->status,
             'production_status' => $script->production_status,
+            'created_at' => $script->created_at?->toIso8601String(),
+            'scheduled_at' => $script->scheduled_at?->toIso8601String(),
         ];
         if ($script->trashed()) {
             $row['deleted_at'] = $script->deleted_at?->toIso8601String();

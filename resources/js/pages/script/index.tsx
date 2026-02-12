@@ -680,6 +680,12 @@ export default function ScriptIndex({
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem className="cursor-pointer gap-2" asChild>
+                                            <Link href={tenantRouter.route('script.transcripts')}>
+                                                <Youtube className="h-4 w-4" />
+                                                YouTube transcripts
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="cursor-pointer gap-2" asChild>
                                             <Link href={recycleBinUrl}>
                                                 <Trash2 className="h-4 w-4" />
                                                 Recycle bin

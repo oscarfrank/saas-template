@@ -8,7 +8,16 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
+use MrMySQL\YoutubeTranscript\Exception\NoTranscriptAvailableException;
+use MrMySQL\YoutubeTranscript\Exception\NoTranscriptFoundException;
+use MrMySQL\YoutubeTranscript\Exception\TranscriptsDisabledException;
+use MrMySQL\YoutubeTranscript\Exception\TooManyRequestsException;
+use MrMySQL\YoutubeTranscript\Exception\YouTubeRequestFailedException;
+use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -1461,5 +1470,489 @@ PROMPT;
         return Inertia::render('script/PublicCalendar', [
             'scripts' => $scripts,
         ]);
+    }
+
+    /**
+     * Show the YouTube transcripts tool page (paste URLs, get combined transcripts).
+     */
+    public function transcripts(Request $request): Response
+    {
+        return Inertia::render('script/Transcripts');
+    }
+
+    /**
+     * Fetch transcripts for the given YouTube URLs. Returns JSON with combined transcript text
+     * or errors. Uses mrmysql/youtube-transcript (Innertube-based, same approach as Python youtube_transcript_api).
+     */
+    public function fetchTranscripts(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'urls' => 'required|string|max:50000',
+        ]);
+        $urls = array_filter(array_map('trim', explode("\n", $validated['urls'])));
+        $urls = array_slice($urls, 0, 50);
+        $videoIds = [];
+        foreach ($urls as $url) {
+            $id = $this->extractYoutubeVideoId($url);
+            if ($id !== null) {
+                $videoIds[] = $id;
+            }
+        }
+        $videoIds = array_values(array_unique($videoIds));
+
+        $httpClient = new Client([
+            'timeout' => 15,
+            'headers' => [
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language' => 'en-US,en;q=0.9',
+            ],
+        ]);
+        $requestFactory = new HttpFactory;
+        $streamFactory = new HttpFactory;
+        $fetcher = new TranscriptListFetcher($httpClient, $requestFactory, $streamFactory);
+
+        $segments = [];
+        $errors = [];
+        foreach ($videoIds as $index => $videoId) {
+            $result = $this->fetchTranscriptForVideo($fetcher, $videoId);
+            if ($result['success']) {
+                $title = $result['title'] !== '' ? $result['title'] : 'Video '.$videoId;
+                $segments[] = '## '.($index + 1).'. '.$title."\n\n```\n".$result['text']."\n```";
+            } else {
+                $errors[] = $result['error'] ?? 'Video '.$videoId;
+            }
+        }
+        $transcript = count($segments) > 0 ? implode("\n\n", $segments) : '';
+
+        return response()->json([
+            'transcript' => $transcript,
+            'errors' => $errors,
+            'fetched' => count($segments),
+            'failed' => count($errors),
+        ]);
+    }
+
+    /**
+     * Generate a YouTube script from the built transcript prompt using OpenAI.
+     */
+    public function generateScriptFromTranscripts(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'prompt' => 'required|string|max:150000',
+        ]);
+
+        $systemPrompt = <<<'PROMPT'
+You are an expert YouTube script writer. The user will provide a request and supporting materials (scripts from other videos, specs, observations). Write a single, conversational YouTube script that fulfills their request. Output only the script: no meta-commentary, no "Here is your script", no bullet points. Use section headings if they asked for them. Write in a natural, read-aloud style—not one sentence per line like a poem. Do not add cues like [pause] or [cut]. Output plain text/markdown only.
+PROMPT;
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $validated['prompt']],
+                ],
+                'max_tokens' => 8192,
+                'temperature' => 0.7,
+            ]);
+
+            $script = trim($response->choices[0]->message->content ?? '');
+            if ($script === '') {
+                return response()->json(['message' => 'No script generated. Try again.'], 422);
+            }
+
+            return response()->json(['script' => $script]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::generateScriptFromTranscripts failed', ['error' => $e->getMessage()]);
+
+            return response()->json(
+                ['message' => 'Failed to generate script. Please try again.'],
+                500
+            );
+        }
+    }
+
+    /**
+     * Create a new script from generated transcript content (plain text) and redirect to the script editor.
+     */
+    public function createScriptFromGenerated(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'nullable|string|max:255',
+            'content' => 'required|string|max:500000',
+        ]);
+
+        $tenantId = tenant('id');
+        $userId = $request->user()?->id;
+        if (! $userId) {
+            return response()->json(['message' => 'Unauthorized.'], 401);
+        }
+
+        $this->ensureDefaultScriptTypes($tenantId);
+
+        $title = trim($validated['title'] ?? '') ?: 'Generated script';
+        $plainText = $validated['content'];
+        $content = $this->plainTextToBlockNoteContent($plainText);
+
+        $scriptTypeId = ScriptType::where('tenant_id', $tenantId)->where('slug', 'youtube')->value('id')
+            ?? ScriptType::where('tenant_id', $tenantId)->orderBy('sort_order')->value('id');
+
+        $script = Script::create([
+            'tenant_id' => $tenantId,
+            'script_type_id' => $scriptTypeId,
+            'created_by' => $userId,
+            'updated_by' => $userId,
+            'title' => $title,
+            'content' => $content,
+            'status' => 'draft',
+            'production_status' => 'not_shot',
+        ]);
+
+        $script->titleOptions()->create([
+            'title' => $script->title,
+            'thumbnail_text' => null,
+            'is_primary' => true,
+            'sort_order' => 0,
+        ]);
+
+        $editUrl = route('script.edit', ['tenant' => tenant('slug'), 'script' => $script->uuid]);
+
+        return response()->json([
+            'uuid' => $script->uuid,
+            'edit_url' => $editUrl,
+        ]);
+    }
+
+    /**
+     * Convert plain text to BlockNote block array (paragraphs only).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function plainTextToBlockNoteContent(string $text): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return [];
+        }
+        $paragraphs = preg_split('/\n\n+/', $text, -1, PREG_SPLIT_NO_EMPTY);
+        $blocks = [];
+        foreach ($paragraphs as $i => $para) {
+            $para = trim($para);
+            if ($para === '') {
+                continue;
+            }
+            $blocks[] = [
+                'id' => Str::uuid()->toString(),
+                'type' => 'paragraph',
+                'content' => [
+                    ['type' => 'text', 'text' => $para],
+                ],
+            ];
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Search current user's scripts by title/description for the transcript tool (e.g. pick a script to use as device review).
+     * Returns top 10 matches: uuid, title.
+     */
+    public function searchMyScripts(Request $request): JsonResponse
+    {
+        $q = $request->query('q', '');
+        $q = is_string($q) ? trim($q) : '';
+        $tenantId = tenant('id');
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['scripts' => []]);
+        }
+
+        $query = Script::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->where(function ($qb) use ($user) {
+                $qb->where('created_by', $user->id)
+                    ->orWhereHas('collaborators', fn ($c) => $c->where('user_id', $user->id));
+            });
+
+        if ($q !== '') {
+            $query->where(function ($qb) use ($q) {
+                $qb->where('title', 'like', '%'.$q.'%')
+                    ->orWhere('description', 'like', '%'.$q.'%');
+            });
+        }
+
+        $scripts = $query->orderByDesc('updated_at')->limit(10)->get(['uuid', 'title']);
+
+        return response()->json([
+            'scripts' => $scripts->map(fn (Script $s) => ['uuid' => $s->uuid, 'title' => $s->title])->values()->all(),
+        ]);
+    }
+
+    /**
+     * Return a script's content as plain text (for use in transcript tool device review).
+     */
+    public function getScriptContentAsText(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canView($request->user())) {
+            abort(403);
+        }
+
+        $content = $script->content;
+        $text = $this->blockNoteContentToPlainText($content);
+
+        return response()->json(['content' => $text]);
+    }
+
+    /**
+     * Convert BlockNote JSON content (array of blocks) to plain text.
+     *
+     * @param  mixed  $content
+     */
+    private function blockNoteContentToPlainText($content): string
+    {
+        if (! is_array($content) || count($content) === 0) {
+            return '';
+        }
+        $lines = [];
+        foreach ($content as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+            $line = $this->blockNoteBlockToText($block);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        return implode("\n\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     */
+    private function blockNoteBlockToText(array $block): string
+    {
+        $parts = [];
+        if (isset($block['content']) && is_array($block['content'])) {
+            foreach ($block['content'] as $inline) {
+                $parts[] = $this->blockNoteInlineToText($inline);
+            }
+        }
+        $text = implode('', $parts);
+        if (isset($block['children']) && is_array($block['children']) && count($block['children']) > 0) {
+            $childLines = [];
+            foreach ($block['children'] as $child) {
+                if (is_array($child)) {
+                    $childLines[] = $this->blockNoteBlockToText($child);
+                }
+            }
+            $childText = implode("\n", array_filter($childLines));
+            $text = $text !== '' ? $text."\n".$childText : $childText;
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param  mixed  $inline
+     */
+    private function blockNoteInlineToText($inline): string
+    {
+        if (is_string($inline)) {
+            return $inline;
+        }
+        if (! is_array($inline)) {
+            return '';
+        }
+        if (isset($inline['type']) && $inline['type'] === 'text' && isset($inline['text']) && is_string($inline['text'])) {
+            return $inline['text'];
+        }
+        if (isset($inline['type']) && $inline['type'] === 'link' && isset($inline['content']) && is_array($inline['content'])) {
+            $out = '';
+            foreach ($inline['content'] as $c) {
+                $out .= $this->blockNoteInlineToText($c);
+            }
+
+            return $out;
+        }
+
+        return '';
+    }
+
+    /**
+     * Fetch phone specs from a GSMArena URL. Returns extracted specs as plain text.
+     */
+    public function fetchSpecsFromUrl(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'url' => 'required|string|url',
+        ]);
+        $url = $validated['url'];
+
+        $parsed = parse_url($url);
+        $host = strtolower($parsed['host'] ?? '');
+        $allowed = ['www.gsmarena.com', 'gsmarena.com'];
+        if (! in_array($host, $allowed, true)) {
+            return response()->json(
+                ['message' => 'Only GSMArena URLs are supported (e.g. https://www.gsmarena.com/phone_name-12345.php).'],
+                422
+            );
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language' => 'en-US,en;q=0.9',
+            ])->timeout(15)->get($url);
+
+            if (! $response->successful()) {
+                return response()->json(['message' => 'Could not load the page. Check the URL and try again.'], 422);
+            }
+
+            $html = $response->body();
+            $result = $this->parseGsmArenaSpecs($html);
+
+            if ($result['specs'] === '') {
+                return response()->json(['message' => 'No specs found on this page.'], 422);
+            }
+
+            return response()->json([
+                'specs' => $result['specs'],
+                'title' => $result['title'],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('fetchSpecsFromUrl failed', ['url' => $url, 'error' => $e->getMessage()]);
+
+            return response()->json(
+                ['message' => 'Failed to fetch specs. Please try again.'],
+                500
+            );
+        }
+    }
+
+    /**
+     * Parse GSMArena phone specs page HTML into plain text.
+     *
+     * @return array{specs: string, title: string}
+     */
+    private function parseGsmArenaSpecs(string $html): array
+    {
+        $title = '';
+        $lines = [];
+
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        // Try to get phone name from h1 or title
+        foreach (['//h1', '//title'] as $query) {
+            $nodes = $xpath->query($query);
+            if ($nodes->length > 0 && $nodes->item(0)->textContent !== null) {
+                $t = trim(preg_replace('/\s+/', ' ', $nodes->item(0)->textContent));
+                if ($t !== '' && stripos($t, 'GSMArena') === false) {
+                    $title = preg_replace('/\s*[-|]\s*Full phone specifications.*$/i', '', $t);
+
+                    break;
+                }
+            }
+        }
+
+        // Specs are in tables. GSMArena uses table with class "specs" or inside #specs-list
+        $tables = $xpath->query("//*[@id='specs-list']//table | //table[contains(@class,'specs')]");
+        if ($tables->length === 0) {
+            $tables = $xpath->query('//table');
+        }
+
+        $currentSection = '';
+        foreach ($tables as $table) {
+            $rows = $xpath->query('.//tr', $table);
+            foreach ($rows as $row) {
+                $cells = $xpath->query('.//td | .//th', $row);
+                $texts = [];
+                foreach ($cells as $cell) {
+                    $texts[] = trim(preg_replace('/\s+/', ' ', $cell->textContent ?? ''));
+                }
+                $texts = array_filter($texts);
+                if (count($texts) === 0) {
+                    continue;
+                }
+                // GSMArena: 2 cols = spec name : value; 3 cols = section | spec name | value
+                if (count($texts) === 1) {
+                    $lines[] = '';
+                    $lines[] = '## '.$texts[0];
+                    $currentSection = $texts[0];
+                } elseif (count($texts) === 2) {
+                    $lines[] = $texts[0].': '.$texts[1];
+                } else {
+                    $section = $texts[0];
+                    $name = $texts[1];
+                    $value = $texts[count($texts) - 1];
+                    if ($currentSection !== $section) {
+                        $lines[] = '';
+                        $lines[] = '## '.$section;
+                        $currentSection = $section;
+                    }
+                    $lines[] = $name.': '.$value;
+                }
+            }
+        }
+
+        $specs = trim(implode("\n", $lines));
+
+        return ['specs' => $specs, 'title' => trim($title)];
+    }
+
+    private function extractYoutubeVideoId(string $url): ?string
+    {
+        if (preg_match('/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    private function fetchTranscriptForVideo(TranscriptListFetcher $fetcher, string $videoId): array
+    {
+        try {
+            $transcriptList = $fetcher->fetch($videoId);
+            $transcript = null;
+            try {
+                $transcript = $transcriptList->findGeneratedTranscript(['en', 'en-US', 'en-GB']);
+            } catch (NoTranscriptFoundException $e) {
+                $codes = $transcriptList->getAvailableLanguageCodes();
+                if (count($codes) > 0) {
+                    $transcript = $transcriptList->findTranscript($codes);
+                } else {
+                    throw $e;
+                }
+            }
+            $segments = $transcript->fetch();
+            $text = implode(' ', array_map(fn ($s) => $s['text'] ?? '', $segments));
+            $title = $transcriptList->getTitle();
+
+            return ['success' => true, 'text' => trim($text), 'title' => $title];
+        } catch (TranscriptsDisabledException $e) {
+            return ['success' => false, 'error' => 'Transcripts disabled for video '.$videoId];
+        } catch (NoTranscriptFoundException|NoTranscriptAvailableException $e) {
+            return ['success' => false, 'error' => 'No transcript found for video '.$videoId];
+        } catch (TooManyRequestsException $e) {
+            return ['success' => false, 'error' => 'Rate limited by YouTube for video '.$videoId.' — try again later'];
+        } catch (YouTubeRequestFailedException $e) {
+            Log::warning('YouTube transcript request failed for '.$videoId.': '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        } catch (\Throwable $e) {
+            Log::warning('YouTube transcript fetch failed for '.$videoId.': '.$e->getMessage());
+
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 }

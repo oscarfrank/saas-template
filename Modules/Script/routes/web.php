@@ -18,9 +18,16 @@ Route::middleware([
     Route::get('script', [ScriptController::class, 'index'])->name('script.index');
     Route::get('script/export-all', [ScriptController::class, 'exportAll'])->name('script.export-all');
     Route::get('script/calendar', [ScriptController::class, 'calendar'])->name('script.calendar');
+    Route::get('script/transcripts', [ScriptController::class, 'transcripts'])->name('script.transcripts');
+    Route::post('script/transcripts/fetch', [ScriptController::class, 'fetchTranscripts'])->name('script.transcripts.fetch');
+    Route::post('script/transcripts/generate', [ScriptController::class, 'generateScriptFromTranscripts'])->name('script.transcripts.generate');
+    Route::post('script/transcripts/create-script', [ScriptController::class, 'createScriptFromGenerated'])->name('script.transcripts.create-script');
+    Route::post('script/transcripts/fetch-specs', [ScriptController::class, 'fetchSpecsFromUrl'])->name('script.transcripts.fetch-specs');
+    Route::get('script/transcripts/search-my-scripts', [ScriptController::class, 'searchMyScripts'])->name('script.transcripts.search-my-scripts');
     Route::get('script/create', [ScriptController::class, 'create'])->name('script.create');
     Route::post('script', [ScriptController::class, 'store'])->name('script.store');
     Route::post('script/import-csv', [ScriptController::class, 'importCsv'])->name('script.import-csv');
+    Route::get('script/{script}/content-as-text', [ScriptController::class, 'getScriptContentAsText'])->name('script.content-as-text');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
     Route::match(['GET', 'POST'], 'script/{script}/export', [ScriptController::class, 'export'])->name('script.export');
     Route::put('script/{script}', [ScriptController::class, 'update'])->name('script.update');

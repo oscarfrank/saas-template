@@ -138,8 +138,41 @@ function AiEditButton() {
                         ) : (
                             <>
                                 <p className="text-sm text-muted-foreground">
-                                    Describe how you want the selected text rewritten.
+                                    Quick actions or describe below.
                                 </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {(['Shorten this.', 'Expand this.', 'Make it more casual.', 'Add an example.'] as const).map((preset) => (
+                                        <Button
+                                            key={preset}
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                            disabled={loading}
+                                            onClick={async () => {
+                                                if (!capturedSelection || !onAiEditRequest || !showResultCard) return;
+                                                setLoading(true);
+                                                try {
+                                                    const rewritten = await onAiEditRequest(capturedSelection.selectedText, preset);
+                                                    if (rewritten != null && rewritten !== '') {
+                                                        setPopoverOpen(false);
+                                                        setCapturedSelection(null);
+                                                        showResultCard({ from: capturedSelection.from, to: capturedSelection.to, originalText: capturedSelection.selectedText, rewrittenText: rewritten });
+                                                    } else {
+                                                        toast.error('No rewrite returned');
+                                                    }
+                                                } catch (e) {
+                                                    toast.error(e instanceof Error ? e.message : 'AI edit failed');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
+                                            }}
+                                        >
+                                            {preset.replace(' this.', '').replace('Make it more casual.', 'Casual').replace('Add an example.', 'Add example')}
+                                        </Button>
+                                    ))}
+                                </div>
+                                <p className="text-muted-foreground text-xs">Or describe:</p>
                                 {capturedSelection && (
                                     <p className="text-muted-foreground rounded border border-border bg-muted/30 p-2 text-xs">
                                         Selected: {capturedSelection.selectedText.length > 80 ? capturedSelection.selectedText.slice(0, 80) + '…' : capturedSelection.selectedText}

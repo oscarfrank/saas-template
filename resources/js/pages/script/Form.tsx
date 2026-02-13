@@ -34,7 +34,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2 } from 'lucide-react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
@@ -66,6 +66,77 @@ function countWordsInBlocks(blocks: PartialBlock[]): number {
     // Split by whitespace, filter empty strings
     const words = allText.trim().split(/\s+/).filter(w => w.length > 0);
     return words.length;
+}
+
+export type OutlineEntry = { id: string; level: number; text: string };
+
+function getOutlineFromBlocks(blocks: PartialBlock[]): OutlineEntry[] {
+    const entries: OutlineEntry[] = [];
+    const extractText = (items: unknown[]): string => {
+        let t = '';
+        for (const item of items) {
+            if (typeof item !== 'object' || item === null) continue;
+            const obj = item as Record<string, unknown>;
+            if (obj.type === 'text' && typeof obj.text === 'string') t += obj.text;
+            if (Array.isArray(obj.content)) t += extractText(obj.content);
+        }
+        return t;
+    };
+    blocks.forEach((block, index) => {
+        const type = (block as { type?: string }).type;
+        const level = type === 'heading' ? (block as { props?: { level?: number } }).props?.level ?? 1 : 0;
+        if (level > 0) {
+            const content = (block as { content?: unknown[] }).content;
+            const text = Array.isArray(content) ? extractText(content) : '';
+            entries.push({ id: (block as { id?: string }).id ?? `h-${index}`, level, text: text.trim() || '(Untitled)' });
+        }
+    });
+    return entries;
+}
+
+function getReadingTimeMinutes(wordCount: number): number {
+    return Math.max(0, Math.round((wordCount / WORDS_PER_MINUTE) * 10) / 10);
+}
+
+/** Simple readability: average words per sentence. Lower = denser. */
+function getReadability(plainText: string): { avgWordsPerSentence: number; label: string } {
+    const sentences = plainText.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+    if (sentences.length === 0) return { avgWordsPerSentence: 0, label: '—' };
+    const words = plainText.trim().split(/\s+/).filter(Boolean).length;
+    const avg = words / sentences.length;
+    let label = 'Conversational';
+    if (avg > 25) label = 'Dense';
+    else if (avg > 18) label = 'Moderate';
+    else if (avg < 10) label = 'Very simple';
+    return { avgWordsPerSentence: Math.round(avg * 10) / 10, label };
+}
+
+const OVERUSED_WORDS = ['actually', 'basically', 'just', 'really', 'very', 'so', 'literally', 'honestly', 'obviously', 'simply', 'clearly', 'quite', 'pretty', 'thing', 'things'];
+
+function getRepetitionStats(plainText: string): { repeatedPhrases: Array<{ phrase: string; count: number }>; overused: Array<{ word: string; count: number }> } {
+    const lower = plainText.toLowerCase().replace(/[^\w\s]/g, ' ');
+    const words = lower.split(/\s+/).filter(Boolean);
+    const phraseCounts: Record<string, number> = {};
+    const n = 3;
+    for (let i = 0; i <= words.length - n; i++) {
+        const phrase = words.slice(i, i + n).join(' ');
+        if (phrase.length < 15) continue;
+        phraseCounts[phrase] = (phraseCounts[phrase] ?? 0) + 1;
+    }
+    const repeatedPhrases = Object.entries(phraseCounts)
+        .filter(([, c]) => c >= 2)
+        .map(([phrase, count]) => ({ phrase, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    const wordCounts: Record<string, number> = {};
+    words.forEach((w) => {
+        if (OVERUSED_WORDS.includes(w)) wordCounts[w] = (wordCounts[w] ?? 0) + 1;
+    });
+    const overused = Object.entries(wordCounts)
+        .filter(([, c]) => c >= 2)
+        .map(([word, count]) => ({ word, count }))
+        .sort((a, b) => b.count - a.count);
+    return { repeatedPhrases, overused };
 }
 
 /** Catches editor render errors so the rest of the page still shows. */
@@ -107,12 +178,20 @@ class EditorErrorBoundary extends Component<
     }
 }
 
+/** BlockNote editor instance for programmatic insert (intro/outro). */
+type BlockNoteEditorRef = {
+    document: PartialBlock[];
+    insertBlocks: (blocks: PartialBlock[], referenceBlock: PartialBlock | string, placement: 'before' | 'after') => void;
+    replaceBlocks: (blocksToRemove: (PartialBlock | string)[], blocksToInsert: PartialBlock[]) => void;
+};
+
 interface EditorProps {
     initialContent?: PartialBlock[];
     onChange?: (content: PartialBlock[]) => void;
     placeholder?: string;
     editable?: boolean;
     onAiEditRequest?: (selectedText: string, instruction: string) => Promise<string | null>;
+    onEditorReady?: (editor: BlockNoteEditorRef) => void;
 }
 
 function ClientOnlyBlockNoteEditor(props: EditorProps) {
@@ -121,7 +200,7 @@ function ClientOnlyBlockNoteEditor(props: EditorProps) {
 
     useEffect(() => {
         import('@/components/editor')
-            .then((m) => setEditor(() => m.BlockNoteEditor))
+            .then((m) => setEditor(() => m.BlockNoteEditor as React.ComponentType<EditorProps>))
             .catch((e) => setError(e?.message ?? 'Failed to load editor'));
     }, []);
 
@@ -172,6 +251,76 @@ interface DescriptionAssets {
     metaTags: string;
 }
 
+const WORDS_PER_MINUTE = 150;
+
+/** Script templates: PartialBlock[] for starting from a structure. Content uses simple inline text (BlockNote accepts at runtime). */
+const SCRIPT_TEMPLATES: { id: string; name: string; content: PartialBlock[] }[] = [
+    {
+        id: 'review',
+        name: 'Review',
+        content: [
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Hook (first 30 sec)' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Intro' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Main review' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Verdict & CTA' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+        ],
+    },
+    {
+        id: 'tutorial',
+        name: 'Tutorial',
+        content: [
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Hook (first 30 sec)' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'What we\'ll cover' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Step 1' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Step 2' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Step 3' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Outro & subscribe' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+        ],
+    },
+    {
+        id: 'listicle',
+        name: 'Listicle',
+        content: [
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Hook (first 30 sec)' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Intro' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Point 1' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Point 2' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Point 3' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Outro & subscribe' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+        ],
+    },
+    {
+        id: 'story',
+        name: 'Story / Vlog',
+        content: [
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Hook (first 30 sec)' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Setup' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Story' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+            { id: crypto.randomUUID(), type: 'heading', content: [{ type: 'text', text: 'Takeaway & CTA' }], props: { level: 2 } },
+            { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: '' }] },
+        ],
+    },
+] as { id: string; name: string; content: PartialBlock[] }[];
+
 const TITLE_STYLE_OPTIONS = [
     { id: 'emotional', label: 'Emotional', description: 'Appeal to feelings' },
     { id: 'urgency', label: 'Urgency', description: 'Create FOMO, act now' },
@@ -207,6 +356,19 @@ interface ThumbnailRow {
 type ScriptWorkflowStatus = 'draft' | 'writing' | 'completed' | 'published';
 type ProductionStatus = 'not_shot' | 'shot' | 'editing' | 'edited';
 
+export interface ChecklistItem {
+    id: string;
+    label: string;
+    checked: boolean;
+}
+
+const DEFAULT_CHECKLIST_ITEMS: ChecklistItem[] = [
+    { id: 'hook', label: 'Hook in first 15 sec', checked: false },
+    { id: 'main', label: '3 main points', checked: false },
+    { id: 'cta', label: 'Clear CTA', checked: false },
+    { id: 'outro', label: 'Outro / subscribe ask', checked: false },
+];
+
 interface ScriptForEdit {
     id: number;
     uuid: string;
@@ -222,6 +384,7 @@ interface ScriptForEdit {
     scheduled_at: string | null;
     title_options: TitleOptionRow[];
     thumbnails: ThumbnailRow[];
+    checklist?: ChecklistItem[] | null;
     current_user_role?: string | null;
     can_edit?: boolean;
     can_delete?: boolean;
@@ -232,6 +395,49 @@ interface Props {
     /** undefined = edit page with deferred script still loading */
     script: ScriptForEdit | null | undefined;
     scriptTypes: ScriptTypeOption[];
+}
+
+function SnippetAddForm({
+    tenantRouter,
+    onAdded,
+}: {
+    tenantRouter: ReturnType<typeof useTenantRouter>;
+    onAdded: (s: { id: number; title: string; body: string }) => void;
+}) {
+    const [title, setTitle] = useState('');
+    const [body, setBody] = useState('');
+    const [loading, setLoading] = useState(false);
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!title.trim() || !body.trim()) return;
+        setLoading(true);
+        const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const res = await fetch(tenantRouter.route('script.snippets.store'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ title: title.trim(), body: body.trim() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.snippet) {
+                onAdded(data.snippet);
+                setTitle('');
+                setBody('');
+                toast.success('Snippet saved');
+            } else toast.error(data.message ?? 'Failed to save');
+        } catch {
+            toast.error('Failed to save');
+        } finally {
+            setLoading(false);
+        }
+    };
+    return (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="h-9" />
+            <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Body" rows={2} className="resize-y text-sm" />
+            <Button type="submit" size="sm" disabled={loading || !title.trim() || !body.trim()}>{loading ? 'Saving…' : 'Add snippet'}</Button>
+        </form>
+    );
 }
 
 /** Skeleton shown while script data is loading (deferred prop) on the edit page. */
@@ -345,6 +551,17 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [editingTitleDraft, setEditingTitleDraft] = useState({ title: '', thumbnailText: '' });
     const [showManualTitleForm, setShowManualTitleForm] = useState(false);
     const [manualTitleDraft, setManualTitleDraft] = useState({ title: '', thumbnailText: '' });
+    const [checklist, setChecklist] = useState<ChecklistItem[]>(() =>
+        initialScript?.checklist?.length ? initialScript.checklist : DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i }))
+    );
+    const [outlineOpen, setOutlineOpen] = useState(false);
+    const [qualityPanelOpen, setQualityPanelOpen] = useState(false);
+    const [snippets, setSnippets] = useState<Array<{ id: number; title: string; body: string }>>([]);
+    const [snippetsSheetOpen, setSnippetsSheetOpen] = useState(false);
+    const [snippetsLoading, setSnippetsLoading] = useState(false);
+    const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+    const [aiScriptActionLoading, setAiScriptActionLoading] = useState<string | null>(null);
+    const blockNoteEditorRef = useRef<BlockNoteEditorRef | null>(null);
     const [generateError, setGenerateError] = useState<string | null>(null);
     const [descriptionSheetOpen, setDescriptionSheetOpen] = useState(false);
     const [descriptionData, setDescriptionData] = useState<DescriptionAssets | null>(
@@ -383,6 +600,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         workflowStatus,
         scheduledAt,
         productionStatus,
+        checklist,
     });
 
     formStateRef.current = {
@@ -395,6 +613,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         workflowStatus,
         scheduledAt,
         productionStatus,
+        checklist,
     };
 
     useEffect(() => {
@@ -430,6 +649,11 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                     : null
             );
             setThumbnails(initialScript.thumbnails ?? []);
+            setChecklist(
+                initialScript.checklist?.length
+                    ? initialScript.checklist
+                    : DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i }))
+            );
         }
     }, [initialScript]);
 
@@ -437,14 +661,31 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         setContent(blocks);
     };
 
+    const PRESET_TO_ACTION: Record<string, string> = {
+        'Shorten this.': 'shorten',
+        'Expand this.': 'expand',
+        'Make it more casual.': 'casual',
+        'Add an example.': 'add_example',
+    };
+
     const handleAiEditSelection = async (
         selectedText: string,
         instruction: string
     ): Promise<string | null> => {
-        const url = tenantRouter.route('script.ai-edit-selection');
+        const action = PRESET_TO_ACTION[instruction];
         const csrfToken =
             document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const url = action
+            ? tenantRouter.route('script.ai-script-action')
+            : tenantRouter.route('script.ai-edit-selection');
         try {
+            const body = action
+                ? { action, content: selectedText }
+                : {
+                      content: blocksToPlainText(content) || '',
+                      selected_text: selectedText,
+                      instruction,
+                  };
             const res = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -453,21 +694,84 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-                body: JSON.stringify({
-                    content: blocksToPlainText(content) || '',
-                    selected_text: selectedText,
-                    instruction,
-                }),
+                body: JSON.stringify(body),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
                 toast.error(data.message ?? 'AI edit failed');
                 return null;
             }
-            return typeof data.rewritten === 'string' ? data.rewritten : null;
+            const text = action ? data.text : data.rewritten;
+            return typeof text === 'string' ? text : null;
         } catch (e) {
             toast.error(e instanceof Error ? e.message : 'AI edit failed');
             return null;
+        }
+    };
+
+    const handleAiScriptAction = async (
+        action: 'intro' | 'outro' | 'hook' | 'shorten' | 'expand' | 'casual' | 'add_example',
+        options: { selectedText?: string; insertAt?: 'top' | 'bottom' }
+    ): Promise<string | null> => {
+        setAiScriptActionLoading(action);
+        const fullScript = blocksToPlainText(content) || '';
+        const csrfToken =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const body: { action: string; content?: string; full_script?: string } = { action };
+            if (options.selectedText) body.content = options.selectedText;
+            if (['intro', 'outro', 'hook'].includes(action)) body.full_script = fullScript;
+            else if (options.selectedText) body.content = options.selectedText;
+            const res = await fetch(tenantRouter.route('script.ai-script-action'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'AI action failed');
+                return null;
+            }
+            const text = typeof data.text === 'string' ? data.text : null;
+            if (text && options.insertAt) {
+                const paragraphs = text.split(/\n\n+/).map((p: string) => p.trim()).filter(Boolean);
+                const newBlocks: PartialBlock[] = paragraphs.length > 0
+                    ? paragraphs.map((p: string) => ({ type: 'paragraph', content: p } as PartialBlock))
+                    : [{ type: 'paragraph', content: text } as PartialBlock];
+                const editor = blockNoteEditorRef.current;
+                if (editor?.document && (editor.insertBlocks || editor.replaceBlocks)) {
+                    try {
+                        const doc = editor.document;
+                        if (doc.length > 0) {
+                            if (options.insertAt === 'top') {
+                                editor.insertBlocks(newBlocks, doc[0], 'before');
+                            } else {
+                                editor.insertBlocks(newBlocks, doc[doc.length - 1], 'after');
+                            }
+                        } else {
+                            editor.replaceBlocks([], newBlocks);
+                        }
+                    } catch (e) {
+                        console.warn('Editor insert failed, falling back to setContent', e);
+                        if (options.insertAt === 'top') setContent([...newBlocks, ...content]);
+                        else setContent([...content, ...newBlocks]);
+                    }
+                } else {
+                    if (options.insertAt === 'top') setContent([...newBlocks, ...content]);
+                    else setContent([...content, ...newBlocks]);
+                }
+            }
+            return text;
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'AI action failed');
+            return null;
+        } finally {
+            setAiScriptActionLoading(null);
         }
     };
 
@@ -700,6 +1004,11 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const hasIdeasToView = displayIdeas.length > 0;
 
     const wordCount = useMemo(() => countWordsInBlocks(content), [content]);
+    const readingTimeMinutes = useMemo(() => getReadingTimeMinutes(wordCount), [wordCount]);
+    const outlineEntries = useMemo(() => getOutlineFromBlocks(content), [content]);
+    const plainTextForQuality = useMemo(() => blocksToPlainText(content), [content]);
+    const readability = useMemo(() => getReadability(plainTextForQuality), [plainTextForQuality]);
+    const repetitionStats = useMemo(() => getRepetitionStats(plainTextForQuality), [plainTextForQuality]);
 
     const buildUpdatePayload = () => {
         const state = formStateRef.current;
@@ -726,6 +1035,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
             production_status: state.productionStatus,
             title_options: optionsToSend,
+            custom_attributes: { checklist: state.checklist },
         };
     };
 
@@ -788,6 +1098,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                     scheduled_at: state.scheduledAt?.trim() ? state.scheduledAt.trim() : null,
                     production_status: state.productionStatus,
                     title_options: titleOptionsPayload,
+                    custom_attributes: { checklist: state.checklist },
                 }),
             });
             if (response.ok) {
@@ -835,7 +1146,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                 autosaveTimeoutRef.current = null;
             }
         };
-    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt, productionStatus, isEdit, initialScript?.id, readOnly]);
+    }, [content, pageTitle, mainThumbnailText, scriptTypeId, descriptionData, titleOptions, workflowStatus, scheduledAt, productionStatus, checklist, isEdit, initialScript?.id, readOnly]);
 
     // When only script type changes, trigger a save so it persists without requiring an editor change
     const scriptTypeSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -902,7 +1213,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         setIsSaving(true);
         if (isEdit && initialScript) {
             const payload = buildUpdatePayload();
-            router.put(tenantRouter.route('script.update', { script: initialScript.uuid }), payload, {
+            router.put(tenantRouter.route('script.update', { script: initialScript.uuid }), payload as unknown as Parameters<typeof router.put>[1], {
                 preserveScroll: true,
                 onFinish: () => setIsSaving(false),
                 onError: () => setIsSaving(false),
@@ -1166,6 +1477,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                         <div className="ml-auto flex shrink-0 items-center gap-2">
                             <span className="text-muted-foreground text-xs tabular-nums">
                                 {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
+                                {readingTimeMinutes > 0 && (
+                                    <span className="ml-1.5">· ~{readingTimeMinutes} min</span>
+                                )}
                                 {((isEdit && autosaveStatus !== 'idle') || (!isEdit && autosaveStatus === 'saving')) && (
                                     <span className="mx-1">·</span>
                                 )}
@@ -1714,6 +2028,209 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             </div>
                         </SheetContent>
                     </Sheet>
+
+                    {/* Script tools: same row as title ideas / description / thumbnails */}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setOutlineOpen(true)}>
+                                <BookOpen className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Outline</TooltipContent>
+                    </Tooltip>
+                    <Popover>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <PopoverTrigger asChild>
+                                            <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0">
+                                                <ClipboardList className="h-4 w-4" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">Checklist</TooltipContent>
+                                </Tooltip>
+                                <PopoverContent className="w-72 p-3" align="start" side="bottom">
+                                    <p className="text-muted-foreground mb-2 text-xs font-medium">Script checklist</p>
+                                    <div className="flex flex-col gap-2">
+                                        {checklist.map((item) => (
+                                            <label key={item.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                                                <Checkbox
+                                                    checked={item.checked}
+                                                    onCheckedChange={(checked) =>
+                                                        setChecklist((prev) =>
+                                                            prev.map((i) => (i.id === item.id ? { ...i, checked: !!checked } : i))
+                                                        )
+                                                    }
+                                                />
+                                                <span className={item.checked ? 'text-muted-foreground line-through' : ''}>{item.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                            {(content.length === 0 || (content.length === 1 && !blocksToPlainText(content).trim())) && (
+                                <Popover open={templatePickerOpen} onOpenChange={setTemplatePickerOpen}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <PopoverTrigger asChild>
+                                                <Button type="button" variant="outline" size="sm" className="h-9 shrink-0">
+                                                    <FileStack className="mr-2 h-4 w-4" />
+                                                    Start from template
+                                                </Button>
+                                            </PopoverTrigger>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom">Script templates</TooltipContent>
+                                    </Tooltip>
+                                    <PopoverContent className="w-64 p-2" align="start">
+                                        {SCRIPT_TEMPLATES.map((t) => (
+                                            <Button
+                                                key={t.id}
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full justify-start"
+                                                onClick={() => {
+                                                    setContent(t.content.map((b) => ({ ...b, id: crypto.randomUUID() })));
+                                                    setTemplatePickerOpen(false);
+                                                    toast.success(`Applied "${t.name}" template`);
+                                                }}
+                                            >
+                                                {t.name}
+                                            </Button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={() => { setSnippetsSheetOpen(true); setSnippetsLoading(true); fetch(tenantRouter.route('script.snippets.index'), { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } }).then((r) => r.json()).then((d) => { setSnippets(d.snippets ?? []); setSnippetsLoading(false); }).catch(() => setSnippetsLoading(false)); }}>
+                                        <Quote className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">Snippets</TooltipContent>
+                            </Tooltip>
+                            <Popover open={qualityPanelOpen} onOpenChange={setQualityPanelOpen}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <PopoverTrigger asChild>
+                                            <Button type="button" variant="outline" size="icon" className="h-9 w-9">
+                                                <BarChart2 className="h-4 w-4" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">Quality & repetition</TooltipContent>
+                                </Tooltip>
+                                <PopoverContent className="w-80 p-3" align="start">
+                                    <p className="text-muted-foreground mb-2 text-xs font-medium uppercase">Readability</p>
+                                    <p className="text-sm">{readability.label} (avg {readability.avgWordsPerSentence} words/sentence)</p>
+                                    {(repetitionStats.repeatedPhrases.length > 0 || repetitionStats.overused.length > 0) && (
+                                        <>
+                                            <p className="text-muted-foreground mt-3 text-xs font-medium uppercase">Repeated phrases (3+ words)</p>
+                                            <ul className="text-muted-foreground mt-1 list-inside list-disc text-xs">
+                                                {repetitionStats.repeatedPhrases.slice(0, 5).map((p) => (
+                                                    <li key={p.phrase}>"{p.phrase}" ({p.count}×)</li>
+                                                ))}
+                                            </ul>
+                                            <p className="text-muted-foreground mt-2 text-xs font-medium uppercase">Overused words</p>
+                                            <ul className="text-muted-foreground mt-1 list-inside list-disc text-xs">
+                                                {repetitionStats.overused.slice(0, 8).map((w) => (
+                                                    <li key={w.word}>{w.word} ({w.count}×)</li>
+                                                ))}
+                                            </ul>
+                                        </>
+                                    )}
+                                    {repetitionStats.repeatedPhrases.length === 0 && repetitionStats.overused.length === 0 && (
+                                        <p className="text-muted-foreground mt-2 text-xs">No notable repetition.</p>
+                                    )}
+                                </PopoverContent>
+                            </Popover>
+                            <span className="text-muted-foreground mx-1 text-xs">|</span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9"
+                                disabled={!!aiScriptActionLoading}
+                                onClick={() => handleAiScriptAction('intro', { insertAt: 'top' })}
+                            >
+                                {aiScriptActionLoading === 'intro' ? '…' : 'Write intro'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9"
+                                disabled={!!aiScriptActionLoading}
+                                onClick={() => handleAiScriptAction('outro', { insertAt: 'bottom' })}
+                            >
+                                {aiScriptActionLoading === 'outro' ? '…' : 'Write outro'}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9"
+                                disabled={!!aiScriptActionLoading}
+                                onClick={() => handleAiScriptAction('hook', { insertAt: 'top' })}
+                            >
+                                {aiScriptActionLoading === 'hook' ? '…' : 'Suggest hook'}
+                            </Button>
+
+                    <Sheet open={outlineOpen} onOpenChange={setOutlineOpen}>
+                        <SheetContent side="left" className="w-64">
+                            <SheetHeader>
+                                <SheetTitle>Outline</SheetTitle>
+                                <SheetDescription>Headings in your script</SheetDescription>
+                            </SheetHeader>
+                            <div className="mt-4 space-y-1">
+                                {outlineEntries.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">Add heading blocks to see the outline.</p>
+                                ) : (
+                                    outlineEntries.map((e) => (
+                                        <div key={e.id} className="text-sm" style={{ paddingLeft: (e.level - 1) * 12 }}>
+                                            {e.text}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
+
+                    <Sheet open={snippetsSheetOpen} onOpenChange={setSnippetsSheetOpen}>
+                        <SheetContent side="right" className="w-full sm:max-w-md">
+                            <SheetHeader>
+                                <SheetTitle>Snippets</SheetTitle>
+                                <SheetDescription>Insert saved phrases at the end of your script.</SheetDescription>
+                            </SheetHeader>
+                            <div className="mt-4 flex flex-col gap-2">
+                                {snippetsLoading ? (
+                                    <p className="text-muted-foreground text-sm">Loading…</p>
+                                ) : (
+                                    <>
+                                        {snippets.map((s) => (
+                                            <div key={s.id} className="flex items-center justify-between gap-2 rounded border p-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-medium text-sm">{s.title}</p>
+                                                    <p className="text-muted-foreground truncate text-xs">{s.body.slice(0, 60)}{s.body.length > 60 ? '…' : ''}</p>
+                                                </div>
+                                                <div className="flex shrink-0 gap-1">
+                                                    <Button size="sm" variant="outline" onClick={() => { const newBlock = { id: crypto.randomUUID(), type: 'paragraph', content: [{ type: 'text', text: s.body }] } as PartialBlock; setContent((prev) => [...prev, newBlock]); toast.success('Snippet appended'); }}>Insert</Button>
+                                                    <Button size="sm" variant="ghost" onClick={async () => { const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''; await fetch(tenantRouter.route('script.snippets.destroy', { id: s.id }), { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' } }); setSnippets((prev) => prev.filter((x) => x.id !== s.id)); toast.success('Deleted'); }}><X className="h-4 w-4" /></Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="rounded border border-dashed p-3">
+                                            <p className="text-muted-foreground mb-2 text-xs font-medium">Add snippet</p>
+                                            <SnippetAddForm
+                                                tenantRouter={tenantRouter}
+                                                onAdded={(s) => setSnippets((prev) => [...prev, s])}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
                 </div>
                 )}
 
@@ -1728,6 +2245,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                         placeholder="Start typing your script or press '/' for commands..."
                         editable={!readOnly}
                         onAiEditRequest={readOnly ? undefined : handleAiEditSelection}
+                        onEditorReady={(e) => { blockNoteEditorRef.current = e; }}
                     />
                 </EditorErrorBoundary>
 

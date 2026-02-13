@@ -91,6 +91,10 @@ interface BlockNoteEditorProps {
      * When provided, enables AI edit: toolbar gets an AI button; callback receives (selectedText, instruction) and returns rewritten text.
      */
     onAiEditRequest?: (selectedText: string, instruction: string) => Promise<string | null>;
+    /**
+     * Called when the editor instance is ready. Use to get a ref for programmatic insertion (e.g. intro/outro).
+     */
+    onEditorReady?: (editor: BlockNoteEditorType) => void;
 }
 
 export function BlockNoteEditor({
@@ -101,10 +105,15 @@ export function BlockNoteEditor({
     placeholder = 'Start typing...',
     showFormattingToolbar = true,
     onAiEditRequest,
+    onEditorReady,
 }: BlockNoteEditorProps) {
     const editor = useCreateBlockNote({
         initialContent,
     });
+
+    useEffect(() => {
+        if (editor && onEditorReady) onEditorReady(editor as BlockNoteEditorType);
+    }, [editor, onEditorReady]);
 
     const [resultCard, setResultCard] = useState<AiEditResultCardData | null>(null);
 

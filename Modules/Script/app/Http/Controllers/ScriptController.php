@@ -212,10 +212,12 @@ final class ScriptController extends Controller
             'title_options.*.title' => 'required_with:title_options|string|max:255',
             'title_options.*.thumbnail_text' => 'nullable|string|max:255',
             'title_options.*.is_primary' => 'nullable|boolean',
+            'custom_attributes' => 'nullable|array',
         ]);
 
         $tenantId = tenant('id');
         $userId = $request->user()?->id;
+        $customAttrs = $validated['custom_attributes'] ?? [];
 
         $script = Script::create([
             'tenant_id' => $tenantId,
@@ -231,6 +233,7 @@ final class ScriptController extends Controller
             'status' => $validated['status'] ?? 'draft',
             'production_status' => $validated['production_status'] ?? 'not_shot',
             'scheduled_at' => isset($validated['scheduled_at']) ? $validated['scheduled_at'] : null,
+            'custom_attributes' => $customAttrs ?: null,
         ]);
 
         if (! empty($validated['title_options'])) {
@@ -315,9 +318,11 @@ final class ScriptController extends Controller
             'title_options.*.title' => 'required_with:title_options|string|max:255',
             'title_options.*.thumbnail_text' => 'nullable|string|max:255',
             'title_options.*.is_primary' => 'nullable|boolean',
+            'custom_attributes' => 'nullable|array',
         ]);
 
-        $script->update([
+        $customAttrs = array_key_exists('custom_attributes', $validated) ? $validated['custom_attributes'] : null;
+        $updatePayload = [
             'script_type_id' => $validated['script_type_id'] ?? $script->script_type_id,
             'updated_by' => $request->user()?->id,
             'title' => $validated['title'] ?? $script->title,
@@ -329,7 +334,11 @@ final class ScriptController extends Controller
             'status' => $validated['status'] ?? $script->status,
             'production_status' => $validated['production_status'] ?? $script->production_status,
             'scheduled_at' => array_key_exists('scheduled_at', $validated) ? ($validated['scheduled_at'] ?? null) : $script->scheduled_at,
-        ]);
+        ];
+        if ($customAttrs !== null) {
+            $updatePayload['custom_attributes'] = $customAttrs;
+        }
+        $script->update($updatePayload);
 
         if (array_key_exists('title_options', $validated)) {
             $script->syncTitleOptionsFromArray($validated['title_options'] ?? []);
@@ -569,7 +578,7 @@ PROMPT;
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
-                'max_tokens' => 4096,
+                'max_completion_tokens' => 4096,
             ]);
 
             $rewritten = trim($response->choices[0]->message->content ?? '');
@@ -585,6 +594,109 @@ PROMPT;
                 500
             );
         }
+    }
+
+    /**
+     * Preset script AI actions: intro, outro, hook, shorten, expand, casual, add_example.
+     */
+    public function aiScriptAction(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => 'required|string|in:intro,outro,hook,shorten,expand,casual,add_example',
+            'content' => 'nullable|string|max:100000',
+            'full_script' => 'nullable|string|max:100000',
+        ]);
+        $action = $validated['action'];
+        $content = $validated['content'] ?? '';
+        $fullScript = $validated['full_script'] ?? $content;
+
+        $instructions = [
+            'intro' => 'Write a short, punchy YouTube video intro (first 30–60 seconds). Hook the viewer immediately. Output only the intro script, no explanation.',
+            'outro' => 'Write a short YouTube video outro. Include a clear call to action (subscribe, like, link in description). Output only the outro script, no explanation.',
+            'hook' => 'Write a strong hook for the first 15–30 seconds of this script. One or two sentences that grab attention. Output only the hook, no explanation.',
+            'shorten' => 'Shorten this text while keeping the main point. Keep it conversational. Output only the shortened text.',
+            'expand' => 'Expand this with a bit more detail or an example. Keep the same tone. Output only the expanded text.',
+            'casual' => 'Rewrite this to sound more casual and conversational, as if speaking to a friend. Output only the rewritten text.',
+            'add_example' => 'Add a brief, concrete example to illustrate the point. Keep the original and add the example naturally. Output only the revised text.',
+        ];
+        $systemPrompt = 'You are an expert YouTube script editor. Apply the user\'s instruction. Return ONLY the requested text—no markdown, no quotes, no meta-commentary.';
+        $userPrompt = $action === 'intro' || $action === 'outro' || $action === 'hook'
+            ? "Script (for context):\n\n" . $fullScript . "\n\n---\n\nInstruction: " . $instructions[$action]
+            : "Text to edit:\n\n" . $content . "\n\n---\n\nInstruction: " . $instructions[$action];
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'max_completion_tokens' => 4096,
+            ]);
+            $text = trim($response->choices[0]->message->content ?? '');
+            if ($text === '') {
+                return response()->json(['message' => 'No response from AI. Try again.'], 422);
+            }
+            return response()->json(['text' => $text]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::aiScriptAction failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'AI action failed. Please try again.'], 500);
+        }
+    }
+
+    /**
+     * List current user's script snippets.
+     */
+    public function snippetsIndex(Request $request): JsonResponse
+    {
+        $tenantId = tenant('id');
+        $userId = $request->user()?->id;
+        if (! $userId) {
+            return response()->json(['snippets' => []]);
+        }
+        $snippets = ScriptSnippet::where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->orderBy('title')
+            ->get(['id', 'title', 'body']);
+        return response()->json(['snippets' => $snippets]);
+    }
+
+    /**
+     * Create a script snippet.
+     */
+    public function snippetsStore(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'body' => 'required|string|max:10000',
+        ]);
+        $tenantId = tenant('id');
+        $userId = $request->user()?->id;
+        if (! $userId) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        $snippet = ScriptSnippet::create([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'title' => $validated['title'],
+            'body' => $validated['body'],
+        ]);
+        return response()->json(['snippet' => ['id' => $snippet->id, 'title' => $snippet->title, 'body' => $snippet->body]]);
+    }
+
+    /**
+     * Delete a script snippet.
+     */
+    public function snippetsDestroy(Request $request, int $id): JsonResponse
+    {
+        $tenantId = tenant('id');
+        $userId = $request->user()?->id;
+        $snippet = ScriptSnippet::where('id', $id)->where('tenant_id', $tenantId)->where('user_id', $userId)->first();
+        if (! $snippet) {
+            return response()->json(['message' => 'Snippet not found.'], 404);
+        }
+        $snippet->delete();
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -738,6 +850,7 @@ PROMPT;
             'can_edit' => $script->canEdit($user),
             'can_delete' => $script->canDelete($user),
             'can_manage_access' => $script->canManageAccess($user),
+            'checklist' => (isset($script->custom_attributes['checklist']) && is_array($script->custom_attributes['checklist'])) ? $script->custom_attributes['checklist'] : null,
         ];
     }
 
@@ -1567,7 +1680,7 @@ PROMPT;
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $validated['prompt']],
                 ],
-                'max_tokens' => 8192,
+                'max_completion_tokens' => 8192,
                 'temperature' => 0.7,
             ]);
 
@@ -1613,7 +1726,7 @@ PROMPT;
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
-                'max_tokens' => 2048,
+                'max_completion_tokens' => 2048,
                 'temperature' => 0.8,
             ]);
 

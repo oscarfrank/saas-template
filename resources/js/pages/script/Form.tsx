@@ -1685,9 +1685,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             if (open && displayIdeas.length === 0) setShowManualTitleForm(true);
                         }}
                     >
-                                <SheetTrigger asChild>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <SheetTrigger asChild>
                                             <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 relative">
                                                 <List className="h-4 w-4" />
                                                 {displayIdeas.length > 0 && (
@@ -1696,12 +1696,12 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                                     </span>
                                                 )}
                                             </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom">
-                                            {displayIdeas.length > 0 ? `Title ideas (${displayIdeas.length})` : 'View title ideas'}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </SheetTrigger>
+                                        </SheetTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">
+                                        {displayIdeas.length > 0 ? `Title ideas (${displayIdeas.length})` : 'View title ideas'}
+                                    </TooltipContent>
+                                </Tooltip>
                                 <SheetContent side="right" className="w-full sm:max-w-md">
                                     <SheetHeader>
                                         <SheetTitle>Title ideas</SheetTitle>

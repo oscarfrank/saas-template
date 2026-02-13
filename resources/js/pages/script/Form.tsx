@@ -116,6 +116,14 @@ function formatMinSec(totalMinutes: number): string {
     return `${m}m ${s}s`;
 }
 
+/** Normalize timestamp time to MM:SS (leading zero when minute < 10). */
+function formatTimestampTime(time: string): string {
+    const parts = (time ?? '').trim().split(':');
+    const min = Math.max(0, parseInt(parts[0], 10) || 0);
+    const sec = Math.max(0, parseInt(parts[1], 10) || 0);
+    return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
 /** Simple readability: average words per sentence. Lower = denser. */
 function getReadability(plainText: string): { avgWordsPerSentence: number; label: string } {
     const sentences = plainText.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
@@ -1310,7 +1318,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                 '::::::::::::::: ⏰ Timestamps :::::::::::::::',
             ];
             for (const ts of timestamps) {
-                parts.push(`${ts.time?.trim() ?? ''} ${ts.label?.trim() ?? ''}`.trim());
+                const timeStr = formatTimestampTime(ts.time ?? '');
+                const labelStr = (ts.label ?? '').trim();
+                parts.push(labelStr ? `${timeStr} - ${labelStr}` : timeStr);
             }
             setDescriptionData({
                 descriptionBlock: parts.join('\n'),

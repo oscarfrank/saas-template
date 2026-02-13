@@ -34,7 +34,8 @@ import type { PartialBlock } from '@blocknote/core';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2 } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2, Film } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 
 /** Simple markdown-style renderer for analysis text (headings, lists, bold). */
@@ -691,6 +692,10 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [snippetsSheetOpen, setSnippetsSheetOpen] = useState(false);
     const [snippetsLoading, setSnippetsLoading] = useState(false);
     const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+    const [shortDialogOpen, setShortDialogOpen] = useState(false);
+    const [shortScriptText, setShortScriptText] = useState('');
+    const [shortLoading, setShortLoading] = useState(false);
+    const [shortCreating, setShortCreating] = useState(false);
     const [aiScriptActionLoading, setAiScriptActionLoading] = useState<string | null>(null);
     const blockNoteEditorRef = useRef<BlockNoteEditorRef | null>(null);
     const [generateError, setGenerateError] = useState<string | null>(null);
@@ -725,6 +730,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const anyBackgroundLoading = useMemo(
         () =>
             analysisLoading ||
+            shortLoading ||
             isGenerating ||
             isGeneratingDescription ||
             !!aiScriptActionLoading ||
@@ -736,6 +742,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             autosaveStatus === 'saving',
         [
             analysisLoading,
+            shortLoading,
             isGenerating,
             isGeneratingDescription,
             aiScriptActionLoading,
@@ -1570,6 +1577,71 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         toast.success('Suggested version added above the original. Compare and edit as needed.');
     };
 
+    const handleGenerateShort = async () => {
+        const plain = blocksToPlainText(content) || '';
+        if (!plain.trim()) {
+            toast.error('Add some script content first.');
+            return;
+        }
+        setShortLoading(true);
+        setShortScriptText('');
+        try {
+            const path = `/${tenantRouter.tenant.slug}/script/generate-short`;
+            const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ content: plain }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'Could not generate short.');
+                return;
+            }
+            setShortScriptText(data.short_script ?? '');
+            setShortDialogOpen(true);
+        } catch {
+            toast.error('Network error. Try again.');
+        } finally {
+            setShortLoading(false);
+        }
+    };
+
+    const handleCreateScriptFromShort = async () => {
+        if (!shortScriptText.trim()) {
+            toast.error('Nothing to save.');
+            return;
+        }
+        setShortCreating(true);
+        try {
+            const url = tenantRouter.route('script.transcripts.create-script');
+            const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const title = (initialScript?.title?.trim() || 'Script') + ' SHORT';
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ title, content: shortScriptText.trim() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'Failed to create script.');
+                return;
+            }
+            const editUrl = data.edit_url;
+            if (editUrl) {
+                toast.success('Short script created. Opening…');
+                router.visit(editUrl);
+            } else {
+                toast.success('Short script created.');
+                setShortDialogOpen(false);
+            }
+        } catch {
+            toast.error('Could not create script. Try again.');
+        } finally {
+            setShortCreating(false);
+        }
+    };
+
     const handleExport = async (format: 'json' | 'csv') => {
         if (!initialScript) return;
         const url = tenantRouter.route('script.export', { script: initialScript.uuid, format });
@@ -2399,6 +2471,21 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom">Analysis</TooltipContent>
                                 </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9"
+                                            disabled={shortLoading}
+                                            onClick={handleGenerateShort}
+                                        >
+                                            {shortLoading ? <span className="text-xs">…</span> : <Film className="h-4 w-4" />}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">Generate short from script</TooltipContent>
+                                </Tooltip>
                                 <PopoverContent className="w-56 p-2" align="start">
                                     <p className="text-muted-foreground mb-2 px-1 text-xs font-medium">What do you want to analyze?</p>
                                     <div className="grid gap-0.5">
@@ -2550,6 +2637,40 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             )}
                         </SheetContent>
                     </Sheet>
+
+                    <Dialog open={shortDialogOpen} onOpenChange={setShortDialogOpen}>
+                        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+                            <DialogHeader>
+                                <DialogTitle>Short from script</DialogTitle>
+                                <DialogDescription>
+                                    Edit the short below, then create a new script to save it. The new script will be titled with &quot; SHORT&quot; appended.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Textarea
+                                value={shortScriptText}
+                                onChange={(e) => setShortScriptText(e.target.value)}
+                                placeholder="Short script will appear here…"
+                                className="min-h-[280px] resize-y font-sans text-sm"
+                                disabled={shortLoading}
+                            />
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShortDialogOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    disabled={!shortScriptText.trim() || shortCreating}
+                                    onClick={handleCreateScriptFromShort}
+                                >
+                                    {shortCreating ? 'Creating…' : 'Create new script'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     <Sheet open={snippetsSheetOpen} onOpenChange={setSnippetsSheetOpen}>
                         <SheetContent side="right" className="w-full sm:max-w-md">

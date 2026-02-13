@@ -30,6 +30,7 @@ Route::middleware([
     Route::post('script/import-csv', [ScriptController::class, 'importCsv'])->name('script.import-csv');
     // Static segments before {script} so they are not matched as script ID
     Route::post('script/analyze', [ScriptController::class, 'analyzeScript'])->name('script.analyze');
+    Route::post('script/generate-short', [ScriptController::class, 'generateShort'])->name('script.generate-short');
     Route::post('script/generate-title-ideas', [ScriptController::class, 'generateTitleIdeas'])->name('script.generate-title-ideas');
     Route::post('script/generate-description-assets', [ScriptController::class, 'generateDescriptionAssets'])->name('script.generate-description-assets');
     Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');

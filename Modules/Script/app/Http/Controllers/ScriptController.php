@@ -836,6 +836,52 @@ PROMPT;
     }
 
     /**
+     * Generate a short-form script from a full script (interactive, conversational, punchy).
+     * Route: POST script/generate-short
+     */
+    public function generateShort(Request $request): JsonResponse
+    {
+        set_time_limit(120);
+        $validated = $request->validate([
+            'content' => 'required|string|max:100000',
+        ]);
+        $content = $validated['content'];
+
+        $systemPrompt = <<<'PROMPT'
+You are a short-form video script writer. Turn a long-form script into a SHORT version (e.g. for YouTube Shorts, TikTok, Reels).
+
+The short must be:
+- Interactive and engaging: hooks, questions, direct address to the viewer
+- Conversational and natural, like talking to a friend
+- Punchy and concise: short sentences, no fluff
+- Optionally funny or witty where it fits the topic
+- Designed for vertical/short format: strong opening, clear beats, satisfying end in 60–90 seconds when read aloud
+
+Output ONLY the short script as plain text. No titles, no stage directions, no "Short script:" prefix. Just the script the creator will read. Use line breaks between paragraphs/beats. Do not add meta commentary.
+PROMPT;
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => "Turn this full script into a short:\n\n" . $content],
+                ],
+                'max_completion_tokens' => 2048,
+                'temperature' => 0.6,
+            ]);
+            $shortScript = trim($response->choices[0]->message->content ?? '');
+            if ($shortScript === '') {
+                return response()->json(['message' => 'No short script generated. Try again.'], 422);
+            }
+            return response()->json(['short_script' => $shortScript]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::generateShort failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Could not generate short. Please try again.'], 500);
+        }
+    }
+
+    /**
      * Generate YouTube description, timestamps, and meta tags.
      */
     public function generateDescriptionAssets(Request $request): JsonResponse

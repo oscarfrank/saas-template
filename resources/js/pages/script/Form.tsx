@@ -1631,16 +1631,16 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             if (open) setGenerateError(null);
                         }}
                     >
-                        <PopoverTrigger asChild>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <PopoverTrigger asChild>
                                     <Button type="button" variant="outline" size="icon" className="h-9 w-9 shrink-0" disabled={isGenerating}>
                                         <Sparkles className="h-4 w-4" />
                                     </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">{isGenerating ? 'Generating…' : 'Generate title ideas'}</TooltipContent>
-                            </Tooltip>
-                        </PopoverTrigger>
+                                </PopoverTrigger>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">{isGenerating ? 'Generating…' : 'Generate title ideas'}</TooltipContent>
+                        </Tooltip>
                         <PopoverContent className="w-80" align="start" side="bottom">
                             <div className="space-y-3">
                                 <div>

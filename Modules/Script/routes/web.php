@@ -36,6 +36,7 @@ Route::middleware([
     Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');
     Route::post('script/ai-script-action', [ScriptController::class, 'aiScriptAction'])->name('script.ai-script-action');
     Route::get('script/{script}/content-as-text', [ScriptController::class, 'getScriptContentAsText'])->name('script.content-as-text');
+    Route::post('script/{script}/generate-reel-captions', [ScriptController::class, 'generateReelCaptions'])->name('script.generate-reel-captions');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
     Route::match(['GET', 'POST'], 'script/{script}/export', [ScriptController::class, 'export'])->name('script.export');
     Route::put('script/{script}', [ScriptController::class, 'update'])->name('script.update');

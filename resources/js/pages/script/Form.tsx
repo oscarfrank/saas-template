@@ -34,7 +34,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2, Film } from 'lucide-react';
+import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2, Film, MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 
@@ -510,6 +510,7 @@ interface ScriptForEdit {
     analysis_retention?: AnalysisRetentionSaved | null;
     analysis_cta?: AnalysisRetentionSaved | null;
     analysis_storytelling?: AnalysisRetentionSaved | null;
+    reel_captions?: { generated_at: string; options: { caption: string }[] } | null;
     current_user_role?: string | null;
     can_edit?: boolean;
     can_delete?: boolean;
@@ -721,6 +722,9 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const [thumbnailsSheetOpen, setThumbnailsSheetOpen] = useState(false);
     const [thumbnailUploading, setThumbnailUploading] = useState(false);
     const thumbnailInputRef = useRef<HTMLInputElement>(null);
+    const [reelCaptionsSheetOpen, setReelCaptionsSheetOpen] = useState(false);
+    const [reelCaptionsLoading, setReelCaptionsLoading] = useState(false);
+    const [reelCaptionsData, setReelCaptionsData] = useState<{ generated_at: string; options: { caption: string }[] } | null>(initialScript?.reel_captions ?? null);
     const hasHydratedFromDeferredRef = useRef(false);
 
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
@@ -731,6 +735,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         () =>
             analysisLoading ||
             shortLoading ||
+            reelCaptionsLoading ||
             isGenerating ||
             isGeneratingDescription ||
             !!aiScriptActionLoading ||
@@ -743,6 +748,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         [
             analysisLoading,
             shortLoading,
+            reelCaptionsLoading,
             isGenerating,
             isGeneratingDescription,
             aiScriptActionLoading,
@@ -813,6 +819,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                     : null
             );
             setThumbnails(initialScript.thumbnails ?? []);
+            setReelCaptionsData(initialScript.reel_captions ?? null);
             setChecklist(
                 initialScript.checklist?.length
                     ? initialScript.checklist
@@ -993,6 +1000,29 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
             setGenerateError('Network or server error. Please try again.');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateReelCaptions = async () => {
+        if (!initialScript?.uuid) return;
+        setReelCaptionsLoading(true);
+        try {
+            const path = `/${tenantRouter.tenant.slug}/script/${initialScript.uuid}/generate-reel-captions`;
+            const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'Could not generate captions.');
+                return;
+            }
+            setReelCaptionsData({ generated_at: data.generated_at ?? '', options: data.options ?? [] });
+        } catch {
+            toast.error('Network error. Try again.');
+        } finally {
+            setReelCaptionsLoading(false);
         }
     };
 
@@ -2021,6 +2051,15 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                         {displayIdeas.length > 0 ? `Title ideas (${displayIdeas.length})` : 'View title ideas'}
                                     </TooltipContent>
                                 </Tooltip>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 relative" onClick={() => setReelCaptionsSheetOpen(true)}>
+                                            <MessageSquare className="h-4 w-4" />
+                                            {reelCaptionsData?.options?.length ? <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px] font-medium">3</span> : null}
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom">{reelCaptionsData?.options?.length ? 'Reel captions (3)' : 'Reel captions'}</TooltipContent>
+                                </Tooltip>
                                 <SheetContent side="right" className="w-full sm:max-w-md">
                                     <SheetHeader>
                                         <SheetTitle>Title ideas</SheetTitle>
@@ -2188,6 +2227,63 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                 </div>
                             </SheetContent>
                         </Sheet>
+                    <Sheet open={reelCaptionsSheetOpen} onOpenChange={setReelCaptionsSheetOpen}>
+                        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col">
+                            <SheetHeader>
+                                <SheetTitle>Reel captions</SheetTitle>
+                                <SheetDescription>
+                                    Captions for IG Reels, TikTok, Facebook Reels, and X. Generate once — they’re saved with the script. Copy the one you like.
+                                </SheetDescription>
+                                {(!reelCaptionsData?.options?.length || reelCaptionsData.options.length < 3) && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-2 w-fit"
+                                        disabled={reelCaptionsLoading}
+                                        onClick={handleGenerateReelCaptions}
+                                    >
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        {reelCaptionsLoading ? 'Generating…' : 'Generate 3 options'}
+                                    </Button>
+                                )}
+                            </SheetHeader>
+                            <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
+                                {reelCaptionsData?.options?.length ? (
+                                    <>
+                                        {reelCaptionsData.options.map((opt, i) => (
+                                            <div key={i} className="rounded-lg border bg-muted/20 p-4">
+                                                <p className="text-muted-foreground mb-2 text-xs font-medium">Option {i + 1}</p>
+                                                <p className="whitespace-pre-wrap text-sm">{opt.caption}</p>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="mt-2 h-8"
+                                                    onClick={() => copyToClipboard(opt.caption, 'Caption copied!')}
+                                                >
+                                                    <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                                    Copy
+                                                </Button>
+                                            </div>
+                                        ))}
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-fit"
+                                            disabled={reelCaptionsLoading}
+                                            onClick={handleGenerateReelCaptions}
+                                        >
+                                            {reelCaptionsLoading ? 'Regenerating…' : 'Regenerate'}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <p className="text-muted-foreground text-sm">No captions yet. Click Generate to create 3 options from your script.</p>
+                                )}
+                            </div>
+                        </SheetContent>
+                    </Sheet>
                     {generateError && (
                         <p className="text-destructive text-sm" role="alert">{generateError}</p>
                     )}

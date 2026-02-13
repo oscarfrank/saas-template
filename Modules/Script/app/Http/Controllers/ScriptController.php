@@ -1042,7 +1042,92 @@ PROMPT;
             'analysis_storytelling' => isset($script->custom_attributes['analysis_storytelling']) && is_array($script->custom_attributes['analysis_storytelling'])
                 ? $script->custom_attributes['analysis_storytelling']
                 : null,
+            'reel_captions' => isset($script->custom_attributes['reel_captions']) && is_array($script->custom_attributes['reel_captions'])
+                ? $script->custom_attributes['reel_captions']
+                : null,
         ];
+    }
+
+    /**
+     * Generate 3 reel caption options for IG Reels, TikTok, Facebook Reels, X. Saved to script.
+     * Route: POST script/{script}/generate-reel-captions
+     */
+    public function generateReelCaptions(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canEdit($request->user())) {
+            abort(403);
+        }
+
+        set_time_limit(120);
+        $content = $this->blockNoteContentToPlainText($script->content ?? []);
+        if (trim($content) === '') {
+            return response()->json(['message' => 'Script has no content to generate captions from.'], 422);
+        }
+
+        $systemPrompt = <<<'PROMPT'
+You are a social media copywriter. Create short-form captions for reels/shorts that work across Instagram Reels, TikTok, Facebook Reels, and X (Twitter).
+
+Given a video script, output exactly 3 different caption options. Each caption must:
+- Hook viewers in the first line (ideal for feeds)
+- Be concise (roughly 1–3 short sentences or a punchy phrase; can use line breaks)
+- Include 2–5 relevant hashtags: place them at the end of the caption (or after a line break). Use hashtags that fit the topic and help discoverability on IG/TikTok/FB (e.g. #tech #tips #howto). No generic spam.
+- Feel native to reels/shorts: conversational, engaging
+- Work for IG Reels, TikTok, Facebook Reels, and X (avoid platform-specific jargon)
+- Vary in tone: e.g. one more curiosity-driven, one direct, one playful
+
+Output ONLY a JSON object with one key: "captions" (array of exactly 3 strings). No other text or markdown.
+Example: {"captions": ["Hook line here.\n\n#topic #niche", "Second caption with #hashtags at the end.", "Third option.\n\n#relevant #tags"]}
+PROMPT;
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => "Video script:\n\n" . $content],
+                ],
+                'max_completion_tokens' => 1024,
+                'temperature' => 0.7,
+            ]);
+            $text = trim($response->choices[0]->message->content ?? '');
+            if (preg_match('/```(?:json)?\s*([\s\S]*?)```/s', $text, $m)) {
+                $text = trim($m[1]);
+            }
+            $start = strpos($text, '{');
+            if ($start !== false) {
+                $end = strrpos($text, '}');
+                if ($end !== false && $end > $start) {
+                    $text = substr($text, $start, $end - $start + 1);
+                }
+            }
+            $data = json_decode($text, true);
+            if (! is_array($data) || ! isset($data['captions']) || ! is_array($data['captions'])) {
+                Log::warning('ScriptController::generateReelCaptions invalid JSON', ['response' => substr($text, 0, 300)]);
+                return response()->json(['message' => 'Invalid response from AI. Please try again.'], 502);
+            }
+            $captions = array_slice(array_filter(array_map(function ($c) {
+                return is_string($c) ? trim($c) : null;
+            }, $data['captions'])), 0, 3);
+            if (count($captions) < 3) {
+                return response()->json(['message' => 'Could not generate 3 captions. Please try again.'], 502);
+            }
+            $payload = [
+                'generated_at' => now()->toIso8601String(),
+                'options' => array_map(fn ($c) => ['caption' => $c], $captions),
+            ];
+            $existing = $script->custom_attributes ?? [];
+            $existing['reel_captions'] = $payload;
+            $script->update(['custom_attributes' => $existing]);
+
+            return response()->json($payload);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::generateReelCaptions failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Could not generate captions. Please try again.'], 500);
+        }
     }
 
     /**

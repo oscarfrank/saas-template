@@ -94,8 +94,26 @@ function getOutlineFromBlocks(blocks: PartialBlock[]): OutlineEntry[] {
     return entries;
 }
 
-function getReadingTimeMinutes(wordCount: number): number {
-    return Math.max(0, Math.round((wordCount / WORDS_PER_MINUTE) * 10) / 10);
+function minutesAtWpm(wordCount: number, wpm: number): number {
+    return Math.max(0, Math.round((wordCount / wpm) * 10) / 10);
+}
+
+/** Returns estimated video length at slower (130), normal (150), and faster (170) WPM. */
+function getReadingTimeRange(wordCount: number): { slower: number; normal: number; faster: number } {
+    return {
+        slower: minutesAtWpm(wordCount, WPM_SLOWER),
+        normal: minutesAtWpm(wordCount, WPM_NORMAL),
+        faster: minutesAtWpm(wordCount, WPM_FASTER),
+    };
+}
+
+/** Format decimal minutes as "Xm Ys" (e.g. 10.5 → "10m 30s"). */
+function formatMinSec(totalMinutes: number): string {
+    const totalSeconds = Math.round(totalMinutes * 60);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    if (s === 0) return `${m}m`;
+    return `${m}m ${s}s`;
 }
 
 /** Simple readability: average words per sentence. Lower = denser. */
@@ -251,7 +269,9 @@ interface DescriptionAssets {
     metaTags: string;
 }
 
-const WORDS_PER_MINUTE = 150;
+const WPM_SLOWER = 130;
+const WPM_NORMAL = 150;
+const WPM_FASTER = 170;
 
 /** Script templates: PartialBlock[] for starting from a structure. Content uses simple inline text (BlockNote accepts at runtime). */
 const SCRIPT_TEMPLATES: { id: string; name: string; content: PartialBlock[] }[] = [
@@ -1004,7 +1024,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const hasIdeasToView = displayIdeas.length > 0;
 
     const wordCount = useMemo(() => countWordsInBlocks(content), [content]);
-    const readingTimeMinutes = useMemo(() => getReadingTimeMinutes(wordCount), [wordCount]);
+    const readingTimeRange = useMemo(() => getReadingTimeRange(wordCount), [wordCount]);
     const outlineEntries = useMemo(() => getOutlineFromBlocks(content), [content]);
     const plainTextForQuality = useMemo(() => blocksToPlainText(content), [content]);
     const readability = useMemo(() => getReadability(plainTextForQuality), [plainTextForQuality]);
@@ -1477,8 +1497,20 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                         <div className="ml-auto flex shrink-0 items-center gap-2">
                             <span className="text-muted-foreground text-xs tabular-nums">
                                 {wordCount.toLocaleString()} {wordCount === 1 ? 'word' : 'words'}
-                                {readingTimeMinutes > 0 && (
-                                    <span className="ml-1.5">· ~{readingTimeMinutes} min</span>
+                                {wordCount > 0 && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="ml-1.5 cursor-default">
+                                                · ~
+                                                {readingTimeRange.faster === readingTimeRange.slower
+                                                    ? formatMinSec(readingTimeRange.normal)
+                                                    : `${formatMinSec(readingTimeRange.faster)}–${formatMinSec(readingTimeRange.slower)}`}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom">
+                                            Faster: ~{formatMinSec(readingTimeRange.faster)} · Normal: ~{formatMinSec(readingTimeRange.normal)} · Slower: ~{formatMinSec(readingTimeRange.slower)}
+                                        </TooltipContent>
+                                    </Tooltip>
                                 )}
                                 {((isEdit && autosaveStatus !== 'idle') || (!isEdit && autosaveStatus === 'saving')) && (
                                     <span className="mx-1">·</span>

@@ -37,6 +37,55 @@ import { toast } from 'sonner';
 import { Download, AlertCircle, Sparkles, List, Check, X, FileText, Copy, Eye, ArrowLeft, Trash2, Share2, Link2, MoreHorizontal, Pencil, Plus, ImagePlus, BookOpen, ClipboardList, FileStack, Quote, BarChart2 } from 'lucide-react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 
+/** Simple markdown-style renderer for analysis text (headings, lists, bold). */
+function AnalysisMarkdown({ text }: { text: string }) {
+    const lines = text.split(/\n/);
+    const out: React.ReactNode[] = [];
+    let listItems: string[] = [];
+    const flushList = () => {
+        if (listItems.length > 0) {
+            out.push(
+                <ul key={out.length} className="list-inside list-disc space-y-0.5 py-1">
+                    {listItems.map((item, i) => (
+                        <li key={i}>{item.replace(/\*\*(.+?)\*\*/g, (_, w) => (w as string))}</li>
+                    ))}
+                </ul>
+            );
+            listItems = [];
+        }
+    };
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        if (/^###\s/.test(trimmed)) {
+            flushList();
+            out.push(<h3 key={out.length} className="mt-3 font-semibold text-sm">{trimmed.slice(3).trim()}</h3>);
+        } else if (/^##\s/.test(trimmed)) {
+            flushList();
+            out.push(<h2 key={out.length} className="mt-4 font-semibold">{trimmed.slice(2).trim()}</h2>);
+        } else if (/^#\s/.test(trimmed)) {
+            flushList();
+            out.push(<h1 key={out.length} className="mt-4 text-lg font-semibold">{trimmed.slice(1).trim()}</h1>);
+        } else if (/^[-*]\s/.test(trimmed)) {
+            listItems.push(trimmed.slice(1).trim());
+        } else if (trimmed === '') {
+            flushList();
+            out.push(<div key={out.length} className="h-2" />);
+        } else {
+            flushList();
+            out.push(
+                <p key={out.length} className="py-0.5 text-sm">
+                    {trimmed.split(/(\*\*.+?\*\*)/g).map((part, j) =>
+                        /^\*\*.+?\*\*$/.test(part) ? <strong key={j}>{part.slice(2, -2)}</strong> : part
+                    )}
+                </p>
+            );
+        }
+    }
+    flushList();
+    return <div className="space-y-0">{out}</div>;
+}
+
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_DELAY_AFTER_MOUNT_MS = 2000;
 
@@ -251,23 +300,61 @@ interface TitleSuggestion {
     thumbnailText?: string;
 }
 
-function blocksToPlainText(blocks: PartialBlock[]): string {
-    if (!blocks?.length) return '';
-    type InlineLike = { type?: string; text?: string; content?: InlineLike[] };
+type InlineLike = { type?: string; text?: string; content?: InlineLike[] };
+
+function getTextFromBlock(block: PartialBlock): string {
     function inlineToText(inline: InlineLike | string): string {
         if (typeof inline === 'string') return inline;
         if (inline.type === 'text' && typeof inline.text === 'string') return inline.text;
         if (inline.type === 'link' && Array.isArray(inline.content)) return inline.content.map(inlineToText).join('');
         return '';
     }
-    function blockToText(block: PartialBlock): string {
-        const parts: string[] = [];
-        const content = block.content as InlineLike[] | undefined;
-        if (Array.isArray(content)) parts.push(content.map(inlineToText).join(''));
-        if (Array.isArray(block.children) && block.children.length) parts.push(block.children.map(blockToText).join('\n'));
-        return parts.filter(Boolean).join('\n');
+    const parts: string[] = [];
+    const content = block.content as InlineLike[] | undefined;
+    if (Array.isArray(content)) parts.push(content.map(inlineToText).join(''));
+    if (Array.isArray(block.children) && block.children.length) parts.push(block.children.map(getTextFromBlock).join('\n'));
+    return parts.filter(Boolean).join('\n');
+}
+
+/** Normalize for matching: collapse whitespace, unify quotes. */
+function normalizeForMatch(s: string): string {
+    return s
+        .replace(/\s+/g, ' ')
+        .replace(/[\u201C\u201D\u201E\u201F\u2033"]/g, '"')
+        .replace(/[\u2018\u2019\u201A\u201B\u2032']/g, "'")
+        .trim();
+}
+
+/** Find first block whose text contains the given snippet. Tries full match, then first N words, then first N chars. */
+function findBlockContainingText(blocks: PartialBlock[], snippet: string): PartialBlock | null {
+    const normalized = normalizeForMatch(snippet);
+    if (!normalized) return null;
+    const firstWords = normalized.split(/\s+/).slice(0, 15).join(' ');
+    const firstChars = normalized.slice(0, 100);
+    const searchPhrases = [normalized];
+    if (firstWords.length < normalized.length) searchPhrases.push(firstWords);
+    if (firstChars.length < normalized.length && firstChars.length >= 20) searchPhrases.push(firstChars);
+
+    function search(blks: PartialBlock[]): PartialBlock | null {
+        for (const block of blks) {
+            const text = getTextFromBlock(block);
+            const normText = normalizeForMatch(text);
+            for (const phrase of searchPhrases) {
+                if (phrase.length >= 10 && normText.includes(phrase)) return block;
+            }
+            if (Array.isArray(block.children)) {
+                const found = search(block.children);
+                if (found) return found;
+            }
+        }
+        return null;
     }
-    return blocks.map(blockToText).filter(Boolean).join('\n\n');
+    return search(blocks);
+}
+
+function blocksToPlainText(blocks: PartialBlock[]): string {
+    if (!blocks?.length) return '';
+    return blocks.map(getTextFromBlock).filter(Boolean).join('\n\n');
 }
 
 const META_TAGS_MAX_LENGTH = 500;
@@ -397,6 +484,12 @@ const DEFAULT_CHECKLIST_ITEMS: ChecklistItem[] = [
     { id: 'outro', label: 'Outro / subscribe ask', checked: false },
 ];
 
+interface AnalysisRetentionSaved {
+    analysis: string;
+    suggestions: Array<{ label: string; originalSnippet: string; suggestedText: string }>;
+    generated_at?: string;
+}
+
 interface ScriptForEdit {
     id: number;
     uuid: string;
@@ -413,6 +506,9 @@ interface ScriptForEdit {
     title_options: TitleOptionRow[];
     thumbnails: ThumbnailRow[];
     checklist?: ChecklistItem[] | null;
+    analysis_retention?: AnalysisRetentionSaved | null;
+    analysis_cta?: AnalysisRetentionSaved | null;
+    analysis_storytelling?: AnalysisRetentionSaved | null;
     current_user_role?: string | null;
     can_edit?: boolean;
     can_delete?: boolean;
@@ -583,7 +679,14 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         initialScript?.checklist?.length ? initialScript.checklist : DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i }))
     );
     const [outlineOpen, setOutlineOpen] = useState(false);
-    const [qualityPanelOpen, setQualityPanelOpen] = useState(false);
+    const [analysisPopoverOpen, setAnalysisPopoverOpen] = useState(false);
+    const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<{
+        type: string;
+        analysis: string;
+        suggestions: Array<{ label: string; originalSnippet: string; suggestedText: string }>;
+    } | null>(null);
     const [snippets, setSnippets] = useState<Array<{ id: number; title: string; body: string }>>([]);
     const [snippetsSheetOpen, setSnippetsSheetOpen] = useState(false);
     const [snippetsLoading, setSnippetsLoading] = useState(false);
@@ -618,6 +721,32 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     const autosaveReadyAtRef = useRef<number>(Date.now() + AUTOSAVE_DELAY_AFTER_MOUNT_MS);
     const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const saveInProgressRef = useRef(false);
+
+    const anyBackgroundLoading = useMemo(
+        () =>
+            analysisLoading ||
+            isGenerating ||
+            isGeneratingDescription ||
+            !!aiScriptActionLoading ||
+            shareLoading ||
+            sharePublishLoading ||
+            inviteLoading ||
+            thumbnailUploading ||
+            snippetsLoading ||
+            autosaveStatus === 'saving',
+        [
+            analysisLoading,
+            isGenerating,
+            isGeneratingDescription,
+            aiScriptActionLoading,
+            shareLoading,
+            sharePublishLoading,
+            inviteLoading,
+            thumbnailUploading,
+            snippetsLoading,
+            autosaveStatus,
+        ]
+    );
     const formStateRef = useRef({
         content,
         pageTitle,
@@ -1338,6 +1467,109 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
         navigator.clipboard.writeText(text).then(() => toast.success(label)).catch(() => {});
     };
 
+    type AnalysisType = 'retention' | 'readability' | 'cta' | 'storytelling';
+
+    const getSavedAnalysis = (t: AnalysisType): AnalysisRetentionSaved | null | undefined => {
+        if (t === 'retention') return initialScript?.analysis_retention;
+        if (t === 'cta') return initialScript?.analysis_cta;
+        if (t === 'storytelling') return initialScript?.analysis_storytelling;
+        return undefined;
+    };
+
+    const runAnalysis = async (type: AnalysisType, forceRegenerate = false) => {
+        setAnalysisPopoverOpen(false);
+        if (type === 'readability') {
+            const analysis = [
+                '## Readability',
+                `${readability.label} (avg ${readability.avgWordsPerSentence} words/sentence).`,
+                '',
+                '## Repeated phrases (3+ words)',
+                repetitionStats.repeatedPhrases.length === 0
+                    ? 'None detected.'
+                    : repetitionStats.repeatedPhrases.slice(0, 10).map((p) => `- "${p.phrase}" (${p.count}×)`).join('\n'),
+                '',
+                '## Overused words',
+                repetitionStats.overused.length === 0 ? 'None detected.' : repetitionStats.overused.slice(0, 12).map((w) => `- ${w.word} (${w.count}×)`).join('\n'),
+            ].join('\n');
+            setAnalysisResult({ type: 'readability', analysis, suggestions: [] });
+            setAnalysisPanelOpen(true);
+            return;
+        }
+        const saved = getSavedAnalysis(type);
+        if (!forceRegenerate && saved?.analysis) {
+            setAnalysisResult({
+                type,
+                analysis: saved.analysis,
+                suggestions: Array.isArray(saved.suggestions) ? saved.suggestions : [],
+            });
+            setAnalysisPanelOpen(true);
+            return;
+        }
+        setAnalysisLoading(true);
+        setAnalysisResult(null);
+        try {
+            const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const res = await fetch(tenantRouter.route('script.analyze'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ type, content: blocksToPlainText(content) || '' }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast.error(data.message ?? 'Analysis failed.');
+                return;
+            }
+            const result = {
+                type,
+                analysis: data.analysis ?? '',
+                suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+            };
+            setAnalysisResult(result);
+            setAnalysisPanelOpen(true);
+            if (initialScript?.uuid && (type === 'retention' || type === 'cta' || type === 'storytelling')) {
+                const path = `/${tenantRouter.tenant.slug}/script/${initialScript.uuid}/analysis-${type}`;
+                try {
+                    const saveRes = await fetch(path, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                        body: JSON.stringify({ analysis: result.analysis, suggestions: result.suggestions }),
+                    });
+                    if (!saveRes.ok) toast.error('Analysis could not be saved for next time.');
+                } catch {
+                    toast.error('Analysis could not be saved for next time.');
+                }
+            }
+        } catch (e) {
+            console.error('Analysis request failed', e);
+            toast.error('Network error. Please try again.');
+        } finally {
+            setAnalysisLoading(false);
+        }
+    };
+
+    const applySuggestion = (suggestion: { originalSnippet: string; suggestedText: string }) => {
+        const editor = blockNoteEditorRef.current;
+        if (!editor?.document?.length) {
+            toast.error('Editor not ready. Focus the script and try again.');
+            return;
+        }
+        let refBlock = findBlockContainingText(editor.document, suggestion.originalSnippet);
+        if (!refBlock && content.length > 0) {
+            refBlock = findBlockContainingText(content, suggestion.originalSnippet);
+        }
+        if (!refBlock) {
+            toast.error('Could not find that section in the script. The text may have been edited or the suggestion quote does not match exactly.');
+            return;
+        }
+        const newBlock: PartialBlock = {
+            id: `suggestion-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+            type: 'paragraph',
+            content: [{ type: 'text', text: suggestion.suggestedText }],
+        } as PartialBlock;
+        editor.insertBlocks([newBlock], refBlock, 'before');
+        toast.success('Suggested version added above the original. Compare and edit as needed.');
+    };
+
     const handleExport = async (format: 'json' | 'csv') => {
         if (!initialScript) return;
         const url = tenantRouter.route('script.export', { script: initialScript.uuid, format });
@@ -1489,6 +1721,11 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={pageTitle || (isEdit ? 'Edit script' : 'New script')} />
+            {anyBackgroundLoading && (
+                <div className="fixed top-0 left-0 right-0 z-[100] h-1 overflow-hidden bg-primary/20" role="progressbar" aria-label="Loading">
+                    <div className="h-full w-[40%] animate-[script-loading-bar_1.5s_ease-in-out_infinite] bg-primary" />
+                </div>
+            )}
             <div className="w-full py-8 px-4 sm:px-6 lg:px-8">
                 <div className="mb-6 flex flex-col gap-3">
                     <div className="flex flex-wrap items-center gap-3">
@@ -2151,39 +2388,60 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">Snippets</TooltipContent>
                             </Tooltip>
-                            <Popover open={qualityPanelOpen} onOpenChange={setQualityPanelOpen}>
+                            <Popover open={analysisPopoverOpen} onOpenChange={setAnalysisPopoverOpen}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <PopoverTrigger asChild>
-                                            <Button type="button" variant="outline" size="icon" className="h-9 w-9">
+                                            <Button type="button" variant="outline" size="icon" className="h-9 w-9" disabled={analysisLoading}>
                                                 <BarChart2 className="h-4 w-4" />
                                             </Button>
                                         </PopoverTrigger>
                                     </TooltipTrigger>
-                                    <TooltipContent side="bottom">Quality & repetition</TooltipContent>
+                                    <TooltipContent side="bottom">Analysis</TooltipContent>
                                 </Tooltip>
-                                <PopoverContent className="w-80 p-3" align="start">
-                                    <p className="text-muted-foreground mb-2 text-xs font-medium uppercase">Readability</p>
-                                    <p className="text-sm">{readability.label} (avg {readability.avgWordsPerSentence} words/sentence)</p>
-                                    {(repetitionStats.repeatedPhrases.length > 0 || repetitionStats.overused.length > 0) && (
-                                        <>
-                                            <p className="text-muted-foreground mt-3 text-xs font-medium uppercase">Repeated phrases (3+ words)</p>
-                                            <ul className="text-muted-foreground mt-1 list-inside list-disc text-xs">
-                                                {repetitionStats.repeatedPhrases.slice(0, 5).map((p) => (
-                                                    <li key={p.phrase}>"{p.phrase}" ({p.count}×)</li>
-                                                ))}
-                                            </ul>
-                                            <p className="text-muted-foreground mt-2 text-xs font-medium uppercase">Overused words</p>
-                                            <ul className="text-muted-foreground mt-1 list-inside list-disc text-xs">
-                                                {repetitionStats.overused.slice(0, 8).map((w) => (
-                                                    <li key={w.word}>{w.word} ({w.count}×)</li>
-                                                ))}
-                                            </ul>
-                                        </>
-                                    )}
-                                    {repetitionStats.repeatedPhrases.length === 0 && repetitionStats.overused.length === 0 && (
-                                        <p className="text-muted-foreground mt-2 text-xs">No notable repetition.</p>
-                                    )}
+                                <PopoverContent className="w-56 p-2" align="start">
+                                    <p className="text-muted-foreground mb-2 px-1 text-xs font-medium">What do you want to analyze?</p>
+                                    <div className="grid gap-0.5">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="justify-start font-normal"
+                                            onClick={() => runAnalysis('retention')}
+                                            disabled={analysisLoading}
+                                        >
+                                            Retention & engagement
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="justify-start font-normal"
+                                            onClick={() => runAnalysis('cta')}
+                                            disabled={analysisLoading}
+                                        >
+                                            CTA & conversion
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="justify-start font-normal"
+                                            onClick={() => runAnalysis('storytelling')}
+                                            disabled={analysisLoading}
+                                        >
+                                            Storytelling & narrative
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="justify-start font-normal"
+                                            onClick={() => runAnalysis('readability')}
+                                        >
+                                            Readability & repetition
+                                        </Button>
+                                    </div>
                                 </PopoverContent>
                             </Popover>
                             <span className="text-muted-foreground mx-1 text-xs">|</span>
@@ -2235,6 +2493,61 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                                     ))
                                 )}
                             </div>
+                        </SheetContent>
+                    </Sheet>
+
+                    <Sheet open={analysisPanelOpen} onOpenChange={setAnalysisPanelOpen}>
+                        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+                            <SheetHeader>
+                                <SheetTitle>
+                                    Analysis {analysisResult ? `(${analysisResult.type === 'retention' ? 'Retention & engagement' : analysisResult.type === 'cta' ? 'CTA & conversion' : analysisResult.type === 'storytelling' ? 'Storytelling & narrative' : 'Readability & repetition'})` : ''}
+                                </SheetTitle>
+                                <SheetDescription>
+                                    Reference while editing. Use Apply to insert a suggested version above the original in the script.
+                                </SheetDescription>
+                            </SheetHeader>
+                            {analysisLoading && (
+                                <p className="text-muted-foreground mt-4 text-sm">Running analysis…</p>
+                            )}
+                            {!analysisLoading && analysisResult && (analysisResult.type === 'retention' || analysisResult.type === 'cta' || analysisResult.type === 'storytelling') && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() => runAnalysis(analysisResult.type as AnalysisType, true)}
+                                >
+                                    Regenerate
+                                </Button>
+                            )}
+                            {!analysisLoading && analysisResult && (
+                                <div className="mt-4 space-y-6">
+                                    {analysisResult.analysis && (
+                                        <div className="rounded-md border bg-muted/30 p-4">
+                                            <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                                                <AnalysisMarkdown text={analysisResult.analysis} />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {analysisResult.suggestions.length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-sm font-semibold">Suggested fixes (insert above original)</h4>
+                                            <div className="space-y-3">
+                                                {analysisResult.suggestions.map((s, i) => (
+                                                    <div key={i} className="rounded-md border bg-card p-3">
+                                                        <p className="text-muted-foreground mb-1 text-xs font-medium">{s.label}</p>
+                                                        <p className="text-muted-foreground mb-2 line-clamp-2 text-xs">Original: {s.originalSnippet.slice(0, 120)}{s.originalSnippet.length > 120 ? '…' : ''}</p>
+                                                        <p className="mb-3 line-clamp-3 text-xs">Suggested: {s.suggestedText.slice(0, 180)}{s.suggestedText.length > 180 ? '…' : ''}</p>
+                                                        <Button type="button" variant="secondary" size="sm" onClick={() => applySuggestion(s)}>
+                                                            Apply above original
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </SheetContent>
                     </Sheet>
 

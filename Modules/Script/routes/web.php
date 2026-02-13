@@ -28,10 +28,19 @@ Route::middleware([
     Route::get('script/create', [ScriptController::class, 'create'])->name('script.create');
     Route::post('script', [ScriptController::class, 'store'])->name('script.store');
     Route::post('script/import-csv', [ScriptController::class, 'importCsv'])->name('script.import-csv');
+    // Static segments before {script} so they are not matched as script ID
+    Route::post('script/analyze', [ScriptController::class, 'analyzeScript'])->name('script.analyze');
+    Route::post('script/generate-title-ideas', [ScriptController::class, 'generateTitleIdeas'])->name('script.generate-title-ideas');
+    Route::post('script/generate-description-assets', [ScriptController::class, 'generateDescriptionAssets'])->name('script.generate-description-assets');
+    Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');
+    Route::post('script/ai-script-action', [ScriptController::class, 'aiScriptAction'])->name('script.ai-script-action');
     Route::get('script/{script}/content-as-text', [ScriptController::class, 'getScriptContentAsText'])->name('script.content-as-text');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
     Route::match(['GET', 'POST'], 'script/{script}/export', [ScriptController::class, 'export'])->name('script.export');
     Route::put('script/{script}', [ScriptController::class, 'update'])->name('script.update');
+    Route::put('script/{script}/analysis-retention', [ScriptController::class, 'saveAnalysisRetention'])->name('script.analysis-retention.save');
+    Route::put('script/{script}/analysis-cta', [ScriptController::class, 'saveAnalysisCta'])->name('script.analysis-cta.save');
+    Route::put('script/{script}/analysis-storytelling', [ScriptController::class, 'saveAnalysisStorytelling'])->name('script.analysis-storytelling.save');
     Route::delete('script/{script}', [ScriptController::class, 'destroy'])->name('script.destroy');
     Route::post('script/delete-all', [ScriptController::class, 'deleteAll'])->name('script.delete-all');
     Route::post('script/empty-trash', [ScriptController::class, 'emptyTrash'])->name('script.empty-trash');
@@ -43,10 +52,6 @@ Route::middleware([
     Route::post('script/{script}/collaborators', [ScriptController::class, 'addCollaborator'])->name('script.collaborators.store');
     Route::delete('script/{script}/collaborators/{user}', [ScriptController::class, 'removeCollaborator'])->name('script.collaborators.destroy');
     Route::put('script/{script}/collaborators/{user}', [ScriptController::class, 'updateCollaboratorRole'])->name('script.collaborators.update');
-    Route::post('script/generate-title-ideas', [ScriptController::class, 'generateTitleIdeas'])->name('script.generate-title-ideas');
-    Route::post('script/generate-description-assets', [ScriptController::class, 'generateDescriptionAssets'])->name('script.generate-description-assets');
-    Route::post('script/ai-edit-selection', [ScriptController::class, 'aiEditSelection'])->name('script.ai-edit-selection');
-    Route::post('script/ai-script-action', [ScriptController::class, 'aiScriptAction'])->name('script.ai-script-action');
     Route::get('script/snippets', [ScriptController::class, 'snippetsIndex'])->name('script.snippets.index');
     Route::post('script/snippets', [ScriptController::class, 'snippetsStore'])->name('script.snippets.store');
     Route::delete('script/snippets/{id}', [ScriptController::class, 'snippetsDestroy'])->name('script.snippets.destroy');

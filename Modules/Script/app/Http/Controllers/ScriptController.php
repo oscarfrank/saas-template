@@ -336,7 +336,8 @@ final class ScriptController extends Controller
             'scheduled_at' => array_key_exists('scheduled_at', $validated) ? ($validated['scheduled_at'] ?? null) : $script->scheduled_at,
         ];
         if ($customAttrs !== null) {
-            $updatePayload['custom_attributes'] = $customAttrs;
+            $existing = $script->custom_attributes ?? [];
+            $updatePayload['custom_attributes'] = array_merge($existing, $customAttrs);
         }
         $script->update($updatePayload);
 
@@ -700,6 +701,141 @@ PROMPT;
     }
 
     /**
+     * Extract JSON string from AI response that may be wrapped in markdown or have extra text.
+     */
+    private static function extractJsonFromAnalysisResponse(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '{}';
+        }
+        // Strip markdown code fence (optional "json" tag, allow content before/after)
+        if (preg_match('/```(?:json)?\s*([\s\S]*?)```/s', $text, $m)) {
+            return trim($m[1]);
+        }
+        // Find first { and last } to extract a single JSON object
+        $start = strpos($text, '{');
+        if ($start !== false) {
+            $end = strrpos($text, '}');
+            if ($end !== false && $end > $start) {
+                return substr($text, $start, $end - $start + 1);
+            }
+        }
+        return $text;
+    }
+
+    /**
+     * Analyze script (e.g. retention). Returns analysis markdown + suggestions with applyable snippets.
+     * Route: POST script/analyze (script.analyze)
+     */
+    public function analyzeScript(Request $request): JsonResponse
+    {
+        set_time_limit(180);
+        $validated = $request->validate([
+            'type' => 'required|string|in:retention,cta,storytelling,readability',
+            'content' => 'required|string|max:100000',
+        ]);
+        $type = $validated['type'];
+        $content = $validated['content'];
+
+        if ($type === 'readability') {
+            return response()->json([
+                'analysis' => '',
+                'suggestions' => [],
+                'message' => 'Use the Analysis panel and choose Readability for local stats.',
+            ]);
+        }
+
+        $retentionSystemPrompt = <<<'PROMPT'
+You are a YouTube retention strategist. Optimize for: viewer retention, emotional engagement, personality, authority, watch time. Creator style: tech YouTuber, calm authority, rational, slightly playful.
+
+Your output has two parts only:
+
+1. A SHORT explanation (2–4 sentences): overall retention strength, the main thing to improve, and that the suggestions below are the concrete edits to consider. No long lists, no scores, no section-by-section breakdown. Keep it brief.
+
+2. Concrete replacement suggestions: specific phrases or short passages in the script that you rewrite for better retention/engagement. Each suggestion will be inserted above the original so the user can compare.
+
+You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
+- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
+- "suggestions": array of objects, each with "label" (short name, e.g. "Hook", "Pacing"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim so we can locate it), "suggestedText" (the rewritten version to insert above the original). Provide at least 1 and up to 5 suggestions. The originalSnippet must be copied exactly from the script.
+PROMPT;
+
+        $ctaSystemPrompt = <<<'PROMPT'
+You are a YouTube growth strategist focused on calls to action and conversion. The creator wants to drive actions (subscribe, like, link in description, product, etc.) without feeling pushy.
+
+Your output has two parts only:
+
+1. A SHORT explanation (2–4 sentences): how strong the CTAs are, where they land, and the main thing to improve. Then say the suggestions below are concrete edits to consider. Keep it brief.
+
+2. Concrete replacement suggestions: specific phrases or short passages in the script where the CTA is weak, missing, or could be more effective. Rewrite them so the ask feels earned and clear. Each suggestion will be inserted above the original so the user can compare. Provide at least 1 and up to 5 suggestions. The originalSnippet must be an exact 15–40 word quote from the script so we can locate it.
+
+You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
+- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
+- "suggestions": array of objects, each with "label" (short name, e.g. "Subscribe CTA", "Link CTA"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim), "suggestedText" (the rewritten version to insert above the original). The originalSnippet must be copied exactly from the script.
+PROMPT;
+
+        $storytellingSystemPrompt = <<<'PROMPT'
+You are a storytelling and narrative coach for video scripts. Focus on: narrative arc, tension and release, clarity of the "story", and where the script goes flat or loses the thread.
+
+Your output has two parts only:
+
+1. A SHORT explanation (2–4 sentences): overall narrative strength, where the story holds or drops, and the main thing to improve. Then say the suggestions below are concrete edits to consider. Keep it brief.
+
+2. Concrete replacement suggestions: specific phrases or short passages in the script where the narrative could be stronger—better transitions, clearer stakes, a punchier beat, or a line that reinforces the arc. Each suggestion will be inserted above the original so the user can compare. Provide at least 1 and up to 5 suggestions. The originalSnippet must be an exact 15–40 word quote from the script so we can locate it.
+
+You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
+- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
+- "suggestions": array of objects, each with "label" (short name, e.g. "Transition", "Stakes"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim), "suggestedText" (the rewritten version to insert above the original). The originalSnippet must be copied exactly from the script.
+PROMPT;
+
+        $systemPrompt = match ($type) {
+            'retention' => $retentionSystemPrompt,
+            'cta' => $ctaSystemPrompt,
+            'storytelling' => $storytellingSystemPrompt,
+            default => $retentionSystemPrompt,
+        };
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => config('openai.chat_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => "Here is my script:\n\n" . $content],
+                ],
+                'max_completion_tokens' => 4096,
+                'temperature' => 0.4,
+            ]);
+            $text = trim($response->choices[0]->message->content ?? '');
+            $text = self::extractJsonFromAnalysisResponse($text);
+            $data = json_decode($text, true);
+            if (! is_array($data)) {
+                Log::warning('ScriptController::analyzeScript invalid JSON', ['response' => substr($text, 0, 500)]);
+                return response()->json(['message' => 'Invalid response from AI. Please try again.'], 502);
+            }
+            $analysis = isset($data['analysis']) && is_string($data['analysis']) ? $data['analysis'] : $text;
+            $suggestions = [];
+            if (isset($data['suggestions']) && is_array($data['suggestions'])) {
+                foreach ($data['suggestions'] as $item) {
+                    if (is_array($item) && ! empty($item['originalSnippet']) && ! empty($item['suggestedText'])) {
+                        $suggestions[] = [
+                            'label' => isset($item['label']) ? (string) $item['label'] : 'Suggestion',
+                            'originalSnippet' => (string) $item['originalSnippet'],
+                            'suggestedText' => (string) $item['suggestedText'],
+                        ];
+                    }
+                }
+            }
+            return response()->json([
+                'analysis' => $analysis,
+                'suggestions' => $suggestions,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('ScriptController::analyzeScript failed', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Analysis failed. Please try again.'], 500);
+        }
+    }
+
+    /**
      * Generate YouTube description, timestamps, and meta tags.
      */
     public function generateDescriptionAssets(Request $request): JsonResponse
@@ -851,7 +987,104 @@ PROMPT;
             'can_delete' => $script->canDelete($user),
             'can_manage_access' => $script->canManageAccess($user),
             'checklist' => (isset($script->custom_attributes['checklist']) && is_array($script->custom_attributes['checklist'])) ? $script->custom_attributes['checklist'] : null,
+            'analysis_retention' => isset($script->custom_attributes['analysis_retention']) && is_array($script->custom_attributes['analysis_retention'])
+                ? $script->custom_attributes['analysis_retention']
+                : null,
+            'analysis_cta' => isset($script->custom_attributes['analysis_cta']) && is_array($script->custom_attributes['analysis_cta'])
+                ? $script->custom_attributes['analysis_cta']
+                : null,
+            'analysis_storytelling' => isset($script->custom_attributes['analysis_storytelling']) && is_array($script->custom_attributes['analysis_storytelling'])
+                ? $script->custom_attributes['analysis_storytelling']
+                : null,
         ];
+    }
+
+    /**
+     * Save retention analysis to script (custom_attributes) so it loads on next open.
+     */
+    public function saveAnalysisRetention(Request $request, Script $script): JsonResponse
+    {
+        if (! $script->canEdit($request->user())) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'analysis' => 'required|string|max:100000',
+            'suggestions' => 'nullable|array',
+        ]);
+        $suggestions = $this->normalizeAnalysisSuggestions($validated['suggestions'] ?? []);
+        $existing = $script->custom_attributes ?? [];
+        $existing['analysis_retention'] = [
+            'analysis' => $validated['analysis'],
+            'suggestions' => $suggestions,
+            'generated_at' => now()->toIso8601String(),
+        ];
+        $script->update(['custom_attributes' => $existing]);
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Save CTA analysis to script (custom_attributes).
+     */
+    public function saveAnalysisCta(Request $request, Script $script): JsonResponse
+    {
+        if (! $script->canEdit($request->user())) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'analysis' => 'required|string|max:100000',
+            'suggestions' => 'nullable|array',
+        ]);
+        $suggestions = $this->normalizeAnalysisSuggestions($validated['suggestions'] ?? []);
+        $existing = $script->custom_attributes ?? [];
+        $existing['analysis_cta'] = [
+            'analysis' => $validated['analysis'],
+            'suggestions' => $suggestions,
+            'generated_at' => now()->toIso8601String(),
+        ];
+        $script->update(['custom_attributes' => $existing]);
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Save storytelling analysis to script (custom_attributes).
+     */
+    public function saveAnalysisStorytelling(Request $request, Script $script): JsonResponse
+    {
+        if (! $script->canEdit($request->user())) {
+            abort(403);
+        }
+        $validated = $request->validate([
+            'analysis' => 'required|string|max:100000',
+            'suggestions' => 'nullable|array',
+        ]);
+        $suggestions = $this->normalizeAnalysisSuggestions($validated['suggestions'] ?? []);
+        $existing = $script->custom_attributes ?? [];
+        $existing['analysis_storytelling'] = [
+            'analysis' => $validated['analysis'],
+            'suggestions' => $suggestions,
+            'generated_at' => now()->toIso8601String(),
+        ];
+        $script->update(['custom_attributes' => $existing]);
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Normalize analysis suggestions array for storage.
+     */
+    private function normalizeAnalysisSuggestions(array $raw): array
+    {
+        $suggestions = [];
+        foreach ($raw as $item) {
+            if (! is_array($item) || empty($item['originalSnippet'] ?? '') || empty($item['suggestedText'] ?? '')) {
+                continue;
+            }
+            $suggestions[] = [
+                'label' => Str::limit((string) ($item['label'] ?? 'Suggestion'), 255),
+                'originalSnippet' => Str::limit((string) $item['originalSnippet'], 2000),
+                'suggestedText' => Str::limit((string) $item['suggestedText'], 10000),
+            ];
+        }
+        return $suggestions;
     }
 
     /**

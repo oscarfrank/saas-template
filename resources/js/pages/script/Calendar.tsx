@@ -115,22 +115,30 @@ export default function ScriptCalendarPage({ scripts }: Props) {
     };
 
     const summary = (() => {
-        if (!currentRange) return { planned: 0, published: 0, shot: 0, ready: 0 };
+        if (!currentRange) return { planned: 0, published: 0, shot: 0, ready: 0, longForm: 0, shorts: 0 };
         const { start, end } = currentRange;
+        // Restrict to the displayed calendar month (FullCalendar range includes adjacent weeks)
+        const mid = new Date(start.getTime() + (end.getTime() - start.getTime()) / 2);
+        const viewYear = mid.getFullYear();
+        const viewMonth = mid.getMonth();
+        const monthStart = new Date(viewYear, viewMonth, 1);
+        const monthEnd = new Date(viewYear, viewMonth + 1, 0, 23, 59, 59, 999);
         const inRange = calendarScripts.filter((s) => {
             if (!s.scheduled_at) return false;
             const d = new Date(s.scheduled_at);
-            return d >= start && d < end;
+            return d >= monthStart && d <= monthEnd;
         });
         const planned = inRange.length;
         const published = inRange.filter((s) => s.status === 'published').length;
         const shot = inRange.filter((s) =>
-            s.production_status && ['shot', 'editing', 'edited'].includes(s.production_status)
+            s.production_status && ['shot', 'editing', 'edited'].includes(s.production_status) && s.status !== 'published'
         ).length;
         const ready = inRange.filter(
             (s) => s.production_status === 'edited' && s.status !== 'published'
         ).length;
-        return { planned, published, shot, ready };
+        const longForm = inRange.filter((s) => s.script_type === 'Long Form').length;
+        const shorts = inRange.filter((s) => s.script_type === 'Shorts').length;
+        return { planned, published, shot, ready, longForm, shorts };
     })();
 
     const getEventStyleClass = (status: string, productionStatus?: string | null): string => {
@@ -192,10 +200,18 @@ export default function ScriptCalendarPage({ scripts }: Props) {
                                 eventContent={(arg) => {
                                     const s = arg.event.extendedProps.status as string | undefined;
                                     const p = arg.event.extendedProps.production_status as string | undefined;
+                                    const scriptType = arg.event.extendedProps.script_type as string | undefined;
                                     const extra = getEventStyleClass(s ?? '', p);
+                                    const typeLabel = scriptType === 'Shorts' ? 'Shorts' : scriptType === 'Long Form' ? 'Long' : scriptType ?? null;
+                                    const typeBorderClass = scriptType === 'Shorts'
+                                        ? 'border-l-2 border-l-blue-500'
+                                        : scriptType === 'Long Form'
+                                            ? 'border-l-2 border-l-pink-500'
+                                            : '';
                                     return (
-                                        <div className={`fc-script-event-title ${extra}`}>
-                                            {arg.event.title}
+                                        <div className={`fc-script-event-title ${extra} ${typeBorderClass}`}>
+                                            <span>{arg.event.title}</span>
+                                            {typeLabel && <span className="ml-1 opacity-80 text-[10px]">· {typeLabel}</span>}
                                         </div>
                                     );
                                 }}
@@ -203,18 +219,24 @@ export default function ScriptCalendarPage({ scripts }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
-                    <span>
-                        <span className="font-medium">Planned:</span> {summary.planned}
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
+                        Planned: {summary.planned}
                     </span>
-                    <span>
-                        <span className="font-medium">Published:</span> {summary.published}
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                        Published: {summary.published}
                     </span>
-                    <span>
-                        <span className="font-medium">Shot:</span> {summary.shot}
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border-b-2 border-yellow-400">
+                        Shot: {summary.shot}
                     </span>
-                    <span>
-                        <span className="font-medium">Ready:</span> {summary.ready}
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border-b-2 border-emerald-500">
+                        Ready: {summary.ready}
+                    </span>
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-muted-foreground border-l-2 border-pink-500 pl-2">
+                        Long Form: {summary.longForm}
+                    </span>
+                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-muted-foreground border-l-2 border-blue-500 pl-2">
+                        Shorts: {summary.shorts}
                     </span>
                 </div>
                 <style>{`

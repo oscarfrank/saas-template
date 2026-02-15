@@ -342,8 +342,8 @@ function ScriptListRowSkeleton() {
 }
 
 const platformConfig: Record<string, { label: string; icon: typeof Youtube; className: string }> = {
-    'long-form': { label: 'Long Form', icon: FileText, className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-    shorts: { label: 'Shorts', icon: Video, className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+    'long-form': { label: 'Long Form', icon: FileText, className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+    shorts: { label: 'Shorts', icon: Video, className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
 };
 
 interface Props {

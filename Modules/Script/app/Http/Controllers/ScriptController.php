@@ -611,10 +611,15 @@ PROMPT;
         $content = $validated['content'] ?? '';
         $fullScript = $validated['full_script'] ?? $content;
 
+        $anchorFramework = <<<'ANCHORS'
+Use this hook/anchor framework. The 10 anchors are: Risk; Conflict / Accusation; Remove Soft Language; Short, Punchy Sentences; Uncomfortable Truth; Contradiction; Bigger Question Framing; Shift from Review to Revelation; Stronger Conviction; Higher Emotional Tension.
+You MUST: (1) Pick ONE of these as the primary anchor for the hook. (2) Weave in at least TWO other anchors from the list as supporting enhancers. Apply them in the writing—do not list their names in the output. Then output only the script, no explanation or labels.
+ANCHORS;
+
         $instructions = [
-            'intro' => 'Write a short, punchy YouTube video intro (first 30–60 seconds). Hook the viewer immediately. Output only the intro script, no explanation.',
+            'intro' => $anchorFramework . ' Write a short, punchy YouTube video intro (first 30–60 seconds). Hook the viewer immediately.',
             'outro' => 'Write a short YouTube video outro. Include a clear call to action (subscribe, like, link in description). Output only the outro script, no explanation.',
-            'hook' => 'Write a strong hook for the first 15–30 seconds of this script. One or two sentences that grab attention. Output only the hook, no explanation.',
+            'hook' => $anchorFramework . ' Write a strong hook for the first 15–30 seconds of this script. One or two sentences that grab attention.',
             'shorten' => 'Shorten this text while keeping the main point. Keep it conversational. Output only the shortened text.',
             'expand' => 'Expand this with a bit more detail or an example. Keep the same tone. Output only the expanded text.',
             'casual' => 'Rewrite this to sound more casual and conversational, as if speaking to a friend. Output only the rewritten text.',

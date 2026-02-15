@@ -60,7 +60,7 @@ export interface ScriptItem {
     uuid: string;
     title: string;
     excerpt: string;
-    platform: 'youtube' | 'tiktok' | 'instagram' | 'general' | 'podcast';
+    platform: 'long-form' | 'shorts';
     updatedAt: string;
     script_type_id?: number | null;
     status?: string | null;
@@ -342,11 +342,8 @@ function ScriptListRowSkeleton() {
 }
 
 const platformConfig: Record<string, { label: string; icon: typeof Youtube; className: string }> = {
-    youtube: { label: 'YouTube', icon: Youtube, className: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' },
-    tiktok: { label: 'TikTok', icon: Video, className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
-    instagram: { label: 'Instagram', icon: Video, className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-    podcast: { label: 'Podcast', icon: FileText, className: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20' },
-    general: { label: 'General', icon: ScrollText, className: 'bg-muted text-muted-foreground border-border' },
+    'long-form': { label: 'Long Form', icon: FileText, className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
+    shorts: { label: 'Shorts', icon: Video, className: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
 };
 
 interface Props {
@@ -366,7 +363,7 @@ function ScriptCard({
     tenantRouter: ReturnType<typeof useTenantRouter>;
     trashed?: boolean;
 }) {
-    const platform = platformConfig[script.platform] ?? platformConfig.general;
+    const platform = platformConfig[script.platform] ?? platformConfig['long-form'];
     const PlatformIcon = platform.icon;
     const editUrl = tenantRouter.route('script.edit', { script: script.uuid });
     const card = (
@@ -644,7 +641,7 @@ export default function ScriptIndex({
                         <p className="text-muted-foreground max-w-xl text-sm md:text-base">
                             {trashed
                                 ? 'Restore or permanently delete scripts. Items here are automatically removed after 30 days.'
-                                : 'Write, refine, and export scripts for YouTube, TikTok, podcasts, and more. One place for all your content.'}
+                                : 'Write, refine, and export scripts. Long form and shorts in one place.'}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

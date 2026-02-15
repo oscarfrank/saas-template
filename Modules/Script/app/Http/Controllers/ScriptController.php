@@ -36,11 +36,8 @@ final class ScriptController extends Controller
             return;
         }
         $defaults = [
-            ['name' => 'YouTube', 'slug' => 'youtube', 'sort_order' => 1],
-            ['name' => 'TikTok', 'slug' => 'tiktok', 'sort_order' => 2],
-            ['name' => 'Instagram', 'slug' => 'instagram', 'sort_order' => 3],
-            ['name' => 'Podcast', 'slug' => 'podcast', 'sort_order' => 4],
-            ['name' => 'General', 'slug' => 'general', 'sort_order' => 5],
+            ['name' => 'Long Form', 'slug' => 'long-form', 'sort_order' => 1],
+            ['name' => 'Shorts', 'slug' => 'shorts', 'sort_order' => 2],
         ];
         foreach ($defaults as $item) {
             ScriptType::create([
@@ -976,10 +973,10 @@ PROMPT;
     private function formatScriptForList(Script $script): array
     {
         $type = $script->scriptType;
-        $platform = $type ? strtolower($type->slug) : 'general';
-        $validPlatforms = ['youtube', 'tiktok', 'instagram', 'podcast', 'general'];
+        $platform = $type ? strtolower($type->slug) : 'long-form';
+        $validPlatforms = ['long-form', 'shorts'];
         if (! in_array($platform, $validPlatforms)) {
-            $platform = 'general';
+            $platform = 'long-form';
         }
 
         $row = [
@@ -2137,7 +2134,7 @@ PROMPT;
         $plainText = $validated['content'];
         $content = $this->plainTextToBlockNoteContent($plainText);
 
-        $scriptTypeId = ScriptType::where('tenant_id', $tenantId)->where('slug', 'youtube')->value('id')
+        $scriptTypeId = ScriptType::where('tenant_id', $tenantId)->where('slug', 'long-form')->value('id')
             ?? ScriptType::where('tenant_id', $tenantId)->orderBy('sort_order')->value('id');
 
         $script = Script::create([

@@ -1,0 +1,8 @@
+{
+    "name": "modules/hr",
+    "description": "HR module",
+    "authors": [],
+    "extra": {"laravel": {"providers": [], "aliases": {}}},
+    "autoload": {"psr-4": {"Modules\\HR\\": "app/", "Modules\\HR\\Database\\Factories\\": "database/factories/", "Modules\\HR\\Database\\Seeders\\": "database/seeders/"}},
+    "autoload-dev": {"psr-4": {"Modules\\HR\\Tests\\": "tests/"}}
+}

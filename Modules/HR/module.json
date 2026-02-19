@@ -1,0 +1,9 @@
+{
+    "name": "HR",
+    "alias": "hr",
+    "description": "HR module: staff, projects, tasks, payments, performance evaluations",
+    "keywords": [],
+    "priority": 0,
+    "providers": ["Modules\\HR\\Providers\\HRServiceProvider"],
+    "files": []
+}

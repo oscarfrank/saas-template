@@ -279,10 +279,33 @@ final class ScriptController extends Controller
             ->ordered()
             ->get(['id', 'name', 'slug']);
 
+        $hrTasks = [];
+        if (class_exists(\Modules\HR\Models\Task::class)) {
+            $hrTasks = \Modules\HR\Models\Task::query()
+                ->where('script_id', $script->id)
+                ->where('tenant_id', $tenantId)
+                ->with(['assignee.user:id,first_name,last_name'])
+                ->orderBy('due_at')
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'title' => $t->title,
+                    'status' => $t->status,
+                    'due_at' => $t->due_at?->toIso8601String(),
+                    'completed_at' => $t->completed_at?->toIso8601String(),
+                    'assignee' => $t->assignee?->user
+                        ? trim($t->assignee->user->first_name . ' ' . $t->assignee->user->last_name)
+                        : null,
+                ])
+                ->values()
+                ->all();
+        }
+
         $user = $request->user();
         return Inertia::render('script/Form', [
             'script' => Inertia::defer(fn () => $this->formatScriptForEdit($script, $user)),
             'scriptTypes' => $scriptTypes,
+            'hrTasks' => $hrTasks,
         ]);
     }
 

@@ -517,10 +517,20 @@ interface ScriptForEdit {
     can_manage_access?: boolean;
 }
 
+interface HRTaskItem {
+    id: number;
+    title: string;
+    status: string;
+    due_at: string | null;
+    completed_at: string | null;
+    assignee: string | null;
+}
+
 interface Props {
     /** undefined = edit page with deferred script still loading */
     script: ScriptForEdit | null | undefined;
     scriptTypes: ScriptTypeOption[];
+    hrTasks?: HRTaskItem[];
 }
 
 function SnippetAddForm({
@@ -623,7 +633,7 @@ interface ShareData {
     collaborators: Array<{ user_id: number; name: string; email: string; role: string }>;
 }
 
-export default function ScriptForm({ script: initialScript, scriptTypes }: Props) {
+export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks = [] }: Props) {
     const tenantRouter = useTenantRouter();
     const isEdit = initialScript !== null && initialScript !== undefined;
     const readOnly = isEdit && initialScript?.can_edit === false;
@@ -1968,6 +1978,34 @@ export default function ScriptForm({ script: initialScript, scriptTypes }: Props
                             </Select>
                         </div>
                     </div>
+                    {hrTasks && hrTasks.length > 0 && (
+                        <div className="mt-3 rounded-md border bg-muted/30 p-3">
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">HR tasks linked to this script</p>
+                            <ul className="space-y-1.5 text-sm">
+                                {hrTasks.map((t) => (
+                                    <li key={t.id} className="flex items-center justify-between gap-2">
+                                        <a
+                                            href={tenantRouter.route('hr.tasks.show', { task: t.id })}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline"
+                                        >
+                                            {t.title}
+                                        </a>
+                                        <span className="shrink-0 text-muted-foreground">
+                                            {t.status}
+                                            {t.completed_at
+                                                ? ` · Done ${new Date(t.completed_at).toLocaleDateString()}`
+                                                : t.due_at
+                                                    ? ` · Due ${new Date(t.due_at).toLocaleDateString()}`
+                                                    : ''}
+                                            {t.assignee ? ` · ${t.assignee}` : ''}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </div>
 
                 {!readOnly && (

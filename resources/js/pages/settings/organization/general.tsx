@@ -23,6 +23,14 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const DEFAULT_LANDING_OPTIONS = [
+    { value: 'dashboard', label: 'Dashboard (hub)' },
+    { value: 'dashboard/workspace', label: 'Workspace' },
+    { value: 'dashboard/youtuber', label: 'YouTuber' },
+    { value: 'dashboard/borrower', label: 'Borrower' },
+    { value: 'dashboard/lender', label: 'Lender' },
+] as const;
+
 type OrganizationForm = {
     name: string;
     slug: string;
@@ -30,6 +38,7 @@ type OrganizationForm = {
     website: string;
     industry: string;
     size: string;
+    default_landing_path: string;
 }
 
 interface Props {
@@ -37,18 +46,20 @@ interface Props {
         id: string;
         name: string;
         slug: string;
-        description: string;
-        website: string;
-        industry: string;
-        size: string;
-        created_at: string;
-        updated_at: string;
+        description?: string;
+        website?: string;
+        industry?: string;
+        size?: string;
+        created_at?: string;
+        updated_at?: string;
     };
+    default_landing_path?: string;
+    can_edit_organization?: boolean;
     industries: string[];
     organizationSizes: string[];
 }
 
-export default function OrganizationGeneral({ tenant, industries, organizationSizes }: Props) {
+export default function OrganizationGeneral({ tenant, default_landing_path = 'dashboard', can_edit_organization = false, industries, organizationSizes }: Props) {
     const { auth } = usePage<SharedData>().props;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<OrganizationForm>({
@@ -56,14 +67,15 @@ export default function OrganizationGeneral({ tenant, industries, organizationSi
         slug: tenant.slug,
         description: tenant.description || '',
         website: tenant.website || '',
-        industry: tenant.industry,
-        size: tenant.size,
+        industry: tenant.industry || 'Other',
+        size: tenant.size || '1-10',
+        default_landing_path,
     });
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('settings.organization.update'), {
+        patch(route('settings.organization.update', { tenant: tenant.slug }), {
             preserveScroll: true,
         });
     };
@@ -166,6 +178,28 @@ export default function OrganizationGeneral({ tenant, industries, organizationSi
                                         <InputError message={errors.size} />
                                     </div>
                                 </div>
+
+                                {can_edit_organization && (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="default_landing_path">Default landing page</Label>
+                                        <select
+                                            id="default_landing_path"
+                                            value={data.default_landing_path}
+                                            onChange={(e) => setData('default_landing_path', e.target.value)}
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                        >
+                                            {DEFAULT_LANDING_OPTIONS.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-sm text-muted-foreground">
+                                            Where members land when they log in (they can override this in their own preferences).
+                                        </p>
+                                        <InputError message={errors.default_landing_path} />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

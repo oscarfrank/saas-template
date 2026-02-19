@@ -21,6 +21,10 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'data',
     ];
 
+    protected $casts = [
+        'data' => 'array',
+    ];
+
     public static function getCustomColumns(): array
     {
         return [
@@ -48,5 +52,25 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     {
         return $this->belongsToMany(User::class, 'tenant_user')
             ->withTimestamps()->withPivot('role');
+    }
+
+    /**
+     * Get the organization's default landing path (e.g. 'dashboard', 'dashboard/workspace').
+     * Set by org admin in Settings → Organization → General.
+     * Stored in the tenant's data JSON; VirtualColumn exposes it as $tenant->default_landing_path.
+     */
+    public function getDefaultLandingPath(): string
+    {
+        return (string) ($this->getAttribute('default_landing_path') ?? 'dashboard');
+    }
+
+    /**
+     * Set the organization's default landing path.
+     * Uses the virtual attribute so Stancl's VirtualColumn (HasDataColumn) persists it into the data JSON.
+     */
+    public function setDefaultLandingPath(string $path): void
+    {
+        $this->setAttribute('default_landing_path', $path);
+        $this->save();
     }
 } 

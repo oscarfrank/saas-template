@@ -87,6 +87,7 @@ class SettingsController extends Controller
             'email_notifications' => ['required', 'boolean'],
             'marketing_emails' => ['required', 'boolean'],
             'activity_visibility' => ['required', 'string', 'in:public,private,connections'],
+            'landing_behavior' => ['nullable', 'string', 'in:organization_default,last_visited'],
         ]);
 
         $preferences = UserPreference::getForUser(auth()->id());
@@ -123,6 +124,12 @@ class SettingsController extends Controller
             $userPermissions = [];
         }
 
+        $currentTenant = tenant();
+        $canEditOrganization = $currentTenant && (
+            $currentTenant->created_by === (int) $user->id ||
+            ($user->tenants()->where('tenants.id', $currentTenant->id)->first()?->pivot?->role === 'owner')
+        );
+
         return Inertia::render('settings/organization/general', [
             'user' => [
                 'id' => $user->id,
@@ -139,6 +146,8 @@ class SettingsController extends Controller
             }),
             'user_roles' => $userRoles,
             'user_permissions' => $userPermissions,
+            'default_landing_path' => $currentTenant ? $currentTenant->getDefaultLandingPath() : 'dashboard',
+            'can_edit_organization' => $canEditOrganization,
             'industries' => [
                 'Technology',
                 'Healthcare',
@@ -340,15 +349,17 @@ class SettingsController extends Controller
      */
     public function updateOrganization(Request $request)
     {
-        $tenant = auth()->user()->tenant;
+        $tenant = tenant();
         
         if (!$tenant) {
             return redirect()->route('profile.edit')
                 ->with('error', 'You must be part of an organization to update these settings.');
         }
 
-        // Check if user has permission to update tenant
-        if (!$tenant->isOwnedBy(auth()->user())) {
+        $user = auth()->user();
+        $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        $isOwner = $tenant->created_by === (int) $user->id || $pivot?->role === 'owner';
+        if (!$isOwner) {
             return back()->with('error', 'You do not have permission to update organization settings.');
         }
 
@@ -359,6 +370,7 @@ class SettingsController extends Controller
             'website' => 'nullable|url|max:255',
             'industry' => 'required|string|max:255',
             'size' => 'required|string|max:255',
+            'default_landing_path' => 'nullable|string|in:dashboard,dashboard/workspace,dashboard/youtuber,dashboard/borrower,dashboard/lender',
         ]);
 
         // Generate slug if not provided
@@ -366,7 +378,10 @@ class SettingsController extends Controller
             $validated['slug'] = Str::slug($validated['name']);
         }
 
+        $landingPath = $validated['default_landing_path'] ?? 'dashboard';
+        unset($validated['default_landing_path']);
         $tenant->update($validated);
+        $tenant->setDefaultLandingPath($landingPath);
 
         return back()->with('success', 'Organization settings updated successfully.');
     }

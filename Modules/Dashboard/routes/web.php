@@ -16,14 +16,25 @@ use App\Helpers\AccessLevel;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
+    // When user hits /dashboard (no tenant in path), send to correct landing (org default or last visited)
     Route::get('/dashboard', function () {
-
         $user = auth()->user();
+        $preferences = $user->getPreferences();
+        $lastTenantId = $preferences->getLastTenantId();
 
-        $tenant = $user->preferences->preferences['last_tenant_id'] ?? 'home';
+        $tenant = null;
+        if ($lastTenantId) {
+            $tenant = \App\Models\Tenant::where('id', $lastTenantId)->first();
+        }
+        if (!$tenant) {
+            $tenant = $user->tenants()->first();
+        }
+        if (!$tenant) {
+            return redirect()->route('tenants.create');
+        }
 
-        return redirect()->route('dashboard', $tenant);
-
+        $url = \App\Services\LandingUrlService::forUser($user, $tenant);
+        return redirect()->to($url);
     });
     
     // ======================================================================
@@ -53,11 +64,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware([
     'auth',
     'verified',
-    // 'track.last.visited',
-    // 'track.tenancy',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
-    // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 
 
@@ -65,8 +74,7 @@ Route::middleware([
             Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
             Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
-            Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');    
-
-
-    
+            Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');
+            Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
+            Route::get('dashboard/workspace', [DashboardController::class, 'workspaceDashboard'])->name('workspace-dashboard');
 });

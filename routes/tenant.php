@@ -29,7 +29,7 @@ use Modules\Loan\Http\Controllers\LoanPaymentController;
 // Tenant routes will be prefixed with the tenant slug
 Route::middleware([
     'web',
-    // 'track.last.visited',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     PreventAccessFromCentralDomains::class,
     'ensure.tenant.access',

@@ -3,6 +3,7 @@
 namespace Modules\User\Traits;
 
 use App\Models\Tenant;
+use App\Services\LandingUrlService;
 use Modules\User\Models\User;
 use Illuminate\Support\Facades\Log;
 
@@ -56,7 +57,7 @@ trait HandlesTenancyAfterAuth
                 $tenant->users()->attach($user->id, ['role' => 'member']);
             }
             
-            return redirect()->to("/{$tenant->slug}/dashboard");
+            return $this->redirectToLanding($user, $tenant);
         } else {
             // Multi tenancy mode
             $tenant = null;
@@ -71,13 +72,22 @@ trait HandlesTenancyAfterAuth
                 $tenant = $user->tenants()->first();
             }
             
-            // If we have a tenant, redirect to its dashboard
+            // If we have a tenant, redirect to landing (org default or last visited)
             if ($tenant) {
-                return redirect()->to("/{$tenant->slug}/dashboard");
+                return $this->redirectToLanding($user, $tenant);
             }
             
             // If no tenant is available, redirect to tenant creation
             return redirect()->route('tenants.create');
         }
+    }
+
+    /**
+     * Redirect to the appropriate landing page: org default or last visited (per user preference).
+     */
+    protected function redirectToLanding(User $user, Tenant $tenant): \Illuminate\Http\RedirectResponse
+    {
+        $url = LandingUrlService::forUser($user, $tenant);
+        return redirect()->to($url);
     }
 } 

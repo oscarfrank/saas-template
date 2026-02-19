@@ -9,16 +9,17 @@ use Symfony\Component\HttpFoundation\Response;
 class TrackLastVisitedPage
 {
     /**
-     * Handle an incoming request.
+     * Track the last visited page for "Return to last page I visited" on next login.
+     * Runs after the request: on every GET (when authenticated) we update last_visited_page
+     * to the current path (e.g. "acme/dashboard/workspace"), except for api/, livewire/, _debugbar/.
      */
     public function handle(Request $request, Closure $next): Response
     {
-
         $response = $next($request);
 
         if ($request->user() && $request->isMethod('GET')) {
             $path = $request->path();
-            
+
             // Don't track certain paths
             if (!str_starts_with($path, 'api/') && 
                 !str_starts_with($path, 'livewire/') && 

@@ -72,9 +72,12 @@ class HandleInertiaRequests extends Middleware
                 $currentTenant = $tenants[0];
             }
 
-            // If we're on the homepage and have a tenant, set the redirect URL
+            // If we're on the homepage and have a tenant, redirect to org default or last visited (per user preference)
             if ($request->is('/') && $currentTenant) {
-                $this->redirect = "/{$currentTenant['slug']}/dashboard";
+                $tenant = Tenant::find($currentTenant['id']);
+                if ($tenant) {
+                    $this->redirect = \App\Services\LandingUrlService::forUser($user, $tenant);
+                }
             }
         }
 
@@ -122,6 +125,7 @@ class HandleInertiaRequests extends Middleware
             'preferences' => $user ? [
                 'last_tenant_id' => $user->getPreferences()->getLastTenantId(),
                 'last_visited_page' => $user->getPreferences()->getLastVisitedPage(),
+                'landing_behavior' => $user->getPreferences()->getLandingBehavior(),
             ] : null,
         ];
     }

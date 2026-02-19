@@ -29,6 +29,11 @@ type PreferencesForm = {
     email_notifications: boolean;
     marketing_emails: boolean;
     activity_visibility: 'public' | 'private' | 'connections';
+    landing_behavior: 'organization_default' | 'last_visited';
+}
+
+interface PreferencesProps {
+    preferences?: Record<string, unknown> & { landing_behavior?: string };
 }
 
 const languages = [
@@ -57,18 +62,19 @@ const timeFormats = [
     { value: '24h', label: '24-hour' },
 ];
 
-export default function Preferences() {
+export default function Preferences({ preferences = {} }: PreferencesProps) {
     const { auth } = usePage<SharedData>().props;
     const { appearance, updateAppearance } = useAppearance();
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<PreferencesForm>({
-        language: 'en',
-        timezone: 'UTC',
-        date_format: 'MM/DD/YYYY',
-        time_format: '12h',
-        email_notifications: true,
-        marketing_emails: false,
-        activity_visibility: 'connections',
+        language: (preferences.language as string) ?? 'en',
+        timezone: (preferences.timezone as string) ?? 'UTC',
+        date_format: (preferences.date_format as string) ?? 'MM/DD/YYYY',
+        time_format: (preferences.time_format as string) ?? '12h',
+        email_notifications: (preferences.email_notifications as boolean) ?? true,
+        marketing_emails: (preferences.marketing_emails as boolean) ?? false,
+        activity_visibility: (preferences.activity_visibility as PreferencesForm['activity_visibility']) ?? 'connections',
+        landing_behavior: (preferences.landing_behavior === 'last_visited' ? 'last_visited' : 'organization_default') as PreferencesForm['landing_behavior'],
     });
 
     const submit: FormEventHandler = (e) => {
@@ -254,6 +260,34 @@ export default function Preferences() {
                                         onCheckedChange={(checked) => setData('marketing_emails', checked)}
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* After login */}
+                        <div className="space-y-6">
+                            <h3 className="text-lg font-medium">After login</h3>
+                            <div className="space-y-2">
+                                <Label>Where to go when you log in</Label>
+                                <Select
+                                    value={data.landing_behavior}
+                                    onValueChange={(value) => setData('landing_behavior', value as PreferencesForm['landing_behavior'])}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="organization_default">
+                                            Use my organization&apos;s default
+                                        </SelectItem>
+                                        <SelectItem value="last_visited">
+                                            Return to last page I visited
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-sm text-muted-foreground">
+                                    Organization default is set by your org admin in Settings → Organization → General.
+                                </p>
+                                <InputError message={errors.landing_behavior} />
                             </div>
                         </div>
 

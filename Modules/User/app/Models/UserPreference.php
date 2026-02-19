@@ -4,9 +4,11 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Stancl\Tenancy\Database\Concerns\CentralConnection;
 
 class UserPreference extends Model
 {
+    use CentralConnection;
     protected $fillable = [
         'user_id',
         'preferences',
@@ -29,6 +31,8 @@ class UserPreference extends Model
         'activity_visibility' => 'connections',
         'last_visited_page' => null,
         'last_tenant_id' => null,
+        /** 'organization_default' = use org default landing; 'last_visited' = go to last page before logout */
+        'landing_behavior' => 'organization_default',
     ];
 
     /**
@@ -143,6 +147,22 @@ class UserPreference extends Model
     public function getLastTenantId(): ?string
     {
         return $this->get('last_tenant_id');
+    }
+
+    /**
+     * Get landing behavior: 'organization_default' or 'last_visited'.
+     */
+    public function getLandingBehavior(): string
+    {
+        return $this->get('landing_behavior', 'organization_default');
+    }
+
+    /**
+     * Set landing behavior.
+     */
+    public function setLandingBehavior(string $value): self
+    {
+        return $this->set('landing_behavior', $value);
     }
 
     /**

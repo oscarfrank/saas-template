@@ -16,6 +16,34 @@ import {
 } from 'lucide-react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+/** Badge class for script production_status / status in upcoming events */
+const scriptStatusBadgeClass: Record<string, string> = {
+    // production_status
+    not_shot: 'border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+    shot: 'border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+    editing: 'border-violet-200 bg-violet-100 text-violet-800 dark:border-violet-800 dark:bg-violet-900/40 dark:text-violet-200',
+    edited: 'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+    // status (when no production_status)
+    draft: 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300',
+    writing: 'border-sky-200 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-900/40 dark:text-sky-200',
+    completed: 'border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+    published: 'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+    in_review: 'border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+    archived: 'border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400',
+};
+
+/** Badge class for task status in My tasks */
+const taskStatusBadgeClass: Record<string, string> = {
+    todo: 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300',
+    in_progress: 'border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+    done: 'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+};
+
+function formatStatusLabel(value: string): string {
+    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -29,6 +57,8 @@ interface UpcomingScript {
     scheduled_at: string | null;
     status: string;
     production_status: string | null;
+    script_type_name?: string | null;
+    script_type_slug?: string | null;
 }
 
 interface UpcomingTask {
@@ -98,19 +128,40 @@ export default function WorkspaceDashboard({ upcomingScripts = [], upcomingTasks
                                     {upcomingScripts.map((s) => (
                                         <li key={s.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
                                             <div className="min-w-0 flex-1">
-                                                <Link
-                                                    href={tenantRouter.route('script.edit', { script: s.uuid })}
-                                                    className="font-medium hover:underline truncate block"
-                                                >
-                                                    {s.title}
-                                                </Link>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <Link
+                                                        href={tenantRouter.route('script.edit', { script: s.uuid })}
+                                                        className="font-medium hover:underline truncate block"
+                                                    >
+                                                        {s.title}
+                                                    </Link>
+                                                    {s.script_type_slug && (
+                                                        <span
+                                                            className={cn(
+                                                                'shrink-0 text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded',
+                                                                s.script_type_slug === 'shorts'
+                                                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                                                            )}
+                                                        >
+                                                            {s.script_type_slug === 'shorts' ? 'Short' : 'Long form'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-muted-foreground text-sm flex items-center gap-1 mt-0.5">
                                                     <Clock className="h-3.5 w-3.5" />
                                                     {formatDate(s.scheduled_at)}
                                                 </p>
                                             </div>
-                                            <Badge variant="secondary" className="ml-2 shrink-0">
-                                                {s.production_status || s.status}
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    'ml-2 shrink-0 capitalize',
+                                                    scriptStatusBadgeClass[(s.production_status || s.status) ?? ''] ??
+                                                        'bg-secondary/50 text-secondary-foreground'
+                                                )}
+                                            >
+                                                {formatStatusLabel(s.production_status || s.status)}
                                             </Badge>
                                         </li>
                                     ))}
@@ -154,8 +205,14 @@ export default function WorkspaceDashboard({ upcomingScripts = [], upcomingTasks
                                                     Due {formatDate(t.due_at)}
                                                 </p>
                                             </div>
-                                            <Badge variant={t.status === 'in_progress' ? 'default' : 'secondary'} className="ml-2 shrink-0">
-                                                {t.status.replace('_', ' ')}
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    'ml-2 shrink-0 capitalize',
+                                                    taskStatusBadgeClass[t.status] ?? 'bg-secondary/50 text-secondary-foreground'
+                                                )}
+                                            >
+                                                {formatStatusLabel(t.status)}
                                             </Badge>
                                         </li>
                                     ))}

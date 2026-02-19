@@ -45,7 +45,8 @@ class DashboardController extends Controller
                 ->where('scheduled_at', '>=', now())
                 ->orderBy('scheduled_at')
                 ->limit(10)
-                ->get(['id', 'uuid', 'title', 'scheduled_at', 'status', 'production_status'])
+                ->with('scriptType:id,name,slug')
+                ->get(['id', 'uuid', 'title', 'scheduled_at', 'status', 'production_status', 'script_type_id'])
                 ->map(fn ($s) => [
                     'id' => $s->id,
                     'uuid' => $s->uuid,
@@ -53,35 +54,33 @@ class DashboardController extends Controller
                     'scheduled_at' => $s->scheduled_at?->toIso8601String(),
                     'status' => $s->status,
                     'production_status' => $s->production_status,
+                    'script_type_name' => $s->scriptType?->name,
+                    'script_type_slug' => $s->scriptType?->slug,
                 ])
                 ->values()
                 ->all();
         }
 
-        if (class_exists(\Modules\HR\Models\Staff::class) && class_exists(\Modules\HR\Models\Task::class)) {
-            $staff = \Modules\HR\Models\Staff::where('tenant_id', $tenantId)
-                ->where('user_id', $user->id)
-                ->first();
-            if ($staff) {
-                $upcomingTasks = \Modules\HR\Models\Task::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('assigned_to', $staff->id)
-                    ->whereIn('status', ['todo', 'in_progress'])
-                    ->whereNotNull('due_at')
-                    ->where('due_at', '>=', now()->startOfDay())
-                    ->orderBy('due_at')
-                    ->limit(10)
-                    ->get(['id', 'uuid', 'title', 'due_at', 'status'])
-                    ->map(fn ($t) => [
-                        'id' => $t->id,
-                        'uuid' => $t->uuid,
-                        'title' => $t->title,
-                        'due_at' => $t->due_at?->toIso8601String(),
-                        'status' => $t->status,
-                    ])
-                    ->values()
-                    ->all();
-            }
+        // My tasks: tasks assigned to the current user (via HR Staff assignee), due now or in the future
+        if (class_exists(\Modules\HR\Models\Task::class)) {
+            $upcomingTasks = \Modules\HR\Models\Task::query()
+                ->where('tenant_id', $tenantId)
+                ->whereHas('assignee', fn ($q) => $q->where('user_id', $user->id))
+                ->whereIn('status', ['todo', 'in_progress'])
+                ->whereNotNull('due_at')
+                ->where('due_at', '>=', now())
+                ->orderBy('due_at')
+                ->limit(10)
+                ->get(['id', 'uuid', 'title', 'due_at', 'status'])
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'uuid' => $t->uuid,
+                    'title' => $t->title,
+                    'due_at' => $t->due_at?->toIso8601String(),
+                    'status' => $t->status,
+                ])
+                ->values()
+                ->all();
         }
 
         return Inertia::render('dashboard/user/workspace-dashboard', [

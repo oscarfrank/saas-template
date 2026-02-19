@@ -3,51 +3,77 @@
 namespace Modules\Pages\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Storage;
+use Modules\Settings\Models\SiteSettings;
 
 class PagesController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Resolve the active homepage theme from site settings (must exist in config).
+     * When maintenance mode is on, the maintenance theme is shown for all public pages.
+     */
+    protected function theme(): string
+    {
+        $settings = SiteSettings::getSettings();
+        if (! empty($settings->maintenance_mode)) {
+            return 'maintenance';
+        }
+        $theme = $settings->homepage_theme ?? 'lending';
+        $allowed = array_keys(config('homepage.themes', ['lending' => 'Lending']));
+
+        return in_array($theme, $allowed, true) ? $theme : 'lending';
+    }
+
+    /**
+     * Render a homepage theme page. Falls back to lending theme if the theme has no page.
+     */
+    protected function renderHomepagePage(string $page): \Inertia\Response
+    {
+        $theme = $this->theme();
+        $view = "homepage/{$theme}/{$page}";
+
+        return Inertia::render($view);
+    }
+
+    /**
+     * Display the homepage (welcome).
      */
     public function index(Request $request)
     {
-        return Inertia::render('homepage/welcome');
+        return $this->renderHomepagePage('welcome');
     }
 
     public function faq(Request $request)
     {
-        return Inertia::render('homepage/faq');
+        return $this->renderHomepagePage('faq');
     }
 
     public function contact(Request $request)
     {
-        return Inertia::render('homepage/contact');
+        return $this->renderHomepagePage('contact');
     }
 
     public function calculator(Request $request)
     {
-        return Inertia::render('homepage/calculator');
+        return $this->renderHomepagePage('calculator');
     }
 
     public function privacy(Request $request)
     {
-        return Inertia::render('homepage/privacy');
+        return $this->renderHomepagePage('privacy');
     }
 
     public function about(Request $request)
     {
-        return Inertia::render('homepage/about');
+        return $this->renderHomepagePage('about');
     }
 
     
 
     public function adminDashboard(Request $request)
     {
-        return Inertia::render('dashboard/admin/admin-dashboard');
+        return redirect()->route('admin.dashboard');
     }
 
     public function lenderDashboard(Request $request)

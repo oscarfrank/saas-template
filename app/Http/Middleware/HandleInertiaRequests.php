@@ -127,6 +127,7 @@ class HandleInertiaRequests extends Middleware
                 'last_visited_page' => $user->getPreferences()->getLastVisitedPage(),
                 'landing_behavior' => $user->getPreferences()->getLandingBehavior(),
             ] : null,
+            'message' => fn () => $request->session()->get('message'),
         ];
     }
 }

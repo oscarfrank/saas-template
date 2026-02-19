@@ -9,6 +9,10 @@ class SiteSettings extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'homepage_theme' => 'lending',
+    ];
+
     protected $fillable = [
         'site_name',
         'site_title',
@@ -30,6 +34,7 @@ class SiteSettings extends Model
         'meta_tags',
         'footer_text',
         'maintenance_mode',
+        'homepage_theme',
     ];
 
     protected $casts = [

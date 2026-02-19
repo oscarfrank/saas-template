@@ -49,6 +49,7 @@ export interface SharedData {
         meta_tags: string;
         footer_text: string;
         maintenance_mode: boolean;
+        homepage_theme: string;
     };
     tenant: Tenant | null;
     [key: string]: unknown;

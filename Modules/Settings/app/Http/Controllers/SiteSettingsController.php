@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Modules\Settings\Models\SiteSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SiteSettingsController extends Controller
@@ -14,12 +15,15 @@ class SiteSettingsController extends Controller
     {
         $settings = SiteSettings::getSettings();
         return Inertia::render('admin/settings/index', [
-            'settings' => $settings
+            'settings' => $settings,
+            'homepageThemes' => config('homepage.themes', ['lending' => 'Lending']),
         ]);
     }
 
     public function update(Request $request)
     {
+        $themeKeys = array_keys(config('homepage.themes', ['lending' => 'Lending']));
+
         $validated = $request->validate([
             'site_name' => 'required|string|max:255',
             'site_title' => 'required|string|max:255',
@@ -41,6 +45,7 @@ class SiteSettingsController extends Controller
             'meta_tags' => 'nullable|string',
             'footer_text' => 'nullable|string',
             'maintenance_mode' => 'boolean',
+            'homepage_theme' => ['required', 'string', Rule::in($themeKeys)],
         ]);
 
         $settings = SiteSettings::getSettings();

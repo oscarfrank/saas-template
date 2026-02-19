@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { toast } from 'sonner';
 
@@ -43,13 +44,25 @@ interface SiteSettings {
     meta_tags: string | null;
     footer_text: string | null;
     maintenance_mode: boolean;
+    homepage_theme: string;
 }
+
+/** Short "best for" description for each homepage theme. */
+const THEME_SUITED_FOR: Record<string, string> = {
+    lending: 'Loan and lending platforms, finance products',
+    'youtube-studio': 'Content teams, YouTube studios, scripts & shoots',
+    oscarmini: 'Organizations: staff, studio, payroll, assets, loans, projects',
+    vault: 'Subscription and membership platforms',
+    nexus: 'Operations and internal tools (startups, remote teams, SMEs)',
+    academy: 'EdTech and online course / learning platforms',
+};
 
 interface Props {
     settings: SiteSettings;
+    homepageThemes: Record<string, string>;
 }
 
-export default function Settings({ settings }: Props) {
+export default function Settings({ settings, homepageThemes }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         ...settings,
         site_logo: null as File | null,
@@ -140,6 +153,46 @@ export default function Settings({ settings }: Props) {
                                         {errors.site_favicon && (
                                             <p className="text-red-500 text-sm mt-1">{errors.site_favicon}</p>
                                         )}
+                                    </div>
+
+                                    <div>
+                                        <Label htmlFor="homepage_theme">Homepage theme</Label>
+                                        <Select
+                                            value={data.homepage_theme}
+                                            onValueChange={(value) => setData('homepage_theme', value)}
+                                        >
+                                            <SelectTrigger id="homepage_theme" className={errors.homepage_theme ? 'border-red-500' : ''}>
+                                                <SelectValue placeholder="Select theme" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(homepageThemes).map(([slug, name]) => (
+                                                    <SelectItem key={slug} value={slug}>{name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {errors.homepage_theme && (
+                                            <p className="text-red-500 text-sm mt-1">{errors.homepage_theme}</p>
+                                        )}
+                                        <p className="text-muted-foreground text-sm mt-1">
+                                            Choose which public homepage design to show.
+                                        </p>
+                                        <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                                                What each theme is suited for
+                                            </p>
+                                            <ul className="space-y-1.5 text-sm">
+                                                {Object.entries(homepageThemes).map(([slug, name]) => (
+                                                    <li
+                                                        key={slug}
+                                                        className={data.homepage_theme === slug ? 'font-medium text-foreground' : 'text-muted-foreground'}
+                                                    >
+                                                        <span className="font-medium">{name}</span>
+                                                        <span className="mx-1.5">—</span>
+                                                        <span>{THEME_SUITED_FOR[slug] ?? 'General use'}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -386,7 +439,12 @@ export default function Settings({ settings }: Props) {
                                             checked={data.maintenance_mode}
                                             onCheckedChange={(checked: boolean) => setData('maintenance_mode', checked)}
                                         />
-                                        <Label htmlFor="maintenance_mode">Maintenance Mode</Label>
+                                        <div>
+                                            <Label htmlFor="maintenance_mode">Maintenance Mode</Label>
+                                            <p className="text-muted-foreground text-sm mt-0.5">
+                                                When on, only admins can log in; everyone else sees the maintenance page and cannot register.
+                                            </p>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

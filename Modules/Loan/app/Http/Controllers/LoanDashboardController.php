@@ -7,6 +7,7 @@ use Modules\Loan\Models\Loan;
 use Modules\User\Models\User;
 use Modules\Ticket\Models\Ticket;
 use Modules\Payment\Models\Currency;
+use Modules\Settings\Models\SiteSettings;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -72,7 +73,6 @@ class LoanDashboardController extends Controller
 
     public function adminDashboard()
     {
-        // Get quick stats
         $quickStats = [
             'total_users' => User::count(),
             'active_loans' => Loan::where('status', 'active')->count(),
@@ -80,48 +80,85 @@ class LoanDashboardController extends Controller
             'support_tickets' => Ticket::where('status', 'open')->count(),
         ];
 
-        // Get loan statistics for each currency
-        $currencies = Currency::select('id', 'code', 'symbol', 'name')
-            ->where('is_active', true)
-            ->orderBy('is_default', 'desc')
-            ->orderBy('code')
-            ->get();
-        $loanStats = [];
-
-        foreach ($currencies as $currency) {
-            $loanStats[$currency->code] = [
-                'total_active_loan_balance' => [
-                    'value' => Loan::where('status', 'active')
-                        ->where('currency_id', $currency->id)
-                        ->sum('current_balance'),
-                    'trend' => $this->calculateTrend('active_loans', $currency->id),
-                ],
-                'total_pending_loan_balance' => [
-                    'value' => Loan::where('status', 'pending')
-                        ->where('currency_id', $currency->id)
-                        ->sum('current_balance'),
-                    'trend' => $this->calculateTrend('pending_loans', $currency->id),
-                ],
-                'average_loan_balance' => [
-                    'value' => Loan::where('currency_id', $currency->id)
-                        ->avg('current_balance'),
-                    'trend' => $this->calculateTrend('average_loan_balance', $currency->id),
-                ],
-                'default_rate' => [
-                    'value' => $this->calculateDefaultRate($currency->id),
-                    'trend' => $this->calculateTrend('default_rate', $currency->id),
-                ],
-            ];
-        }
-
-        // Get recent activity
         $recentActivity = $this->getRecentActivity();
 
-        return Inertia::render('dashboard/admin-dashboard', [
+        $theme = SiteSettings::getSettings()->homepage_theme ?? 'lending';
+        $allowedThemes = ['lending', 'youtube-studio', 'oscarmini', 'vault', 'nexus', 'academy'];
+        if (! in_array($theme, $allowedThemes)) {
+            $theme = 'lending';
+        }
+
+        if ($theme === 'lending') {
+            $currencies = Currency::select('id', 'code', 'symbol', 'name', 'is_default')
+                ->where('is_active', true)
+                ->orderBy('is_default', 'desc')
+                ->orderBy('code')
+                ->get();
+            $loanStats = [];
+            foreach ($currencies as $currency) {
+                $loanStats[$currency->code] = [
+                    'total_active_loan_balance' => [
+                        'value' => Loan::where('status', 'active')
+                            ->where('currency_id', $currency->id)
+                            ->sum('current_balance'),
+                        'trend' => $this->calculateTrend('active_loans', $currency->id),
+                    ],
+                    'total_pending_loan_balance' => [
+                        'value' => Loan::where('status', 'pending')
+                            ->where('currency_id', $currency->id)
+                            ->sum('current_balance'),
+                        'trend' => $this->calculateTrend('pending_loans', $currency->id),
+                    ],
+                    'average_loan_balance' => [
+                        'value' => Loan::where('currency_id', $currency->id)->avg('current_balance'),
+                        'trend' => $this->calculateTrend('average_loan_balance', $currency->id),
+                    ],
+                    'default_rate' => [
+                        'value' => $this->calculateDefaultRate($currency->id),
+                        'trend' => $this->calculateTrend('default_rate', $currency->id),
+                    ],
+                ];
+            }
+
+            return Inertia::render('homepage/lending/admin-dashboard', [
+                'quickStats' => $quickStats,
+                'loanStats' => $loanStats,
+                'recentActivity' => $recentActivity,
+                'currencies' => $currencies,
+            ]);
+        }
+
+        if ($theme === 'youtube-studio') {
+            return Inertia::render('homepage/youtube-studio/admin-dashboard', [
+                'quickStats' => $quickStats,
+                'recentActivity' => $recentActivity,
+            ]);
+        }
+
+        if ($theme === 'vault') {
+            return Inertia::render('homepage/vault/admin-dashboard', [
+                'quickStats' => $quickStats,
+                'recentActivity' => $recentActivity,
+            ]);
+        }
+
+        if ($theme === 'nexus') {
+            return Inertia::render('homepage/nexus/admin-dashboard', [
+                'quickStats' => $quickStats,
+                'recentActivity' => $recentActivity,
+            ]);
+        }
+
+        if ($theme === 'academy') {
+            return Inertia::render('homepage/academy/admin-dashboard', [
+                'quickStats' => $quickStats,
+                'recentActivity' => $recentActivity,
+            ]);
+        }
+
+        return Inertia::render('homepage/oscarmini/admin-dashboard', [
             'quickStats' => $quickStats,
-            'loanStats' => $loanStats,
             'recentActivity' => $recentActivity,
-            'currencies' => $currencies,
         ]);
     }
 

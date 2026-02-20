@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { Plus, Search, ChevronLeft, ChevronRight, LayoutGrid, Calendar, Columns3, Users, FolderKanban } from 'lucide-react';
@@ -25,6 +32,7 @@ export type TaskItem = {
     project?: { id: number; name: string };
     assignee?: { id: number; user?: { first_name: string; last_name: string } };
     script?: { id: number; title: string; scheduled_at: string | null };
+    blocked_by_task?: { id: number; uuid: string; title: string; status: string } | null;
 };
 
 type ViewType = 'table' | 'calendar' | 'board' | 'by_staff' | 'by_project';
@@ -34,11 +42,13 @@ interface Props {
     allTasks: TaskItem[] | null;
     staffOptions: { id: number; name: string }[];
     projectOptions: { id: number; name: string }[];
-    filters: Record<string, unknown> & { view?: ViewType };
-    /** 'all' = see everyone's tasks (view-only for others); 'mine' = only tasks assigned to me */
+    filters: Record<string, unknown> & { view?: ViewType; show_completed?: string };
+    /** 'all' = see everyone's tasks; 'mine' = only tasks assigned to me */
     tasksView?: 'all' | 'mine';
-    /** Current user's staff id in this tenant; used to decide if user can edit a task (assignee only) */
+    /** Current user's staff id in this tenant */
     currentStaffId?: number | null;
+    /** Admin: can edit, reschedule, delete any task. If false, user can only change status on their own tasks. */
+    canManageAnyTask?: boolean;
 }
 
 const STATUS_COLUMNS: { key: string; label: string }[] = [
@@ -54,7 +64,7 @@ function assigneeName(t: TaskItem): string {
         : '—';
 }
 
-export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOptions, filters, tasksView = 'all', currentStaffId = null }: Props) {
+export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOptions, filters, tasksView = 'all', currentStaffId = null, canManageAnyTask = false }: Props) {
     const tenantRouter = useTenantRouter();
     const currentView = (filters.view as ViewType) || 'table';
     const [boardTasks, setBoardTasks] = useState<TaskItem[]>(() => allTasks ?? []);
@@ -62,8 +72,9 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
         if (currentView === 'board' && allTasks) setBoardTasks(allTasks);
     }, [currentView, allTasks]);
     const allTasksForViews = currentView === 'board' ? boardTasks : (allTasks ?? []);
-
-    const canEditTask = (t: TaskItem) => currentStaffId != null && t.assignee?.id === currentStaffId;
+    const isAssignee = (t: TaskItem) => currentStaffId != null && t.assignee?.id === currentStaffId;
+    const canManageTask = (_t: TaskItem) => canManageAnyTask;
+    const canUpdateStatus = (t: TaskItem) => canManageAnyTask || isAssignee(t);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: tenantRouter.route('hr.staff.index') },
@@ -104,9 +115,9 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
             return;
         }
         const task = allTasks?.find((t) => t.uuid === taskUuid);
-        if (!task || !canEditTask(task)) {
+        if (!task || !canManageTask(task)) {
             arg.revert();
-            toast.error('You can only reschedule tasks assigned to you.');
+            toast.error('Only admins can reschedule tasks.');
             return;
         }
         const dueAt = start.toISOString();
@@ -215,6 +226,24 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                 <Search className="h-4 w-4" />
                             </Button>
                         </form>
+                        {(currentView === 'table' || currentView === 'board' || currentView === 'by_staff' || currentView === 'by_project') && (
+                            <Select
+                                value={(filters.show_completed as string) || 'active'}
+                                onValueChange={(value) => {
+                                    tenantRouter.get('hr.tasks.index', { ...filters, show_completed: value === 'active' ? undefined : value, view: currentView, page: undefined });
+                                }}
+                            >
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Show completed" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active">Active only</SelectItem>
+                                    <SelectItem value="last_month">+ Completed (last month)</SelectItem>
+                                    <SelectItem value="last_3_months">+ Completed (last 3 months)</SelectItem>
+                                    <SelectItem value="all">All time</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                         {(tasksView === 'all' || currentStaffId != null) && (
                             <Button asChild>
                                 <Link href={tenantRouter.route('hr.tasks.create')}>
@@ -270,6 +299,7 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                                             <th className="p-3 text-left font-medium">Assignee</th>
                                                             <th className="p-3 text-left font-medium">Status</th>
                                                             <th className="p-3 text-left font-medium">Due</th>
+                                                            <th className="p-3 text-left font-medium">Blocked by</th>
                                                             <th className="p-3 text-right font-medium"></th>
                                                         </tr>
                                                     </thead>
@@ -283,11 +313,23 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                                                     <Badge variant={t.status === 'done' ? 'secondary' : 'default'}>{t.status}</Badge>
                                                                 </td>
                                                                 <td className="p-3">{t.due_at ? new Date(t.due_at).toLocaleDateString() : '—'}</td>
+                                                                <td className="p-3">
+                                                                    {t.blocked_by_task ? (
+                                                                        <Link
+                                                                            href={tenantRouter.route('hr.tasks.show', { task: t.blocked_by_task.uuid })}
+                                                                            className="text-amber-600 dark:text-amber-400 hover:underline text-sm"
+                                                                        >
+                                                                            {t.blocked_by_task.title}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        '—'
+                                                                    )}
+                                                                </td>
                                                                 <td className="p-3 text-right">
                                                                     <Button variant="ghost" size="sm" asChild>
                                                                         <Link href={tenantRouter.route('hr.tasks.show', { task: t.uuid })}>View</Link>
                                                                     </Button>
-                                                                    {canEditTask(t) && (
+                                                                    {canManageTask(t) && (
                                                                         <Button variant="ghost" size="sm" asChild>
                                                                             <Link href={tenantRouter.route('hr.tasks.edit', { task: t.uuid })}>Edit</Link>
                                                                         </Button>
@@ -345,7 +387,7 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                             plugins={[dayGridPlugin, interactionPlugin]}
                                             initialView="dayGridMonth"
                                             events={calendarEvents}
-                                            editable
+                                            editable={canManageAnyTask}
                                             eventClick={handleEventClick}
                                             eventDrop={handleCalendarEventDrop}
                                             height="auto"
@@ -385,13 +427,13 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                                         {columnTasks.map((t) => (
                                                             <div
                                                                 key={t.id}
-                                                                draggable={canEditTask(t)}
+                                                                draggable={canUpdateStatus(t)}
                                                                 onDragStart={(e) => {
-                                                                    if (!canEditTask(t)) return;
+                                                                    if (!canUpdateStatus(t)) return;
                                                                     e.dataTransfer.setData('taskUuid', t.uuid);
                                                                     e.dataTransfer.effectAllowed = 'move';
                                                                 }}
-                                                                className={`rounded border bg-background p-3 shadow-sm ${canEditTask(t) ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                                                                className={`rounded border bg-background p-3 shadow-sm ${canUpdateStatus(t) ? 'cursor-grab active:cursor-grabbing' : ''}`}
                                                             >
                                                                 <Link
                                                                     href={tenantRouter.route('hr.tasks.show', { task: t.uuid })}
@@ -404,6 +446,11 @@ export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOpt
                                                                     {assigneeName(t)}
                                                                     {t.due_at ? ` · Due ${new Date(t.due_at).toLocaleDateString()}` : ''}
                                                                 </p>
+                                                                {t.blocked_by_task && (
+                                                                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                                                                        Blocked by: <Link href={tenantRouter.route('hr.tasks.show', { task: t.blocked_by_task.uuid })} className="hover:underline">{t.blocked_by_task.title}</Link>
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>

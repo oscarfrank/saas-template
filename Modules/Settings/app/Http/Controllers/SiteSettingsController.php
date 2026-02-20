@@ -50,20 +50,27 @@ class SiteSettingsController extends Controller
 
         $settings = SiteSettings::getSettings();
 
+        // Store under the public disk (like Script thumbnails) so files are served at /storage/...
+        // Previously used default disk (local → storage/app/private), which led to 403 when loading the icon.
+        $publicDisk = 'public';
+        $settingsDir = 'settings';
+
         // Handle logo upload
         if ($request->hasFile('site_logo')) {
             if ($settings->site_logo) {
-                Storage::delete($settings->site_logo);
+                $oldPath = str_starts_with($settings->site_logo, 'public/') ? substr($settings->site_logo, 7) : $settings->site_logo;
+                Storage::disk($publicDisk)->delete($oldPath);
             }
-            $validated['site_logo'] = $request->file('site_logo')->store('public/settings');
+            $validated['site_logo'] = $request->file('site_logo')->store($settingsDir, $publicDisk);
         }
 
         // Handle favicon upload
         if ($request->hasFile('site_favicon')) {
             if ($settings->site_favicon) {
-                Storage::delete($settings->site_favicon);
+                $oldPath = str_starts_with($settings->site_favicon, 'public/') ? substr($settings->site_favicon, 7) : $settings->site_favicon;
+                Storage::disk($publicDisk)->delete($oldPath);
             }
-            $validated['site_favicon'] = $request->file('site_favicon')->store('public/settings');
+            $validated['site_favicon'] = $request->file('site_favicon')->store($settingsDir, $publicDisk);
         }
 
         $settings->update($validated);

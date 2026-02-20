@@ -19,11 +19,12 @@ interface Props {
     staff: { id: number; name: string }[];
     projects: { id: number; name: string }[];
     scripts: { id: number; title: string; scheduled_at: string | null }[];
+    taskOptions: { id: number; uuid: string; title: string }[];
     tasksView?: 'all' | 'mine';
     currentStaffId?: number | null;
 }
 
-export default function HRTasksCreate({ staff, projects, scripts, tasksView = 'all', currentStaffId = null }: Props) {
+export default function HRTasksCreate({ staff, projects, scripts, taskOptions = [], tasksView = 'all', currentStaffId = null }: Props) {
     const tenantRouter = useTenantRouter();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: tenantRouter.route('hr.staff.index') },
@@ -39,6 +40,7 @@ export default function HRTasksCreate({ staff, projects, scripts, tasksView = 'a
         project_id: projectId ? Number(projectId) : ('' as number | ''),
         assigned_to: '' as number | '',
         script_id: '' as number | '',
+        blocked_by_task_id: '' as number | '',
         status: 'todo',
         priority: '',
         due_at: '',
@@ -145,6 +147,23 @@ export default function HRTasksCreate({ staff, projects, scripts, tasksView = 'a
                                         ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="blocked_by_task_id">Blocked by (optional)</Label>
+                                <Select
+                                    value={data.blocked_by_task_id === '' ? undefined : String(data.blocked_by_task_id)}
+                                    onValueChange={(v) => setData('blocked_by_task_id', v === '' ? '' : Number(v))}
+                                >
+                                    <SelectTrigger id="blocked_by_task_id">
+                                        <SelectValue placeholder="None – this task is not blocked" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {taskOptions.map((t) => (
+                                            <SelectItem key={t.id} value={String(t.id)}>{t.title}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">This task cannot be completed until the selected task is done.</p>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">

@@ -5,7 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
-import { Pencil, CheckCircle } from 'lucide-react';
+import { Pencil, CheckCircle, ShieldAlert, Link2 } from 'lucide-react';
+
+interface BlockerTask {
+    id: number;
+    uuid: string;
+    title: string;
+    status: string;
+    assignee?: { user?: { first_name: string; last_name: string } };
+}
+
+interface BlockingTask {
+    id: number;
+    uuid: string;
+    title: string;
+    status: string;
+}
 
 interface Task {
     id: number;
@@ -18,16 +33,20 @@ interface Task {
     completed_at: string | null;
     project?: { id: number; name: string };
     assignee?: { user?: { first_name: string; last_name: string; email: string } };
-    script?: { id: number; title: string; scheduled_at: string | null };
+    script?: { id: number; uuid?: string; title: string; scheduled_at: string | null };
+    blocked_by_task?: BlockerTask | null;
+    blocking_tasks?: BlockingTask[];
 }
 
 interface Props {
     task: Task;
-    /** Whether the current user can edit/complete this task (assignee only; view-all users are view-only for others) */
-    canEditTask?: boolean;
+    /** Admin: can edit, reschedule, delete this task */
+    canManageTask?: boolean;
+    /** Regular user: can only change status / mark complete (no edit) */
+    canUpdateStatusOnly?: boolean;
 }
 
-export default function HRTasksShow({ task, canEditTask = false }: Props) {
+export default function HRTasksShow({ task, canManageTask = false, canUpdateStatusOnly = false }: Props) {
     const tenantRouter = useTenantRouter();
     const { post, processing } = useForm();
 
@@ -51,13 +70,13 @@ export default function HRTasksShow({ task, canEditTask = false }: Props) {
                         <Link href={tenantRouter.route('hr.tasks.index')}>← Tasks</Link>
                     </Button>
                     <div className="flex gap-2">
-                        {canEditTask && task.status !== 'done' && (
+                        {(canManageTask || canUpdateStatusOnly) && task.status !== 'done' && (
                             <Button variant="outline" size="sm" onClick={handleComplete} disabled={processing}>
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Mark complete
                             </Button>
                         )}
-                        {canEditTask && (
+                        {canManageTask && (
                             <Button asChild>
                                 <Link href={tenantRouter.route('hr.tasks.edit', { task: task.uuid })}>
                                     <Pencil className="h-4 w-4 mr-2" />
@@ -126,6 +145,50 @@ export default function HRTasksShow({ task, canEditTask = false }: Props) {
                                                 (scheduled {new Date(task.script.scheduled_at).toLocaleString()})
                                             </span>
                                         )}
+                                    </dd>
+                                </>
+                            )}
+                            {task.blocked_by_task && (
+                                <>
+                                    <dt className="text-muted-foreground flex items-center gap-1">
+                                        <ShieldAlert className="h-4 w-4 text-amber-500" />
+                                        Blocked by
+                                    </dt>
+                                    <dd>
+                                        <Link
+                                            href={tenantRouter.route('hr.tasks.show', { task: task.blocked_by_task.uuid })}
+                                            className="text-primary hover:underline font-medium"
+                                        >
+                                            {task.blocked_by_task.title}
+                                        </Link>
+                                        <span className="text-muted-foreground text-sm ml-1">
+                                            ({task.blocked_by_task.status}
+                                            {task.blocked_by_task.assignee?.user
+                                                ? ` · assigned to ${task.blocked_by_task.assignee.user.first_name} ${task.blocked_by_task.assignee.user.last_name}`
+                                                : ''}
+                                            )
+                                        </span>
+                                    </dd>
+                                </>
+                            )}
+                            {task.blocking_tasks && task.blocking_tasks.length > 0 && (
+                                <>
+                                    <dt className="text-muted-foreground flex items-center gap-1">
+                                        <Link2 className="h-4 w-4" />
+                                        Blocking
+                                    </dt>
+                                    <dd className="space-y-1">
+                                        {task.blocking_tasks.map((t) => (
+                                            <div key={t.id}>
+                                                <Link
+                                                    href={tenantRouter.route('hr.tasks.show', { task: t.uuid })}
+                                                    className="text-primary hover:underline text-sm"
+                                                >
+                                                    {t.title}
+                                                </Link>
+                                                <span className="text-muted-foreground text-xs ml-1">({t.status})</span>
+                                            </div>
+                                        ))}
                                     </dd>
                                 </>
                             )}

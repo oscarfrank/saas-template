@@ -1,4 +1,5 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useEffect, useMemo } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { toast } from 'sonner';
+
+/** Storage path is valid for public URL when it doesn't use the old buggy "public/..." format. */
+function publicStorageUrl(path: string | null): string | null {
+    if (!path || path.startsWith('public/')) return null;
+    return `/storage/${path}`;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -69,17 +76,46 @@ export default function Settings({ settings, homepageThemes }: Props) {
         site_favicon: null as File | null,
     });
 
+    const logoPreviewUrl = useMemo(() => {
+        if (data.site_logo instanceof File) return URL.createObjectURL(data.site_logo);
+        return publicStorageUrl(settings.site_logo);
+    }, [data.site_logo, settings.site_logo]);
+    const faviconPreviewUrl = useMemo(() => {
+        if (data.site_favicon instanceof File) return URL.createObjectURL(data.site_favicon);
+        return publicStorageUrl(settings.site_favicon);
+    }, [data.site_favicon, settings.site_favicon]);
+
+    useEffect(() => {
+        return () => {
+            if (logoPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(logoPreviewUrl);
+            if (faviconPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(faviconPreviewUrl);
+        };
+    }, [logoPreviewUrl, faviconPreviewUrl]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('admin.settings.update'), {
+        const hasFiles = data.site_logo || data.site_favicon;
+        const options = {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Settings updated successfully');
+                // Favicon/logo live in the document <head> (app.blade.php), which is only sent on full page load.
+                // Inertia redirects don't re-render the head, so force a reload so the new icon is shown.
+                if (hasFiles) {
+                    window.location.reload();
+                }
             },
             onError: () => {
                 toast.error('Failed to update settings');
-            }
-        });
+            },
+        };
+        // PHP does not parse multipart/form-data for PUT, so other fields arrive empty when files are present.
+        // Use POST with method spoofing so the request is parsed correctly; Laravel still treats it as PUT.
+        if (hasFiles) {
+            router.post(route('admin.settings.update'), { ...data, _method: 'PUT' }, options);
+        } else {
+            put(route('admin.settings.update'), options);
+        }
     };
 
     return (
@@ -129,29 +165,53 @@ export default function Settings({ settings, homepageThemes }: Props) {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <Label htmlFor="site_logo">Site Logo</Label>
-                                        <Input
-                                            id="site_logo"
-                                            type="file"
-                                            onChange={(e) => setData('site_logo', e.target.files?.[0] || null)}
-                                            className={errors.site_logo ? 'border-red-500' : ''}
-                                        />
-                                        {errors.site_logo && (
-                                            <p className="text-red-500 text-sm mt-1">{errors.site_logo}</p>
+                                    <div className="flex flex-wrap items-start gap-4">
+                                        <div className="min-w-0 flex-1">
+                                            <Label htmlFor="site_logo">Site Logo</Label>
+                                            <Input
+                                                id="site_logo"
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/gif"
+                                                onChange={(e) => setData('site_logo', e.target.files?.[0] || null)}
+                                                className={errors.site_logo ? 'border-red-500' : ''}
+                                            />
+                                            {errors.site_logo && (
+                                                <p className="text-red-500 text-sm mt-1">{errors.site_logo}</p>
+                                            )}
+                                            <p className="text-muted-foreground text-sm mt-1">
+                                                If you don’t choose a new file, the current one is kept.
+                                            </p>
+                                        </div>
+                                        {logoPreviewUrl && (
+                                            <div className="shrink-0 rounded-md border bg-muted/30 p-2">
+                                                <p className="text-muted-foreground text-xs mb-1">Preview</p>
+                                                <img src={logoPreviewUrl} alt="Site logo" className="h-12 max-w-[180px] object-contain" />
+                                            </div>
                                         )}
                                     </div>
 
-                                    <div>
-                                        <Label htmlFor="site_favicon">Site Favicon</Label>
-                                        <Input
-                                            id="site_favicon"
-                                            type="file"
-                                            onChange={(e) => setData('site_favicon', e.target.files?.[0] || null)}
-                                            className={errors.site_favicon ? 'border-red-500' : ''}
-                                        />
-                                        {errors.site_favicon && (
-                                            <p className="text-red-500 text-sm mt-1">{errors.site_favicon}</p>
+                                    <div className="flex flex-wrap items-start gap-4">
+                                        <div className="min-w-0 flex-1">
+                                            <Label htmlFor="site_favicon">Site Favicon</Label>
+                                            <Input
+                                                id="site_favicon"
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/gif,image/x-icon,.ico"
+                                                onChange={(e) => setData('site_favicon', e.target.files?.[0] || null)}
+                                                className={errors.site_favicon ? 'border-red-500' : ''}
+                                            />
+                                            {errors.site_favicon && (
+                                                <p className="text-red-500 text-sm mt-1">{errors.site_favicon}</p>
+                                            )}
+                                            <p className="text-muted-foreground text-sm mt-1">
+                                                Shown in the browser tab. If you don’t choose a new file, the current one is kept.
+                                            </p>
+                                        </div>
+                                        {faviconPreviewUrl && (
+                                            <div className="shrink-0 rounded-md border bg-muted/30 p-2">
+                                                <p className="text-muted-foreground text-xs mb-1">Current / New</p>
+                                                <img src={faviconPreviewUrl} alt="Favicon" className="size-12 object-contain" />
+                                            </div>
                                         )}
                                     </div>
 

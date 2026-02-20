@@ -33,8 +33,19 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
+        @php
+            $siteSettings = \Modules\Settings\Models\SiteSettings::getSettings();
+            // Favicon is stored on the public disk (path like "settings/xxx.png"). Old buggy paths started with "public/"
+            // and were on the local disk, so we only link when we have a public-disk path to avoid 403.
+            $faviconPath = $siteSettings->site_favicon;
+            $faviconUrl = $faviconPath && !str_starts_with($faviconPath, 'public/') ? asset('storage/' . $faviconPath) : null;
+        @endphp
+        @if($faviconUrl)
+        <link rel="icon" href="{{ $faviconUrl }}">
+        @else
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        @endif
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
         <link rel="preconnect" href="https://fonts.bunny.net">

@@ -27,6 +27,7 @@ interface Task {
     project_id: number | null;
     assigned_to: number | null;
     script_id: number | null;
+    blocked_by_task_id: number | null;
 }
 
 interface Props {
@@ -34,9 +35,10 @@ interface Props {
     staff: { id: number; name: string }[];
     projects: { id: number; name: string }[];
     scripts: { id: number; title: string; scheduled_at: string | null }[];
+    taskOptions: { id: number; uuid: string; title: string }[];
 }
 
-export default function HRTasksEdit({ task, staff, projects, scripts }: Props) {
+export default function HRTasksEdit({ task, staff, projects, scripts, taskOptions = [] }: Props) {
     const tenantRouter = useTenantRouter();
     const formatDatetime = (s: string | null) => {
         if (!s) return '';
@@ -53,6 +55,7 @@ export default function HRTasksEdit({ task, staff, projects, scripts }: Props) {
         priority: task.priority ?? '',
         due_at: formatDatetime(task.due_at),
         completed_at: formatDatetime(task.completed_at),
+        blocked_by_task_id: task.blocked_by_task_id === null ? '' : String(task.blocked_by_task_id),
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -157,6 +160,23 @@ export default function HRTasksEdit({ task, staff, projects, scripts }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="blocked_by_task_id">Blocked by</Label>
+                                <Select
+                                    value={data.blocked_by_task_id || undefined}
+                                    onValueChange={(v) => setData('blocked_by_task_id', v || '')}
+                                >
+                                    <SelectTrigger id="blocked_by_task_id">
+                                        <SelectValue placeholder="None – not blocked" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {taskOptions.map((t) => (
+                                            <SelectItem key={t.id} value={String(t.id)}>{t.title}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">This task cannot be completed until the selected task is done.</p>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">

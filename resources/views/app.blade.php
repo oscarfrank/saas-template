@@ -34,11 +34,12 @@
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
         @php
-            $siteSettings = \Modules\Settings\Models\SiteSettings::getSettings();
-            // Favicon is stored on the public disk (path like "settings/xxx.png"). Old buggy paths started with "public/"
-            // and were on the local disk, so we only link when we have a public-disk path to avoid 403.
-            $faviconPath = $siteSettings->site_favicon;
-            $faviconUrl = $faviconPath && !str_starts_with($faviconPath, 'public/') ? asset('storage/' . $faviconPath) : null;
+            $faviconUrl = null;
+            if (!request()->is('install') && !request()->is('install/*')) {
+                $siteSettings = \Modules\Settings\Models\SiteSettings::getSettings();
+                $faviconPath = $siteSettings->site_favicon ?? null;
+                $faviconUrl = $faviconPath && !str_starts_with($faviconPath, 'public/') ? asset('storage/' . $faviconPath) : null;
+            }
         @endphp
         @if($faviconUrl)
         <link rel="icon" href="{{ $faviconUrl }}">

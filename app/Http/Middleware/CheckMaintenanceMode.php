@@ -19,6 +19,11 @@ class CheckMaintenanceMode
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Skip maintenance check during install (no DB yet)
+        if ($request->is('install') || $request->is('install/*')) {
+            return $next($request);
+        }
+
         $settings = SiteSettings::getSettings();
         if (empty($settings->maintenance_mode)) {
             return $next($request);

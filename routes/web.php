@@ -1,10 +1,21 @@
 <?php
 
 use App\Http\Controllers\EditorController;
+use App\Http\Controllers\InstallController;
 use App\Http\Controllers\TenantController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+// Install wizard (when app not installed, only these and /install are allowed)
+Route::middleware('web')->group(function () {
+    Route::get('/install', [InstallController::class, 'welcome'])->name('install.welcome');
+    Route::get('/install/requirements', [InstallController::class, 'requirements'])->name('install.requirements');
+    Route::get('/install/env', [InstallController::class, 'env'])->name('install.env');
+    Route::get('/install/database', [InstallController::class, 'database'])->name('install.database');
+    Route::post('/install/database', [InstallController::class, 'runMigrations'])->name('install.run-migrations');
+    Route::get('/install/complete', [InstallController::class, 'complete'])->name('install.complete');
+    Route::post('/install/complete', [InstallController::class, 'finish'])->name('install.finish');
+});
 
 Route::get('/taiwo', function () {
     return "This is the home page";

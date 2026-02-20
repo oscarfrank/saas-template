@@ -40,6 +40,28 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // Install wizard: no DB or auth yet; share minimal props only
+        if ($request->is('install') || $request->is('install/*')) {
+            $ziggy = new Ziggy;
+            $ziggyData = $ziggy->toArray();
+            return [
+                ...parent::share($request),
+                'name' => config('app.name'),
+                'quote' => ['message' => '', 'author' => ''],
+                'auth' => ['user' => null],
+                'ziggy' => fn () => [
+                    ...$ziggyData,
+                    'location' => $request->url(),
+                ],
+                'sidebarOpen' => true,
+                'siteSettings' => null,
+                'tenant' => null,
+                'tenants' => [],
+                'preferences' => null,
+                'message' => fn () => $request->session()->get('message'),
+            ];
+        }
+
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         $user = $request->user();

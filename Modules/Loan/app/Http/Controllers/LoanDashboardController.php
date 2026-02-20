@@ -83,8 +83,12 @@ class LoanDashboardController extends Controller
         $recentActivity = $this->getRecentActivity();
 
         $theme = SiteSettings::getSettings()->homepage_theme ?? 'lending';
-        $allowedThemes = ['lending', 'youtube-studio', 'oscarmini', 'vault', 'nexus', 'academy'];
+        $allowedThemes = ['lending', 'youtube-studio', 'oscarmini', 'vault', 'nexus', 'academy', 'redirect'];
         if (! in_array($theme, $allowedThemes)) {
+            $theme = 'lending';
+        }
+        // Redirect theme has no own dashboard; use lending.
+        if ($theme === 'redirect') {
             $theme = 'lending';
         }
 

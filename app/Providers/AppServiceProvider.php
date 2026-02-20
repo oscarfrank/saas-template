@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\ServiceProvider;
 
 use Laravel\Cashier\Cashier;
@@ -24,5 +25,11 @@ class AppServiceProvider extends ServiceProvider
     {
         // Tell Cashier to use Customer model instead of User
         Cashier::useCustomerModel(Customer::class);
+
+        // Guest middleware: when logged-in user visits /login etc., redirect to /dashboard
+        // so the dashboard route can resolve tenant and send to correct landing URL (route('dashboard') requires tenant).
+        RedirectIfAuthenticated::redirectUsing(function () {
+            return '/dashboard';
+        });
     }
 }

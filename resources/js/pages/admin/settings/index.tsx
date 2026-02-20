@@ -52,6 +52,7 @@ interface SiteSettings {
     footer_text: string | null;
     maintenance_mode: boolean;
     homepage_theme: string;
+    homepage_redirect_url: string | null;
 }
 
 /** Short "best for" description for each homepage theme. */
@@ -62,6 +63,7 @@ const THEME_SUITED_FOR: Record<string, string> = {
     vault: 'Subscription and membership platforms',
     nexus: 'Operations and internal tools (startups, remote teams, SMEs)',
     academy: 'EdTech and online course / learning platforms',
+    redirect: 'Redirect root (/) and public pages to any URL; app and other routes work as normal',
 };
 
 interface Props {
@@ -232,6 +234,25 @@ export default function Settings({ settings, homepageThemes }: Props) {
                                         </Select>
                                         {errors.homepage_theme && (
                                             <p className="text-red-500 text-sm mt-1">{errors.homepage_theme}</p>
+                                        )}
+                                        {data.homepage_theme === 'redirect' && (
+                                            <div className="mt-3">
+                                                <Label htmlFor="homepage_redirect_url">Redirect URL</Label>
+                                                <Input
+                                                    id="homepage_redirect_url"
+                                                    type="url"
+                                                    value={data.homepage_redirect_url ?? ''}
+                                                    onChange={(e) => setData('homepage_redirect_url', e.target.value)}
+                                                    placeholder="https://example.com"
+                                                    className={errors.homepage_redirect_url ? 'border-red-500' : ''}
+                                                />
+                                                {errors.homepage_redirect_url && (
+                                                    <p className="text-red-500 text-sm mt-1">{errors.homepage_redirect_url}</p>
+                                                )}
+                                                <p className="text-muted-foreground text-sm mt-1">
+                                                    Visiting the root (/) or public pages will redirect here.
+                                                </p>
+                                            </div>
                                         )}
                                         <p className="text-muted-foreground text-sm mt-1">
                                             Choose which public homepage design to show.

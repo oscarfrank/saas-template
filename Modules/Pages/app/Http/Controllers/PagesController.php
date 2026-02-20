@@ -26,10 +26,31 @@ class PagesController extends Controller
     }
 
     /**
+     * When theme is "redirect", redirect to the configured URL (root and all public theme pages).
+     * Returns a redirect response or null if theme is not redirect or URL is missing.
+     */
+    protected function redirectIfRedirectTheme(): ?\Illuminate\Http\RedirectResponse
+    {
+        if ($this->theme() !== 'redirect') {
+            return null;
+        }
+        $url = SiteSettings::getSettings()->homepage_redirect_url;
+        if (empty($url) || ! filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        return redirect()->away($url);
+    }
+
+    /**
      * Render a homepage theme page. Falls back to lending theme if the theme has no page.
      */
-    protected function renderHomepagePage(string $page): \Inertia\Response
+    protected function renderHomepagePage(string $page): \Inertia\Response|\Illuminate\Http\RedirectResponse
     {
+        $redirect = $this->redirectIfRedirectTheme();
+        if ($redirect !== null) {
+            return $redirect;
+        }
         $theme = $this->theme();
         $view = "homepage/{$theme}/{$page}";
 

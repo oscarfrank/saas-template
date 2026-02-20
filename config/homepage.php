@@ -16,6 +16,7 @@ return [
         'vault' => 'Vault',
         'nexus' => 'Nexus',
         'academy' => 'Academy',
+        'redirect' => 'Redirect',
     ],
 
 ];

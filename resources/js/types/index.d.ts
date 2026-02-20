@@ -50,6 +50,7 @@ export interface SharedData {
         footer_text: string;
         maintenance_mode: boolean;
         homepage_theme: string;
+        homepage_redirect_url: string | null;
     };
     tenant: Tenant | null;
     [key: string]: unknown;
@@ -150,6 +151,8 @@ export interface SiteSettings {
     meta_tags: string | null;
     footer_text: string | null;
     maintenance_mode: boolean;
+    homepage_theme: string;
+    homepage_redirect_url: string | null;
     created_at: string;
     updated_at: string;
 }

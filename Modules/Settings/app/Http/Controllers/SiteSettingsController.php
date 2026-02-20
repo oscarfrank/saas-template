@@ -46,6 +46,13 @@ class SiteSettingsController extends Controller
             'footer_text' => 'nullable|string',
             'maintenance_mode' => 'boolean',
             'homepage_theme' => ['required', 'string', Rule::in($themeKeys)],
+            'homepage_redirect_url' => [
+                'nullable',
+                'string',
+                'max:500',
+                'required_if:homepage_theme,redirect',
+                'url',
+            ],
         ]);
 
         $settings = SiteSettings::getSettings();

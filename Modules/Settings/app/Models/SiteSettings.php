@@ -35,6 +35,7 @@ class SiteSettings extends Model
         'footer_text',
         'maintenance_mode',
         'homepage_theme',
+        'homepage_redirect_url',
     ];
 
     protected $casts = [

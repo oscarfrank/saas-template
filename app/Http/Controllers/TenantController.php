@@ -76,7 +76,7 @@ class TenantController extends Controller
                 if (!isset($invite['email']) || !filter_var($invite['email'], FILTER_VALIDATE_EMAIL)) {
                     return back()->withErrors(['invites' => 'Invalid email in invites.'])->withInput();
                 }
-                if (!isset($invite['role']) || !in_array($invite['role'], ['admin', 'member'])) {
+                if (!isset($invite['role']) || !in_array($invite['role'], ['admin', 'editor', 'member'])) {
                     return back()->withErrors(['invites' => 'Invalid role in invites.'])->withInput();
                 }
             }

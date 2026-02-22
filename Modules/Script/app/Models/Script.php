@@ -2,6 +2,7 @@
 
 namespace Modules\Script\Models;
 
+use App\Models\TenantScriptRole;
 use App\Traits\TenantAwareModelBinding;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -78,6 +79,16 @@ class Script extends Model
         return $this->hasMany(ScriptCollaborator::class)->orderBy('role');
     }
 
+    public function accessDenied(): HasMany
+    {
+        return $this->hasMany(ScriptAccessDenied::class);
+    }
+
+    public function coAuthors(): HasMany
+    {
+        return $this->hasMany(ScriptCoAuthor::class)->orderBy('sort_order');
+    }
+
     protected static function booted(): void
     {
         static::creating(function (Script $script) {
@@ -100,6 +111,8 @@ class Script extends Model
             }
             $script->versions()->delete();
             $script->collaborators()->delete();
+            $script->accessDenied()->delete();
+            $script->coAuthors()->delete();
         });
     }
 
@@ -114,9 +127,10 @@ class Script extends Model
     }
 
     /**
-     * Get the current user's role: 'owner', 'admin', 'edit', 'view', or null if no access.
+     * Resolve effective role: owner → script collaborator → denied → org default.
+     * Returns 'owner', 'admin', 'edit', 'view', or null.
      */
-    public function userRole(?User $user): ?string
+    public function effectiveUserRole(?User $user): ?string
     {
         if (! $user) {
             return null;
@@ -125,58 +139,69 @@ class Script extends Model
             return 'owner';
         }
         $collab = $this->collaborators()->where('user_id', $user->id)->first();
+        if ($collab) {
+            return $collab->role;
+        }
+        if ($this->accessDenied()->where('user_id', $user->id)->exists()) {
+            return null;
+        }
+        $orgRole = TenantScriptRole::where('tenant_id', $this->tenant_id)
+            ->where('user_id', $user->id)
+            ->value('role');
 
-        return $collab ? $collab->role : null;
+        return $orgRole ?: null;
+    }
+
+    /**
+     * Get the current user's role: 'owner', 'admin', 'edit', 'view', or null if no access.
+     */
+    public function userRole(?User $user): ?string
+    {
+        return $this->effectiveUserRole($user);
     }
 
     public function canView(?User $user): bool
     {
-        if (! $user) {
-            return false;
-        }
-        if ($this->isOwner($user)) {
-            return true;
-        }
-        return $this->collaborators()->where('user_id', $user->id)->exists();
+        return $this->effectiveUserRole($user) !== null;
     }
 
     public function canEdit(?User $user): bool
     {
-        if (! $user) {
+        $role = $this->effectiveUserRole($user);
+        if (! $role) {
             return false;
         }
-        if ($this->isOwner($user)) {
+        if ($role === 'owner') {
             return true;
         }
-        $collab = $this->collaborators()->where('user_id', $user->id)->first();
 
-        return $collab && $collab->canEdit();
+        return in_array($role, [ScriptCollaborator::ROLE_EDIT, ScriptCollaborator::ROLE_ADMIN], true);
     }
 
     public function canDelete(?User $user): bool
     {
-        if (! $user) {
+        $role = $this->effectiveUserRole($user);
+        if (! $role) {
             return false;
         }
-        if ($this->isOwner($user)) {
+        if ($role === 'owner') {
             return true;
         }
-        $collab = $this->collaborators()->where('user_id', $user->id)->first();
 
-        return $collab && $collab->canDelete();
+        return $role === ScriptCollaborator::ROLE_ADMIN;
     }
 
     public function canManageAccess(?User $user): bool
     {
-        if (! $user) {
+        $role = $this->effectiveUserRole($user);
+        if (! $role) {
             return false;
         }
-        if ($this->isOwner($user)) {
+        if ($role === 'owner') {
             return true;
         }
-        $collab = $this->collaborators()->where('user_id', $user->id)->first();
 
-        return $collab && $collab->canManageAccess();
+        return $role === ScriptCollaborator::ROLE_ADMIN;
     }
 
     public function getPrimaryTitleOption(): ?ScriptTitleOption

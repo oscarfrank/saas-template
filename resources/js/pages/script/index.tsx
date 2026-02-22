@@ -49,6 +49,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Scripts', href: '/script' },
@@ -69,6 +76,7 @@ export interface ScriptItem {
     scheduled_at?: string | null;
     deleted_at?: string;
     deleted_at_human?: string;
+    is_co_author?: boolean;
 }
 
 export interface ScriptTypeOption {
@@ -85,6 +93,12 @@ export interface ScriptFilters {
     date_field: string | null;
     date_from: string | null;
     date_to: string | null;
+    created_by: number | null;
+}
+
+export interface ScriptWriterOption {
+    user_id: number;
+    name: string;
 }
 
 const SORT_OPTIONS = [
@@ -352,6 +366,10 @@ interface Props {
     scriptTypes?: ScriptTypeOption[];
     filters?: ScriptFilters;
     sort?: string;
+    view?: 'all' | 'mine';
+    canManageScriptAccess?: boolean;
+    hasOrgScriptRole?: boolean;
+    writers?: ScriptWriterOption[];
 }
 
 function ScriptCard({
@@ -371,10 +389,17 @@ function ScriptCard({
             <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-2">
                 <div className="min-w-0 flex-1 space-y-1">
                     <h3 className="font-semibold leading-tight line-clamp-2">{script.title}</h3>
-                    <Badge variant="outline" className={`w-fit text-xs ${platform.className}`}>
-                        <PlatformIcon className="mr-1 h-3 w-3" />
-                        {platform.label}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline" className={`w-fit text-xs ${platform.className}`}>
+                            <PlatformIcon className="mr-1 h-3 w-3" />
+                            {platform.label}
+                        </Badge>
+                        {script.is_co_author && (
+                            <Badge variant="secondary" className="w-fit text-xs">
+                                Co-author
+                            </Badge>
+                        )}
+                    </div>
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild onClick={(e) => e.preventDefault()}>
@@ -483,6 +508,7 @@ const defaultFilters: ScriptFilters = {
     date_field: null,
     date_from: null,
     date_to: null,
+    created_by: null,
 };
 
 export default function ScriptIndex({
@@ -491,6 +517,10 @@ export default function ScriptIndex({
     scriptTypes = [],
     filters: filtersFromServer,
     sort: sortFromServer = 'updated_desc',
+    view: viewFromServer = 'all',
+    canManageScriptAccess = false,
+    hasOrgScriptRole = false,
+    writers = [],
 }: Props) {
     const tenantRouter = useTenantRouter();
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -502,6 +532,7 @@ export default function ScriptIndex({
 
     const filters = filtersFromServer ?? defaultFilters;
     const sort = trashed ? (sortFromServer === 'updated_desc' || sortFromServer === 'updated_asc' ? 'deleted_desc' : sortFromServer) : sortFromServer;
+    const view = viewFromServer === 'mine' ? 'mine' : 'all';
 
     const [searchInput, setSearchInput] = useState(filters.search ?? '');
     useEffect(() => {
@@ -521,7 +552,8 @@ export default function ScriptIndex({
         (filters.script_type_id?.length ?? 0) > 0 ||
         (filters.status?.length ?? 0) > 0 ||
         (filters.production_status?.length ?? 0) > 0 ||
-        (filters.date_field != null && (filters.date_from != null || filters.date_to != null));
+        (filters.date_field != null && (filters.date_from != null || filters.date_to != null)) ||
+        (filters.created_by != null);
     const scriptCount = scripts.length;
     const noSearchResults = hasActiveFilters && isEmpty;
     const scriptsIndexUrl = tenantRouter.route('script.index');
@@ -537,8 +569,12 @@ export default function ScriptIndex({
         const dateFrom = overrides.date_from !== undefined ? (overrides.date_from as string | null) : (filters.date_from ?? null);
         const dateTo = overrides.date_to !== undefined ? (overrides.date_to as string | null) : (filters.date_to ?? null);
         const sortParam = overrides.sort !== undefined ? (overrides.sort as string) : sort;
+        const viewParam = overrides.view !== undefined ? (overrides.view as string) : view;
+        const createdBy = overrides.created_by !== undefined ? (overrides.created_by as number | null) : (filters.created_by ?? null);
 
         const params: Record<string, unknown> = { ...trashedParam, sort: sortParam };
+        if (viewParam === 'mine') params.view = 'mine';
+        if (createdBy != null) params.created_by = createdBy;
         if (search) params.search = search;
         if (scriptTypeId.length > 0) params.script_type_id = scriptTypeId;
         if (status.length > 0) params.status = status;
@@ -559,7 +595,7 @@ export default function ScriptIndex({
         router.get(url, params as Record<string, string | number | number[] | string[]>, {
             preserveState: true,
             preserveScroll: true,
-            only: ['scripts', 'filters', 'sort', 'scriptTypes'],
+            only: ['scripts', 'filters', 'sort', 'view', 'scriptTypes', 'writers'],
             onStart: () => setIsLoading(true),
             onFinish: () => setIsLoading(false),
         });
@@ -585,6 +621,7 @@ export default function ScriptIndex({
             date_field: null,
             date_from: null,
             date_to: null,
+            created_by: null,
         });
     };
 
@@ -643,6 +680,21 @@ export default function ScriptIndex({
                                 ? 'Restore or permanently delete scripts. Items here are automatically removed after 30 days.'
                                 : 'Write, refine, and export scripts. Long form and shorts in one place.'}
                         </p>
+                        {!trashed && (
+                            <ToggleGroup
+                                type="single"
+                                value={view}
+                                onValueChange={(v) => v && applyQuery({ view: v })}
+                                className="mt-2 justify-start"
+                            >
+                                <ToggleGroupItem value="all" aria-label="All scripts I can access">
+                                    All scripts
+                                </ToggleGroupItem>
+                                <ToggleGroupItem value="mine" aria-label="Only my scripts">
+                                    Just mine
+                                </ToggleGroupItem>
+                            </ToggleGroup>
+                        )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         {!trashed && (
@@ -763,6 +815,24 @@ export default function ScriptIndex({
                                     ))}
                                 </DropdownMenuContent>
                             </DropdownMenu>
+                            {!trashed && canManageScriptAccess && writers.length > 0 && (
+                                <Select
+                                    value={filters.created_by != null ? String(filters.created_by) : 'all'}
+                                    onValueChange={(v) => applyQuery({ created_by: v === 'all' ? null : Number(v) })}
+                                >
+                                    <SelectTrigger className="w-[11rem] shrink-0" aria-label="Filter by writer">
+                                        <SelectValue placeholder="All writers" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All writers</SelectItem>
+                                        {writers.map((w) => (
+                                            <SelectItem key={w.user_id} value={String(w.user_id)}>
+                                                {w.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
                             <FilterPopover
                                 scriptTypes={scriptTypes}
                                 filters={filters}

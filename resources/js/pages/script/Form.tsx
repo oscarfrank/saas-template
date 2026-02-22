@@ -515,6 +515,7 @@ interface ScriptForEdit {
     can_edit?: boolean;
     can_delete?: boolean;
     can_manage_access?: boolean;
+    co_authors?: Array<{ user_id: number; name: string; email: string; sort_order?: number }>;
 }
 
 interface HRTaskItem {
@@ -631,6 +632,15 @@ interface ShareData {
     public_url: string | null;
     owner: { user_id: number; name: string; email: string; role: string };
     collaborators: Array<{ user_id: number; name: string; email: string; role: string }>;
+    org_members?: Array<{ user_id: number; name: string; email: string }>;
+    access_denied_user_ids?: number[];
+}
+
+interface CoAuthorRow {
+    user_id: number;
+    name: string;
+    email: string;
+    sort_order?: number;
 }
 
 export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks = [] }: Props) {
@@ -725,9 +735,15 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
     const [shareLoading, setShareLoading] = useState(false);
     const [sharePublishLoading, setSharePublishLoading] = useState(false);
     const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteMemberId, setInviteMemberId] = useState<number | ''>('');
     const [inviteRole, setInviteRole] = useState<'view' | 'edit' | 'admin'>('view');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteError, setInviteError] = useState<string | null>(null);
+    const [coAuthors, setCoAuthors] = useState<CoAuthorRow[]>(initialScript?.co_authors ?? []);
+    const [coAuthorAdding, setCoAuthorAdding] = useState(false);
+    const [coAuthorRemoving, setCoAuthorRemoving] = useState<number | null>(null);
+    const [coAuthorPickId, setCoAuthorPickId] = useState<number | ''>('');
+    const [coAuthorAddAsEditor, setCoAuthorAddAsEditor] = useState(false);
     const [thumbnails, setThumbnails] = useState<ThumbnailRow[]>(initialScript?.thumbnails ?? []);
     const [thumbnailsSheetOpen, setThumbnailsSheetOpen] = useState(false);
     const [thumbnailUploading, setThumbnailUploading] = useState(false);
@@ -1731,6 +1747,10 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
         if (shareSheetOpen && initialScript && canManageAccess) fetchShareData();
     }, [shareSheetOpen, initialScript?.id, canManageAccess]);
 
+    useEffect(() => {
+        if (initialScript?.co_authors) setCoAuthors(initialScript.co_authors);
+    }, [initialScript?.co_authors]);
+
     const handlePublish = async () => {
         if (!initialScript) return;
         setSharePublishLoading(true);
@@ -1782,6 +1802,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
             if (res.ok && data.collaborator) {
                 setShareData((prev) => prev ? { ...prev, collaborators: [...(prev.collaborators || []), data.collaborator] } : null);
                 setInviteEmail('');
+                setInviteMemberId('');
                 setInviteRole('view');
             } else {
                 setInviteError(data.message || 'Failed to invite.');
@@ -1818,6 +1839,58 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
         if (shareData?.public_url) {
             navigator.clipboard.writeText(shareData.public_url);
             toast.success('Link copied to clipboard');
+        }
+    };
+
+    const handleReAddRemoved = async (email: string) => {
+        if (!initialScript) return;
+        setInviteError(null);
+        const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const url = tenantRouter.route('script.collaborators.store', { script: initialScript.uuid });
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ email, role: 'view' }),
+        });
+        const data = await res.json();
+        if (res.ok && data.collaborator) {
+            setShareData((prev) => prev ? { ...prev, collaborators: [...(prev.collaborators || []), data.collaborator], access_denied_user_ids: (prev.access_denied_user_ids || []).filter((id) => id !== data.collaborator.user_id) } : null);
+        }
+    };
+
+    const handleAddCoAuthor = async (userId: number, addAsCollaborator: boolean) => {
+        if (!initialScript) return;
+        setCoAuthorAdding(true);
+        const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const url = tenantRouter.route('script.co-authors.store', { script: initialScript.uuid });
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ user_id: userId, add_as_collaborator: addAsCollaborator }),
+            });
+            const data = await res.json();
+            if (res.ok && data.co_author) {
+                setCoAuthors((prev) => [...prev, data.co_author]);
+                if (data.co_author && addAsCollaborator && shareData) {
+                    setShareData((prev) => prev ? { ...prev, collaborators: [...(prev.collaborators || []), { user_id: data.co_author.user_id, name: data.co_author.name, email: data.co_author.email, role: 'edit' }], access_denied_user_ids: (prev.access_denied_user_ids || []).filter((id) => id !== data.co_author.user_id) } : null);
+                }
+            }
+        } finally {
+            setCoAuthorAdding(false);
+        }
+    };
+
+    const handleRemoveCoAuthor = async (userId: number) => {
+        if (!initialScript) return;
+        setCoAuthorRemoving(userId);
+        const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        try {
+            const url = tenantRouter.route('script.co-authors.destroy', { script: initialScript.uuid, user: userId });
+            await fetch(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' } });
+            setCoAuthors((prev) => prev.filter((c) => c.user_id !== userId));
+        } finally {
+            setCoAuthorRemoving(null);
         }
     };
 
@@ -2906,6 +2979,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                                 </section>
                                 <section className="space-y-3">
                                     <h4 className="text-sm font-medium">People with access</h4>
+                                    <p className="text-muted-foreground text-xs">Only organization members can be added. To share publicly, use Publish above.</p>
                                     {shareData && (
                                         <ul className="space-y-2">
                                             <li className="flex items-center justify-between gap-2 rounded-md border p-2">
@@ -2932,7 +3006,7 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                                                                 <SelectItem value="admin">Admin</SelectItem>
                                                             </SelectContent>
                                                         </Select>
-                                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleRemoveCollaborator(c.user_id)} title="Remove">
+                                                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleRemoveCollaborator(c.user_id)} title="Remove from this script">
                                                             <X className="h-4 w-4" />
                                                         </Button>
                                                     </div>
@@ -2940,14 +3014,53 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                                             ))}
                                         </ul>
                                     )}
+                                    {shareData?.access_denied_user_ids && shareData.access_denied_user_ids.length > 0 && shareData.org_members && (
+                                        <div className="space-y-1.5">
+                                            <p className="text-muted-foreground text-xs font-medium">Removed from this script (can re-add)</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {shareData.org_members
+                                                    .filter((m) => shareData.access_denied_user_ids!.includes(m.user_id))
+                                                    .map((m) => (
+                                                        <span key={m.user_id} className="inline-flex items-center gap-1 rounded-md border bg-muted/50 px-2 py-1 text-xs">
+                                                            {m.name}
+                                                            <Button type="button" variant="ghost" size="sm" className="h-5 px-1 text-xs" onClick={() => handleReAddRemoved(m.email)}>
+                                                                Re-add
+                                                            </Button>
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="flex flex-wrap gap-2">
-                                        <Input
-                                            type="email"
-                                            placeholder="Email"
-                                            value={inviteEmail}
-                                            onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }}
-                                            className="max-w-[180px]"
-                                        />
+                                        <Select
+                                            value={inviteMemberId === '' ? '' : String(inviteMemberId)}
+                                            onValueChange={(v) => {
+                                                const id = v === '' ? '' : Number(v);
+                                                setInviteMemberId(id);
+                                                if (id && shareData?.org_members) {
+                                                    const member = shareData.org_members.find((m) => m.user_id === id);
+                                                    if (member) setInviteEmail(member.email);
+                                                }
+                                                setInviteError(null);
+                                            }}
+                                        >
+                                            <SelectTrigger className="max-w-[220px]">
+                                                <SelectValue placeholder="Add a team member…" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {shareData?.org_members
+                                                    ?.filter(
+                                                        (m) =>
+                                                            m.user_id !== shareData.owner?.user_id &&
+                                                            !(shareData.collaborators || []).some((c) => c.user_id === m.user_id)
+                                                    )
+                                                    .map((m) => (
+                                                        <SelectItem key={m.user_id} value={String(m.user_id)}>
+                                                            {m.name} ({m.email})
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
                                         <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as 'view' | 'edit' | 'admin')}>
                                             <SelectTrigger className="w-28">
                                                 <SelectValue />
@@ -2959,10 +3072,63 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                                             </SelectContent>
                                         </Select>
                                         <Button type="button" size="sm" onClick={handleInvite} disabled={inviteLoading || !inviteEmail.trim()}>
-                                            {inviteLoading ? '…' : 'Invite'}
+                                            {inviteLoading ? '…' : 'Add'}
                                         </Button>
                                     </div>
                                     {inviteError && <p className="text-destructive text-sm">{inviteError}</p>}
+                                </section>
+                                <section className="space-y-3">
+                                    <h4 className="text-sm font-medium">Co-authors</h4>
+                                    <p className="text-muted-foreground text-xs">Credit others on this script. Optionally give them edit access when adding.</p>
+                                    <ul className="space-y-2">
+                                        {coAuthors.map((c) => (
+                                            <li key={c.user_id} className="flex items-center justify-between gap-2 rounded-md border p-2">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium">{c.name}</p>
+                                                    <p className="text-muted-foreground truncate text-xs">{c.email}</p>
+                                                </div>
+                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive" onClick={() => handleRemoveCoAuthor(c.user_id)} disabled={coAuthorRemoving === c.user_id} title="Remove co-author">
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    {coAuthors.length === 0 && <p className="text-muted-foreground text-xs">No co-authors yet.</p>}
+                                    {shareData?.org_members && (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Select value={coAuthorPickId === '' ? '' : String(coAuthorPickId)} onValueChange={(v) => setCoAuthorPickId(v === '' ? '' : Number(v))} disabled={coAuthorAdding}>
+                                                <SelectTrigger className="max-w-[220px]">
+                                                    <SelectValue placeholder="Add co-author…" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {shareData.org_members
+                                                        .filter((m) => m.user_id !== shareData.owner?.user_id && !coAuthors.some((c) => c.user_id === m.user_id))
+                                                        .map((m) => (
+                                                            <SelectItem key={m.user_id} value={String(m.user_id)}>
+                                                                {m.name} ({m.email})
+                                                            </SelectItem>
+                                                        ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <label className="flex items-center gap-1.5 text-sm">
+                                                <input type="checkbox" checked={coAuthorAddAsEditor} onChange={(e) => setCoAuthorAddAsEditor(e.target.checked)} className="rounded border-input" />
+                                                Also give edit access
+                                            </label>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (coAuthorPickId && !coAuthors.some((c) => c.user_id === coAuthorPickId)) {
+                                                        handleAddCoAuthor(coAuthorPickId, coAuthorAddAsEditor);
+                                                        setCoAuthorPickId('');
+                                                    }
+                                                }}
+                                                disabled={coAuthorAdding || !coAuthorPickId}
+                                            >
+                                                {coAuthorAdding ? '…' : 'Add'}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </section>
                             </div>
                         </SheetContent>

@@ -31,7 +31,7 @@ interface Member {
     id: string;
     name: string;
     email: string;
-    role: 'owner' | 'admin' | 'member';
+    role: 'owner' | 'admin' | 'editor' | 'member';
     avatar: string;
     joinedAt: string;
 }
@@ -39,7 +39,7 @@ interface Member {
 interface Invite {
     id: string;
     email: string;
-    role: 'admin' | 'member';
+    role: 'admin' | 'editor' | 'member';
     invitedBy: string;
     invitedAt: string;
     status: 'pending' | 'accepted' | 'expired';
@@ -48,7 +48,7 @@ interface Invite {
 interface Props {
     members: Member[];
     invites: Invite[];
-    userRole: 'owner' | 'admin' | 'member';
+    userRole: 'owner' | 'admin' | 'editor' | 'member';
 }
 
 export default function OrganizationPeople({ members, invites, userRole }: Props) {
@@ -63,7 +63,7 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
     const [inviteToResend, setInviteToResend] = useState<{ id: string; email: string } | null>(null);
     const [memberToUpdate, setMemberToUpdate] = useState<{ id: string; email: string; currentRole: string } | null>(null);
     const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string; email: string } | null>(null);
-    const [newInvite, setNewInvite] = useState<{ email: string; role: 'admin' | 'member' }>({ 
+    const [newInvite, setNewInvite] = useState<{ email: string; role: 'admin' | 'editor' | 'member' }>({ 
         email: '', 
         role: 'member' 
     });
@@ -71,7 +71,7 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
 
     // Check if user can manage invites
     const canManageInvites = userRole === 'owner' || userRole === 'admin';
-    // Check if user can manage members
+    // Check if user can manage members (owner and admin only; editors manage script access, not org membership)
     const canManageMembers = userRole === 'owner' || userRole === 'admin';
 
     // Search and filter states
@@ -303,10 +303,11 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
                                             <select
                                                 id="role"
                                                 value={newInvite.role}
-                                                onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as 'admin' | 'member' })}
+                                                onChange={(e) => setNewInvite({ ...newInvite, role: e.target.value as 'admin' | 'editor' | 'member' })}
                                                 className="w-full rounded-md border border-input bg-background px-3 py-2"
                                             >
                                                 <option value="member">Member</option>
+                                                <option value="editor">Editor</option>
                                                 <option value="admin">Admin</option>
                                             </select>
                                         </div>
@@ -417,6 +418,7 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
                                         className="w-full rounded-md border border-input bg-background px-3 py-2"
                                     >
                                         <option value="member">Member</option>
+                                        <option value="editor">Editor</option>
                                         <option value="admin">Admin</option>
                                     </select>
                                 </div>
@@ -499,6 +501,7 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
                                     <option value="all">All Roles</option>
                                     <option value="owner">Owners</option>
                                     <option value="admin">Admins</option>
+                                    <option value="editor">Editors</option>
                                     <option value="member">Members</option>
                                 </select>
                             </div>
@@ -517,7 +520,8 @@ export default function OrganizationPeople({ members, invites, userRole }: Props
                                                 </div>
                                                 <Badge variant={
                                                     member.role === 'owner' ? 'default' :
-                                                    member.role === 'admin' ? 'secondary' : 'outline'
+                                                    member.role === 'admin' ? 'secondary' :
+                                                    member.role === 'editor' ? 'secondary' : 'outline'
                                                 }>
                                                     {member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : 'Member'}
                                                 </Badge>

@@ -54,6 +54,11 @@ Route::middleware([
     Route::post('script/{script}/collaborators', [ScriptController::class, 'addCollaborator'])->name('script.collaborators.store');
     Route::delete('script/{script}/collaborators/{user}', [ScriptController::class, 'removeCollaborator'])->name('script.collaborators.destroy');
     Route::put('script/{script}/collaborators/{user}', [ScriptController::class, 'updateCollaboratorRole'])->name('script.collaborators.update');
+    Route::get('script/access', [ScriptController::class, 'scriptAccessIndex'])->name('script.access.index');
+    Route::put('script/access/{user}', [ScriptController::class, 'scriptAccessUpdate'])->name('script.access.update');
+    Route::post('script/{script}/co-authors', [ScriptController::class, 'addCoAuthor'])->name('script.co-authors.store');
+    Route::delete('script/{script}/co-authors/{user}', [ScriptController::class, 'removeCoAuthor'])->name('script.co-authors.destroy');
+    Route::patch('script/{script}/co-authors', [ScriptController::class, 'reorderCoAuthors'])->name('script.co-authors.reorder');
     Route::get('script/snippets', [ScriptController::class, 'snippetsIndex'])->name('script.snippets.index');
     Route::post('script/snippets', [ScriptController::class, 'snippetsStore'])->name('script.snippets.store');
     Route::delete('script/snippets/{id}', [ScriptController::class, 'snippetsDestroy'])->name('script.snippets.destroy');

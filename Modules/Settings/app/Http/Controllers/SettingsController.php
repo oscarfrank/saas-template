@@ -250,7 +250,7 @@ class SettingsController extends Controller
 
         $validated = $request->validate([
             'email' => 'required|email',
-            'role' => 'required|in:admin,member',
+            'role' => 'required|in:admin,editor,member',
         ]);
 
         // Check if user is already a member
@@ -508,7 +508,7 @@ class SettingsController extends Controller
     public function updateMemberRole(Request $request, $memberId)
     {
         $request->validate([
-            'role' => ['required', 'string', 'in:admin,member,owner'],
+            'role' => ['required', 'string', 'in:admin,editor,member,owner'],
         ]);
 
         $tenant = tenant();

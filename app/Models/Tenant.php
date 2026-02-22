@@ -8,6 +8,7 @@ use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Illuminate\Support\Facades\Artisan;
 use Modules\User\Models\User;
+use App\Models\TenantScriptRole;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
@@ -52,6 +53,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     {
         return $this->belongsToMany(User::class, 'tenant_user')
             ->withTimestamps()->withPivot('role');
+    }
+
+    /**
+     * Default script role per user (view/edit/admin). Applies to all scripts in the org.
+     */
+    public function scriptRoles()
+    {
+        return $this->hasMany(TenantScriptRole::class);
     }
 
     /**

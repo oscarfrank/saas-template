@@ -4,6 +4,7 @@ namespace Modules\Script\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Models\TenantScriptRole;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,8 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Script\Models\Script;
+use Modules\Script\Models\ScriptAccessDenied;
+use Modules\Script\Models\ScriptCoAuthor;
 use Modules\Script\Models\ScriptCollaborator;
 use Modules\Script\Models\ScriptThumbnail;
 use Modules\Script\Models\ScriptType;
@@ -60,14 +63,46 @@ final class ScriptController extends Controller
         $this->ensureDefaultScriptTypes($tenantId);
 
         $user = $request->user();
+        $tenant = tenant();
+        $pivot = $user?->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        $orgRole = $pivot?->role ?? null;
+        $isEditorOrAdmin = in_array($orgRole, ['owner', 'admin', 'editor'], true);
+
         $trashed = $request->boolean('trashed');
+        $view = $request->input('view', 'all');
+        if (! in_array($view, ['all', 'mine'], true)) {
+            $view = 'all';
+        }
+        $hasOrgScriptRole = $user ? TenantScriptRole::where('tenant_id', $tenantId)->where('user_id', $user->id)->exists() : false;
+
         $query = Script::query()
-            ->with(['scriptType', 'titleOptions'])
-            ->where('tenant_id', $tenantId)
-            ->where(function ($q) use ($user) {
-                $q->where('created_by', $user?->id);
-                $q->orWhereHas('collaborators', fn ($c) => $c->where('user_id', $user?->id));
+            ->with(['scriptType', 'titleOptions', 'coAuthors'])
+            ->where('tenant_id', $tenantId);
+
+        if (! ($isEditorOrAdmin && $view === 'all')) {
+            $query->where(function ($q) use ($user, $hasOrgScriptRole, $view) {
+                if ($view === 'mine') {
+                    $q->where('created_by', $user?->id);
+                    $q->orWhereHas('coAuthors', fn ($c) => $c->where('user_id', $user?->id));
+                } else {
+                    $q->where('created_by', $user?->id);
+                    $q->orWhereHas('collaborators', fn ($c) => $c->where('user_id', $user?->id));
+                    if ($user && $hasOrgScriptRole) {
+                        $q->orWhere(function ($q2) use ($user) {
+                            $q2->whereDoesntHave('accessDenied', fn ($d) => $d->where('user_id', $user->id));
+                        });
+                    }
+                }
             });
+        }
+
+        $createdBy = $request->input('created_by');
+        if ($createdBy !== null && $createdBy !== '' && $isEditorOrAdmin) {
+            $createdById = (int) $createdBy;
+            if ($createdById > 0) {
+                $query->where('created_by', $createdById);
+            }
+        }
 
         if ($trashed) {
             $query->onlyTrashed();
@@ -146,17 +181,40 @@ final class ScriptController extends Controller
             $query->orderBy($sortColumn, $sortDir);
         }
 
-        $scripts = $query->get()->map(fn (Script $script) => $this->formatScriptForList($script));
+        $scripts = $query->get()->map(fn (Script $script) => $this->formatScriptForList($script, $user));
 
         $scriptTypes = ScriptType::where('tenant_id', $tenantId)
             ->active()
             ->ordered()
             ->get(['id', 'name', 'slug']);
 
+        $canManageScriptAccess = in_array($orgRole, ['owner', 'admin', 'editor'], true);
+
+        $writers = [];
+        if ($isEditorOrAdmin) {
+            $creatorIds = Script::where('tenant_id', $tenantId)->distinct()->pluck('created_by')->filter()->values()->all();
+            if (count($creatorIds) > 0) {
+                $creatorUsers = \Modules\User\Models\User::whereIn('id', $creatorIds)->get(['id', 'first_name', 'last_name', 'email']);
+                $writers = $creatorUsers->map(function ($u) {
+                    $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+                    return [
+                        'user_id' => $u->id,
+                        'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
+                    ];
+                })->sortBy('name')->values()->all();
+            }
+        }
+
+        $createdByFilter = ($createdBy !== null && $createdBy !== '' && $isEditorOrAdmin && (int) $createdBy > 0) ? (int) $createdBy : null;
+
         return Inertia::render('script/index', [
             'scripts' => $scripts,
             'trashed' => $trashed,
             'scriptTypes' => $scriptTypes,
+            'canManageScriptAccess' => $canManageScriptAccess,
+            'hasOrgScriptRole' => $hasOrgScriptRole,
+            'view' => $view,
+            'writers' => $writers,
             'filters' => [
                 'search' => $search,
                 'script_type_id' => $scriptTypeIds,
@@ -165,6 +223,7 @@ final class ScriptController extends Controller
                 'date_field' => in_array($dateField, $dateFields, true) ? $dateField : null,
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
+                'created_by' => $createdByFilter,
             ],
             'sort' => $sort,
         ]);
@@ -993,7 +1052,7 @@ PROMPT;
         }
     }
 
-    private function formatScriptForList(Script $script): array
+    private function formatScriptForList(Script $script, $user): array
     {
         $type = $script->scriptType;
         $platform = $type ? strtolower($type->slug) : 'long-form';
@@ -1001,6 +1060,8 @@ PROMPT;
         if (! in_array($platform, $validPlatforms)) {
             $platform = 'long-form';
         }
+
+        $isCoAuthor = $user && $script->coAuthors->contains('user_id', $user->id);
 
         $row = [
             'id' => $script->id,
@@ -1016,6 +1077,7 @@ PROMPT;
             'production_status' => $script->production_status,
             'created_at' => $script->created_at?->toIso8601String(),
             'scheduled_at' => $script->scheduled_at?->toIso8601String(),
+            'is_co_author' => $isCoAuthor,
         ];
         if ($script->trashed()) {
             $row['deleted_at'] = $script->deleted_at?->toIso8601String();
@@ -1070,6 +1132,12 @@ PROMPT;
             'reel_captions' => isset($script->custom_attributes['reel_captions']) && is_array($script->custom_attributes['reel_captions'])
                 ? $script->custom_attributes['reel_captions']
                 : null,
+            'co_authors' => $script->coAuthors()->with('user')->orderBy('sort_order')->get()->map(fn ($ca) => [
+                'user_id' => $ca->user_id,
+                'name' => trim(($ca->user->first_name ?? '') . ' ' . ($ca->user->last_name ?? '')) ?: $ca->user->email ?? 'Unknown',
+                'email' => $ca->user->email ?? '',
+                'sort_order' => $ca->sort_order,
+            ])->values()->all(),
         ];
     }
 
@@ -1754,6 +1822,18 @@ PROMPT;
             $publicUrl = url('/script/shared/' . $script->share_token);
         }
 
+        $tenant = tenant();
+        $orgMembers = $tenant->users()->get()->map(function ($u) {
+            $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+            return [
+                'user_id' => $u->id,
+                'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
+                'email' => $u->email ?? '',
+            ];
+        })->values()->all();
+
+        $accessDeniedUserIds = $script->accessDenied()->pluck('user_id')->all();
+
         return response()->json([
             'visibility' => $script->visibility ?? 'private',
             'share_token' => $script->share_token,
@@ -1761,6 +1841,8 @@ PROMPT;
             'public_url' => $publicUrl,
             'owner' => $ownerRow,
             'collaborators' => $collaborators,
+            'org_members' => $orgMembers,
+            'access_denied_user_ids' => $accessDeniedUserIds,
         ]);
     }
 
@@ -1858,6 +1940,7 @@ PROMPT;
             'user_id' => $user->id,
             'role' => $validated['role'],
         ]);
+        $script->accessDenied()->where('user_id', $user->id)->delete();
 
         $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
 
@@ -1885,6 +1968,7 @@ PROMPT;
         }
 
         $script->collaborators()->where('user_id', $userId)->delete();
+        $script->accessDenied()->firstOrCreate(['user_id' => $userId], ['user_id' => $userId]);
 
         return response()->json(['removed' => true]);
     }
@@ -1919,6 +2003,154 @@ PROMPT;
                 'role' => $collab->role,
             ],
         ]);
+    }
+
+    /**
+     * List org members with their default script role (for script homepage access management).
+     * Only tenant owner or admin.
+     */
+    public function scriptAccessIndex(Request $request): JsonResponse
+    {
+        $tenant = tenant();
+        $user = $request->user();
+        $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        $orgRole = $pivot?->role ?? null;
+        if (! in_array($orgRole, ['owner', 'admin', 'editor'], true)) {
+            abort(403, 'Only organization owners, admins, and editors can manage default script access.');
+        }
+
+        $members = $tenant->users()->get()->map(function ($u) use ($tenant) {
+            $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+            $scriptRole = TenantScriptRole::where('tenant_id', $tenant->id)->where('user_id', $u->id)->value('role');
+            return [
+                'user_id' => $u->id,
+                'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
+                'email' => $u->email ?? '',
+                'script_role' => $scriptRole,
+            ];
+        })->values()->all();
+
+        return response()->json(['members' => $members]);
+    }
+
+    /**
+     * Set or clear default script role for an org member. Only tenant owner or admin.
+     */
+    public function scriptAccessUpdate(Request $request, int $userId): JsonResponse
+    {
+        $tenant = tenant();
+        $user = $request->user();
+        $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        if (! in_array($pivot?->role ?? null, ['owner', 'admin', 'editor'], true)) {
+            abort(403, 'Only organization owners, admins, and editors can manage default script access.');
+        }
+
+        $target = $tenant->users()->where('users.id', $userId)->first();
+        if (! $target) {
+            return response()->json(['message' => 'User not in this organization.'], 404);
+        }
+        if ((int) $userId === (int) $user->id) {
+            return response()->json(['message' => 'You cannot change your own default script role here.'], 422);
+        }
+
+        $role = $request->input('role');
+        if ($role === null || $role === '') {
+            TenantScriptRole::where('tenant_id', $tenant->id)->where('user_id', $userId)->delete();
+            return response()->json(['script_role' => null]);
+        }
+        $validated = $request->validate(['role' => 'required|string|in:view,edit,admin']);
+        $role = $validated['role'];
+        TenantScriptRole::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $userId],
+            ['role' => $role]
+        );
+        return response()->json(['script_role' => $role]);
+    }
+
+    /**
+     * Add a co-author (attribution). Optionally add as collaborator if not already.
+     */
+    public function addCoAuthor(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canManageAccess($request->user())) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|integer',
+            'add_as_collaborator' => 'sometimes|boolean',
+        ]);
+        $userId = (int) $validated['user_id'];
+        $target = \Modules\User\Models\User::whereHas('tenants', fn ($q) => $q->where('tenants.id', $tenantId))->find($userId);
+        if (! $target) {
+            return response()->json(['message' => 'User not in this organization.'], 404);
+        }
+        if ($script->coAuthors()->where('user_id', $userId)->exists()) {
+            return response()->json(['message' => 'Already a co-author.'], 422);
+        }
+
+        $maxOrder = $script->coAuthors()->max('sort_order') ?? 0;
+        $script->coAuthors()->create([
+            'user_id' => $userId,
+            'sort_order' => $maxOrder + 1,
+        ]);
+        if (! empty($validated['add_as_collaborator'])) {
+            if (! $script->collaborators()->where('user_id', $userId)->exists()) {
+                $script->collaborators()->create(['user_id' => $userId, 'role' => ScriptCollaborator::ROLE_EDIT]);
+            }
+            $script->accessDenied()->where('user_id', $userId)->delete();
+        }
+
+        $name = trim(($target->first_name ?? '') . ' ' . ($target->last_name ?? ''));
+        return response()->json([
+            'co_author' => [
+                'user_id' => $target->id,
+                'name' => $name !== '' ? $name : $target->email,
+                'email' => $target->email,
+                'sort_order' => $maxOrder + 1,
+            ],
+        ]);
+    }
+
+    /**
+     * Remove a co-author.
+     */
+    public function removeCoAuthor(Request $request, Script $script, int $userId): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canManageAccess($request->user())) {
+            abort(403);
+        }
+
+        $script->coAuthors()->where('user_id', $userId)->delete();
+        return response()->json(['removed' => true]);
+    }
+
+    /**
+     * Reorder co-authors. Body: { "user_ids": [id1, id2, ...] }
+     */
+    public function reorderCoAuthors(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canManageAccess($request->user())) {
+            abort(403);
+        }
+
+        $validated = $request->validate(['user_ids' => 'required|array', 'user_ids.*' => 'integer']);
+        foreach ($validated['user_ids'] as $index => $id) {
+            $script->coAuthors()->where('user_id', $id)->update(['sort_order' => $index]);
+        }
+        return response()->json(['reordered' => true]);
     }
 
     /**

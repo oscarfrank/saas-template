@@ -22,6 +22,8 @@ class Script extends Model
         'script_type_id',
         'created_by',
         'updated_by',
+        'locked_by',
+        'locked_at',
         'title',
         'thumbnail_text',
         'content',
@@ -42,6 +44,7 @@ class Script extends Model
         'custom_attributes' => 'array',
         'published_at' => 'datetime',
         'scheduled_at' => 'datetime',
+        'locked_at' => 'datetime',
     ];
 
     public function scriptType(): BelongsTo
@@ -57,6 +60,33 @@ class Script extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function lockedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    /** Lock is considered stale after this many minutes (no longer blocks others). */
+    public const LOCK_STALE_MINUTES = 30;
+
+    public function isLocked(): bool
+    {
+        return $this->locked_by !== null && $this->locked_at !== null && ! $this->isLockStale();
+    }
+
+    public function isLockedBy(?User $user): bool
+    {
+        return $user && (int) $this->locked_by === (int) $user->id;
+    }
+
+    public function isLockStale(int $minutes = self::LOCK_STALE_MINUTES): bool
+    {
+        if (! $this->locked_at) {
+            return true;
+        }
+
+        return $this->locked_at->addMinutes($minutes)->isPast();
     }
 
     public function titleOptions(): HasMany

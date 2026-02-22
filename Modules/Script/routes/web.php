@@ -38,6 +38,9 @@ Route::middleware([
     Route::get('script/{script}/content-as-text', [ScriptController::class, 'getScriptContentAsText'])->name('script.content-as-text');
     Route::post('script/{script}/generate-reel-captions', [ScriptController::class, 'generateReelCaptions'])->name('script.generate-reel-captions');
     Route::get('script/{script}', [ScriptController::class, 'edit'])->name('script.edit');
+    Route::get('script/{script}/lock', [ScriptController::class, 'getLock'])->name('script.lock.show');
+    Route::post('script/{script}/lock', [ScriptController::class, 'acquireLock'])->name('script.lock.acquire');
+    Route::delete('script/{script}/lock', [ScriptController::class, 'releaseLock'])->name('script.lock.release');
     Route::match(['GET', 'POST'], 'script/{script}/export', [ScriptController::class, 'export'])->name('script.export');
     Route::put('script/{script}', [ScriptController::class, 'update'])->name('script.update');
     Route::put('script/{script}/analysis-retention', [ScriptController::class, 'saveAnalysisRetention'])->name('script.analysis-retention.save');

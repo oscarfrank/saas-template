@@ -519,6 +519,12 @@ interface ScriptForEdit {
     author?: { user_id: number; name: string; email: string } | null;
     last_edited_by?: { user_id: number; name: string; email: string } | null;
     updated_at?: string | null;
+    current_user_id?: number | null;
+    lock?: {
+        locked: boolean;
+        locked_by: { user_id: number; name: string } | null;
+        locked_at: string | null;
+    };
 }
 
 interface HRTaskItem {
@@ -646,10 +652,18 @@ interface CoAuthorRow {
     sort_order?: number;
 }
 
+const LOCK_POLL_INTERVAL_MS = 45_000;
+
 export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks = [] }: Props) {
     const tenantRouter = useTenantRouter();
     const isEdit = initialScript !== null && initialScript !== undefined;
-    const readOnly = isEdit && initialScript?.can_edit === false;
+    const [lockAcquired, setLockAcquired] = useState(false);
+    const [lockAcquiring, setLockAcquiring] = useState(false);
+    const lockAcquiredRef = useRef(false);
+    lockAcquiredRef.current = lockAcquired;
+    const readOnly =
+        (isEdit && initialScript?.can_edit === false) ||
+        (isEdit && !!initialScript?.can_edit && !lockAcquired);
     const canManageAccess = !!(isEdit && initialScript?.can_manage_access);
 
     const [content, setContent] = useState<PartialBlock[]>(
@@ -856,6 +870,87 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
             );
         }
     }, [initialScript]);
+
+    // Acquire edit lock when opening an editable script (run once per script; avoid tenantRouter in deps so we don't re-run every render)
+    useEffect(() => {
+        if (!isEdit || !initialScript?.can_edit || !initialScript?.uuid || !tenantRouter) return;
+        const url = tenantRouter.route('script.lock.acquire', { script: initialScript.uuid });
+        const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        setLockAcquiring(true);
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then((res) => res.json().catch(() => ({})))
+            .then((data: { acquired?: boolean }) => {
+                setLockAcquired(!!data.acquired);
+            })
+            .finally(() => setLockAcquiring(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- tenantRouter is unstable (new ref each render); we only want to run when script identity changes
+    }, [isEdit, initialScript?.can_edit, initialScript?.uuid]);
+
+    // Release lock on navigate away or tab close
+    useEffect(() => {
+        if (!isEdit || !initialScript?.uuid || !tenantRouter) return;
+        const release = () => {
+            if (!lockAcquiredRef.current) return;
+            const url = tenantRouter.route('script.lock.release', { script: initialScript.uuid });
+            const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            navigator.sendBeacon?.(
+                url,
+                new Blob([JSON.stringify({ _token: csrf })], { type: 'application/json' })
+            );
+            // DELETE with sendBeacon is not standard; use fetch with keepalive in beforeunload
+        };
+        const releaseFetch = () => {
+            if (!lockAcquiredRef.current) return;
+            const url = tenantRouter.route('script.lock.release', { script: initialScript.uuid });
+            const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            fetch(url, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                keepalive: true,
+            }).catch(() => {});
+        };
+        const removeBefore = router.on('before', () => {
+            releaseFetch();
+        });
+        const onBeforeUnload = () => {
+            releaseFetch();
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+        return () => {
+            removeBefore();
+            window.removeEventListener('beforeunload', onBeforeUnload);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- tenantRouter is unstable; we only need to run when script uuid changes
+    }, [isEdit, initialScript?.uuid]);
+
+    // Poll lock state so we know if someone else took the lock (e.g. after our lock expired)
+    useEffect(() => {
+        if (!isEdit || !initialScript?.uuid || !tenantRouter || !initialScript?.current_user_id) return;
+        const url = tenantRouter.route('script.lock.show', { script: initialScript.uuid });
+        const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const currentUserId = initialScript.current_user_id;
+        const interval = setInterval(() => {
+            if (!lockAcquiredRef.current) return;
+            fetch(url, { headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf } })
+                .then((res) => res.json().catch(() => ({})))
+                .then((data: { locked?: boolean; locked_by?: { user_id: number } | null }) => {
+                    if (data.locked && data.locked_by && data.locked_by.user_id !== currentUserId) {
+                        setLockAcquired(false);
+                        toast.info('Someone else is now editing this script. You are in view-only mode.');
+                    }
+                })
+                .catch(() => {});
+        }, LOCK_POLL_INTERVAL_MS);
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- tenantRouter is unstable; we only need to run when script identity changes
+    }, [isEdit, initialScript?.uuid, initialScript?.current_user_id]);
 
     const handleContentChange = (blocks: PartialBlock[]) => {
         setContent(blocks);
@@ -1283,6 +1378,10 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                 setAutosaveStatus('saved');
                 setTimeout(() => setAutosaveStatus('idle'), 2000);
             } else {
+                if (response.status === 423) {
+                    setLockAcquired(false);
+                    toast.error('Script is being edited by someone else. Your changes were not saved.');
+                }
                 setAutosaveStatus('idle');
             }
         } catch {
@@ -2944,7 +3043,14 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                 </div>
                 )}
 
-                {readOnly && (
+                {isEdit && initialScript?.can_edit && !lockAcquired && initialScript?.lock?.locked && initialScript.lock.locked_by && (
+                    <div className="mb-4 flex items-center gap-2">
+                        <p className="bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-md px-3 py-1.5 text-sm font-medium">
+                            Locked by {initialScript.lock.locked_by.name}. You can view only until they leave.
+                        </p>
+                    </div>
+                )}
+                {readOnly && isEdit && initialScript?.can_edit === false && (
                     <p className="text-muted-foreground mb-4 text-sm">You have view-only access to this script.</p>
                 )}
 

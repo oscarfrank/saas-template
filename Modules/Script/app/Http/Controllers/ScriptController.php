@@ -332,7 +332,7 @@ final class ScriptController extends Controller
 
         $this->ensureDefaultScriptTypes($tenantId);
 
-        $script->load(['scriptType', 'titleOptions', 'thumbnails']);
+        $script->load(['scriptType', 'titleOptions', 'thumbnails', 'lockedByUser']);
         $scriptTypes = ScriptType::where('tenant_id', $tenantId)
             ->active()
             ->ordered()
@@ -379,6 +379,15 @@ final class ScriptController extends Controller
         }
         if (! $script->canEdit($request->user())) {
             abort(403, 'You do not have permission to edit this script.');
+        }
+
+        $script->refresh();
+        if ($script->isLocked() && ! $script->isLockedBy($request->user())) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Script is being edited by someone else. You cannot save until they leave.'], 423);
+            }
+
+            return back()->with('error', 'Script is being edited by someone else. You cannot save until they leave.');
         }
 
         $validated = $request->validate([
@@ -1149,7 +1158,105 @@ PROMPT;
                 'email' => $script->updater->email ?? '',
             ] : null,
             'updated_at' => $script->updated_at?->toIso8601String(),
+            'current_user_id' => $user?->id,
+            'lock' => $this->formatLockForScript($script),
         ];
+    }
+
+    /**
+     * Return lock state for API/Inertia: locked (bool), locked_by (null | { user_id, name }), locked_at (iso string | null).
+     */
+    private function formatLockForScript(Script $script): array
+    {
+        if (! $script->isLocked()) {
+            return ['locked' => false, 'locked_by' => null, 'locked_at' => null];
+        }
+
+        $locker = $script->lockedByUser;
+
+        return [
+            'locked' => true,
+            'locked_by' => $locker ? [
+                'user_id' => $locker->id,
+                'name' => trim(($locker->first_name ?? '') . ' ' . ($locker->last_name ?? '')) ?: $locker->email ?? 'Unknown',
+            ] : null,
+            'locked_at' => $script->locked_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * GET script/{script}/lock — current lock state for polling.
+     */
+    public function getLock(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canView($request->user())) {
+            abort(403);
+        }
+
+        $script->load('lockedByUser');
+
+        return response()->json($this->formatLockForScript($script));
+    }
+
+    /**
+     * POST script/{script}/lock — acquire edit lock (or refresh if already held).
+     */
+    public function acquireLock(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canEdit($request->user())) {
+            abort(403, 'You do not have permission to edit this script.');
+        }
+
+        $user = $request->user();
+        $script->refresh();
+
+        if ($script->isLocked() && ! $script->isLockedBy($user) && ! $script->isLockStale()) {
+            $script->load('lockedByUser');
+
+            return response()->json([
+                'acquired' => false,
+                'lock' => $this->formatLockForScript($script),
+            ], 200);
+        }
+
+        $script->update(['locked_by' => $user->id, 'locked_at' => now()]);
+        $script->load('lockedByUser');
+
+        return response()->json([
+            'acquired' => true,
+            'lock' => $this->formatLockForScript($script),
+        ]);
+    }
+
+    /**
+     * DELETE script/{script}/lock — release edit lock (only if held by current user).
+     */
+    public function releaseLock(Request $request, Script $script): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if ($script->tenant_id !== $tenantId) {
+            abort(404);
+        }
+        if (! $script->canEdit($request->user())) {
+            abort(403);
+        }
+
+        $user = $request->user();
+        $script->refresh();
+
+        if ($script->isLockedBy($user)) {
+            $script->update(['locked_by' => null, 'locked_at' => null]);
+        }
+
+        return response()->json(['released' => true]);
     }
 
     /**

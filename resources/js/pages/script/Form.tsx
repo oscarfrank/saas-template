@@ -516,6 +516,9 @@ interface ScriptForEdit {
     can_delete?: boolean;
     can_manage_access?: boolean;
     co_authors?: Array<{ user_id: number; name: string; email: string; sort_order?: number }>;
+    author?: { user_id: number; name: string; email: string } | null;
+    last_edited_by?: { user_id: number; name: string; email: string } | null;
+    updated_at?: string | null;
 }
 
 interface HRTaskItem {
@@ -1986,6 +1989,30 @@ export default function ScriptForm({ script: initialScript, scriptTypes, hrTasks
                             )}
                         </div>
                     </div>
+                    {isEdit && (initialScript?.author || (initialScript?.co_authors && initialScript.co_authors.length > 0) || initialScript?.last_edited_by) && (
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                            {initialScript?.author && (
+                                <span>
+                                    <span className="font-medium">Author:</span> {initialScript.author.name}
+                                </span>
+                            )}
+                            {initialScript?.co_authors && initialScript.co_authors.length > 0 && (
+                                <span>
+                                    <span className="font-medium">Co-authors:</span> {initialScript.co_authors.map((c) => c.name).join(', ')}
+                                </span>
+                            )}
+                            {initialScript?.last_edited_by && (
+                                <span>
+                                    <span className="font-medium">Last edited by:</span> {initialScript.last_edited_by.name}
+                                    {initialScript?.updated_at && (
+                                        <span className="ml-1">
+                                            ({new Date(initialScript.updated_at).toLocaleDateString(undefined, { dateStyle: 'short' })})
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <div className="flex flex-wrap items-center gap-4">
                         {scriptTypes.length > 0 && (
                             <div className="flex items-center gap-2">

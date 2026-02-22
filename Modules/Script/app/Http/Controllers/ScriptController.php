@@ -1132,12 +1132,23 @@ PROMPT;
             'reel_captions' => isset($script->custom_attributes['reel_captions']) && is_array($script->custom_attributes['reel_captions'])
                 ? $script->custom_attributes['reel_captions']
                 : null,
+            'author' => $script->creator ? [
+                'user_id' => $script->creator->id,
+                'name' => trim(($script->creator->first_name ?? '') . ' ' . ($script->creator->last_name ?? '')) ?: $script->creator->email ?? 'Unknown',
+                'email' => $script->creator->email ?? '',
+            ] : null,
             'co_authors' => $script->coAuthors()->with('user')->orderBy('sort_order')->get()->map(fn ($ca) => [
                 'user_id' => $ca->user_id,
                 'name' => trim(($ca->user->first_name ?? '') . ' ' . ($ca->user->last_name ?? '')) ?: $ca->user->email ?? 'Unknown',
                 'email' => $ca->user->email ?? '',
                 'sort_order' => $ca->sort_order,
             ])->values()->all(),
+            'last_edited_by' => $script->updater ? [
+                'user_id' => $script->updater->id,
+                'name' => trim(($script->updater->first_name ?? '') . ' ' . ($script->updater->last_name ?? '')) ?: $script->updater->email ?? 'Unknown',
+                'email' => $script->updater->email ?? '',
+            ] : null,
+            'updated_at' => $script->updated_at?->toIso8601String(),
         ];
     }
 

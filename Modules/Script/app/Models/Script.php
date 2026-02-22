@@ -127,6 +127,19 @@ class Script extends Model
     }
 
     /**
+     * User is org owner, admin, or editor for this script's tenant — can view, edit, manage access, and delete any script.
+     */
+    public function hasOrgEditorOrAdminAccess(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        $pivot = $user->tenants()->where('tenants.id', $this->tenant_id)->first()?->pivot;
+
+        return $pivot && in_array($pivot->role, ['owner', 'admin', 'editor'], true);
+    }
+
+    /**
      * Resolve effective role: owner → script collaborator → denied → org default.
      * Returns 'owner', 'admin', 'edit', 'view', or null.
      */
@@ -162,11 +175,18 @@ class Script extends Model
 
     public function canView(?User $user): bool
     {
+        if ($this->hasOrgEditorOrAdminAccess($user)) {
+            return true;
+        }
+
         return $this->effectiveUserRole($user) !== null;
     }
 
     public function canEdit(?User $user): bool
     {
+        if ($this->hasOrgEditorOrAdminAccess($user)) {
+            return true;
+        }
         $role = $this->effectiveUserRole($user);
         if (! $role) {
             return false;
@@ -180,6 +200,9 @@ class Script extends Model
 
     public function canDelete(?User $user): bool
     {
+        if ($this->hasOrgEditorOrAdminAccess($user)) {
+            return true;
+        }
         $role = $this->effectiveUserRole($user);
         if (! $role) {
             return false;
@@ -193,6 +216,9 @@ class Script extends Model
 
     public function canManageAccess(?User $user): bool
     {
+        if ($this->hasOrgEditorOrAdminAccess($user)) {
+            return true;
+        }
         $role = $this->effectiveUserRole($user);
         if (! $role) {
             return false;

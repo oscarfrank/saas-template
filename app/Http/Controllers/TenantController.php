@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Tenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -86,6 +87,14 @@ class TenantController extends Controller
                 'slug' => $validated['slug'],
                 'created_by' => auth()->user()->id,
             ]);
+
+            // Store organization logo on central public disk so it is served at /storage/... (not tenant-prefixed)
+            if ($request->hasFile('logo')) {
+                $request->validate(['logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048']);
+                $path = $request->file('logo')->store('organization-logos/'.$tenant->id, 'public_central');
+                $tenant->data = array_merge($tenant->data ?? [], ['logo' => $path]);
+                $tenant->save();
+            }
 
             // Initialize the tenant
             $tenant->createDomain(['domain' => $tenant->slug]);

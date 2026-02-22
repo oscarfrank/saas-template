@@ -1,7 +1,8 @@
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Transition } from '@headlessui/react';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { FormEventHandler, useMemo, useEffect, useState } from 'react';
+import { Upload } from 'lucide-react';
 
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
@@ -11,6 +12,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+
+function organizationLogoUrl(path: string | null | undefined): string | null {
+    if (!path || typeof path !== 'string') return null;
+    const normalized = path.startsWith('public/') ? path.slice(7) : path;
+    return `/storage/${normalized}`;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -39,29 +46,40 @@ type OrganizationForm = {
     industry: string;
     size: string;
     default_landing_path: string;
+    logo: File | null;
 }
 
 interface Props {
-    tenant: {
+    tenant?: {
         id: string;
         name: string;
         slug: string;
+        logo?: string | null;
         description?: string;
         website?: string;
         industry?: string;
         size?: string;
         created_at?: string;
         updated_at?: string;
-    };
+    } | null;
     default_landing_path?: string;
     can_edit_organization?: boolean;
     industries: string[];
     organizationSizes: string[];
 }
 
-export default function OrganizationGeneral({ tenant, default_landing_path = 'dashboard', can_edit_organization = false, industries, organizationSizes }: Props) {
-    const { auth } = usePage<SharedData>().props;
+type TenantForForm = NonNullable<Props['tenant']>;
 
+export default function OrganizationGeneral({ tenant: tenantProp, default_landing_path = 'dashboard', can_edit_organization = false, industries, organizationSizes }: Props) {
+    const { auth, tenant: sharedTenant } = usePage<SharedData>().props;
+    const tenant: TenantForForm = (tenantProp ?? (sharedTenant ? {
+        id: sharedTenant.id,
+        name: sharedTenant.name,
+        slug: sharedTenant.slug,
+        logo: sharedTenant.logo ?? null,
+    } : null)) ?? { id: '', name: '', slug: '', logo: null };
+
+    const [savedWithFile, setSavedWithFile] = useState(false);
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<OrganizationForm>({
         name: tenant.name,
         slug: tenant.slug,
@@ -70,14 +88,40 @@ export default function OrganizationGeneral({ tenant, default_landing_path = 'da
         industry: tenant.industry || 'Other',
         size: tenant.size || '1-10',
         default_landing_path,
+        logo: null,
     });
+
+    const logoPreviewUrl = useMemo(() => {
+        if (data.logo instanceof File) return URL.createObjectURL(data.logo);
+        return organizationLogoUrl(tenant.logo ?? null);
+    }, [data.logo, tenant.logo]);
+
+    useEffect(() => {
+        return () => {
+            if (logoPreviewUrl?.startsWith('blob:')) URL.revokeObjectURL(logoPreviewUrl);
+        };
+    }, [logoPreviewUrl]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('settings.organization.update', { tenant: tenant.slug }), {
-            preserveScroll: true,
-        });
+        const url = route('settings.organization.update', { tenant: tenant.slug });
+        const options: { preserveScroll: boolean; onSuccess?: () => void; onError?: () => void } = { preserveScroll: true };
+
+        // PHP does not parse multipart/form-data for PATCH, so other fields arrive empty when a file is present.
+        // Use POST with method spoofing so the request is parsed correctly; Laravel still treats it as PATCH.
+        if (data.logo) {
+            options.onSuccess = () => {
+                setData('logo', null);
+                setSavedWithFile(true);
+                setTimeout(() => setSavedWithFile(false), 2000);
+                // Sidebar logo comes from shared Inertia props; full reload so tenant.logo updates.
+                setTimeout(() => window.location.reload(), 1500);
+            };
+            router.post(url, { ...data, _method: 'PATCH' }, options);
+        } else {
+            patch(url, options);
+        }
     };
 
     return (
@@ -94,6 +138,38 @@ export default function OrganizationGeneral({ tenant, default_landing_path = 'da
                     <form onSubmit={submit} className="space-y-8">
                         <div className="space-y-6">
                             <div className="grid gap-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="logo">Organization Logo</Label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative h-24 w-24 shrink-0 rounded-lg border-2 border-dashed border-muted-foreground/25 p-2">
+                                            {logoPreviewUrl ? (
+                                                <img
+                                                    src={logoPreviewUrl}
+                                                    alt="Organization logo"
+                                                    className="h-full w-full rounded-md object-contain"
+                                                />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center">
+                                                    <Upload className="h-8 w-8 text-muted-foreground" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <Input
+                                                id="logo"
+                                                type="file"
+                                                accept="image/jpeg,image/png,image/gif"
+                                                onChange={(e) => setData('logo', e.target.files?.[0] ?? null)}
+                                                className="cursor-pointer"
+                                            />
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                PNG, JPG or GIF. Max 2MB. Leave empty to keep current logo.
+                                            </p>
+                                            <InputError message={errors.logo} />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-2">
                                     <Label htmlFor="name">Organization Name</Label>
                                     <Input
@@ -207,7 +283,7 @@ export default function OrganizationGeneral({ tenant, default_landing_path = 'da
                             <Button disabled={processing}>Save Changes</Button>
 
                             <Transition
-                                show={recentlySuccessful}
+                                show={recentlySuccessful || savedWithFile}
                                 enter="transition ease-in-out"
                                 enterFrom="opacity-0"
                                 leave="transition ease-in-out"

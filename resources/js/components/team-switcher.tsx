@@ -23,7 +23,8 @@ import {
 
 export interface Team {
   name: string
-  logo: React.ComponentType
+  /** Logo: React component (icon) or image URL string. When string, an img is rendered. */
+  logo: React.ComponentType | string
   plan: string
   slug: string
 }
@@ -70,9 +71,16 @@ export function TeamSwitcher({ teams = [], onTeamSwitch, defaultTeam }: TeamSwit
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between">
-              <div className="flex items-center gap-2">
-                <currentTeam.logo />
+            <Button
+              variant="ghost"
+              className={state === "collapsed" ? "w-full justify-center" : "w-full justify-between"}
+            >
+              <div className={state === "collapsed" ? "flex items-center justify-center" : "flex items-center gap-2"}>
+                {typeof currentTeam.logo === 'string' ? (
+                  <img src={currentTeam.logo} alt="" className="size-8 shrink-0 rounded-md object-contain" />
+                ) : (
+                  <currentTeam.logo />
+                )}
                 {state === "expanded" && (
                   <div className="flex flex-col items-start">
                     <span className="text-sm font-medium">{currentTeam.name}</span>
@@ -93,7 +101,11 @@ export function TeamSwitcher({ teams = [], onTeamSwitch, defaultTeam }: TeamSwit
                 className="cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <team.logo />
+                  {typeof team.logo === 'string' ? (
+                    <img src={team.logo} alt="" className="size-8 shrink-0 rounded-md object-contain" />
+                  ) : (
+                    <team.logo />
+                  )}
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{team.name}</span>
                     <span className="text-xs text-muted-foreground">{team.plan}</span>

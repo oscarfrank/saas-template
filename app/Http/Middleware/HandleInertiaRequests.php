@@ -94,6 +94,18 @@ class HandleInertiaRequests extends Middleware
                 $currentTenant = $tenants[0];
             }
 
+            // Add workspace (organization) logo to each tenant for sidebar and TeamSwitcher; always read from central DB
+            $centralConnection = config('tenancy.database.central_connection');
+            $tenantIds = collect($tenants)->pluck('id')->filter()->unique()->values()->all();
+            $tenantModels = $tenantIds ? Tenant::on($centralConnection)->whereIn('id', $tenantIds)->get()->keyBy('id') : collect();
+            foreach ($tenants as &$t) {
+                $t['logo'] = $tenantModels->get($t['id'])?->getAttribute('logo');
+            }
+            unset($t);
+            if ($currentTenant) {
+                $currentTenant['logo'] = $tenantModels->get($currentTenant['id'])?->getAttribute('logo');
+            }
+
             // If we're on the homepage and have a tenant, redirect to org default or last visited (per user preference)
             if ($request->is('/') && $currentTenant) {
                 $tenant = Tenant::find($currentTenant['id']);
@@ -141,7 +153,10 @@ class HandleInertiaRequests extends Middleware
                 'location' => $request->url(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            'siteSettings' => SiteSettings::getSettings(),
+            'siteSettings' => function () {
+                $settings = SiteSettings::getSettings();
+                return $settings && $settings->exists ? $settings->toArray() : null;
+            },
             'tenant' => $currentTenant,
             'tenants' => $tenants,
             'preferences' => $user ? [

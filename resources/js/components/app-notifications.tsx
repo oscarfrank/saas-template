@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from "@/hooks/use-auth";
 import { useEffectiveTenant } from "@/hooks/use-effective-tenant";
 import { useTenantRouter } from "@/hooks/use-tenant-router";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface Activity {
     id: number;
@@ -83,6 +84,7 @@ const ActivitySkeleton = () => (
 
 export function AppNotifications({ unreadCount }: { unreadCount: number }) {
     const { props } = usePage();
+    const { state } = useSidebar();
     const [activities, setActivities] = useState<Activities | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [open, setOpen] = useState(false);
@@ -219,18 +221,30 @@ export function AppNotifications({ unreadCount }: { unreadCount: number }) {
         }
     };
 
+    const isCollapsed = state === "collapsed";
+
     return (
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
                 <Button
                     variant="ghost"
-                    className="relative w-full justify-start gap-2"
+                    className={cn(
+                        "relative",
+                        isCollapsed
+                            ? "size-8 shrink-0 justify-center p-0"
+                            : "w-full justify-start gap-2"
+                    )}
                     aria-label="Notifications"
                 >
-                    <Bell className="size-4" />
-                    <span>Inbox</span>
+                    <Bell className="size-4 shrink-0" />
+                    {!isCollapsed && <span>Inbox</span>}
                     {unreadCount > 0 && (
-                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] text-white">
+                        <span
+                            className={cn(
+                                "flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white",
+                                isCollapsed ? "absolute -right-0.5 -top-0.5 px-1" : "ml-auto px-1.5"
+                            )}
+                        >
                             {unreadCount}
                         </span>
                     )}

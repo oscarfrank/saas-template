@@ -35,6 +35,8 @@ export interface SharedData {
         site_title: string;
         site_description: string;
         site_keywords: string;
+        site_logo: string | null;
+        site_favicon: string | null;
         company_name: string;
         company_address: string;
         company_phone: string;
@@ -161,6 +163,8 @@ export interface Tenant {
     id: string;
     name: string;
     slug: string;
+    /** Organization logo path (in tenant data), served at /storage/{logo} */
+    logo?: string | null;
     data?: Record<string, any>;
     created_at?: string;
     updated_at?: string;

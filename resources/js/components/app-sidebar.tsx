@@ -7,6 +7,7 @@ import { router } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, Link, ScrollText, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { TeamSwitcher } from '@/components/team-switcher';
 import { useRef, useMemo, memo } from 'react';
 import { AppNotifications } from './app-notifications';
@@ -20,6 +21,7 @@ interface Tenant {
     id: string;
     name: string;
     slug: string;
+    logo?: string | null;
 }
 
 interface PageProps extends InertiaPageProps {
@@ -32,9 +34,16 @@ interface PageProps extends InertiaPageProps {
     [key: string]: any;
 }
 
-// Memoize the OrganizationLogo component
-const OrganizationLogo = memo(function OrganizationLogo() {
-    return <Building2 className="size-4" />;
+/** Public URL for a storage path (organization logo). */
+function organizationLogoUrl(path: string | null | undefined): string | null {
+    if (!path || typeof path !== 'string') return null;
+    const normalized = path.startsWith('public/') ? path.slice(7) : path;
+    return `/storage/${normalized}`;
+}
+
+// Default icon when an organization has no logo (for TeamSwitcher)
+const OrganizationLogoIcon = memo(function OrganizationLogoIcon() {
+    return <Building2 className="size-4 shrink-0" />;
 });
 
 // Memoize the TeamSwitcher component
@@ -64,13 +73,16 @@ export const AppSidebar = memo(function AppSidebar() {
 
     console.log('Notif', notifications);
 
-    // Memoize the teams data
-    const teams = useMemo(() => tenants.map(t => ({
-        name: t.name,
-        logo: OrganizationLogo,
-        plan: hasRole(user, 'superadmin') ? 'Admin' : 'User',
-        slug: t.slug
-    })), [tenants, user, hasRole]);
+    // Memoize the teams data: pass logo URL when tenant has one, else default icon for TeamSwitcher
+    const teams = useMemo(() => tenants.map((t: Tenant) => {
+        const logoUrl = organizationLogoUrl(t.logo ?? null);
+        return {
+            name: t.name,
+            logo: logoUrl ?? OrganizationLogoIcon,
+            plan: hasRole(user, 'superadmin') ? 'Admin' : 'User',
+            slug: t.slug
+        };
+    }), [tenants, user, hasRole]);
 
     const handleTeamSwitch = (team: { slug: string }) => {
         router.visit(`/${team.slug}/dashboard`, {
@@ -169,7 +181,7 @@ export const AppSidebar = memo(function AppSidebar() {
         },
     ];
 
-    // Ensure currentTenant has required properties
+    // No organization selected yet: show team switcher and site/logo in same header area
     if (!effectiveTenant?.slug) {
         return (
             <Sidebar collapsible="icon" variant="inset" className="border-r border-border">
@@ -203,15 +215,6 @@ export const AppSidebar = memo(function AppSidebar() {
         <Sidebar collapsible="icon" variant="inset" className="border-r border-border">
             <SidebarHeader className="border-b border-border">
                 <SidebarMenu>
-                    
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={route('dashboard', effectiveTenant?.slug)}>
-                                <AppLogo /> LastPass
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-
 
                     <SidebarMenuItem>
                         <MemoizedTeamSwitcher
@@ -220,19 +223,20 @@ export const AppSidebar = memo(function AppSidebar() {
                             defaultTeam={effectiveTenant.slug}
                         />
                     </SidebarMenuItem>
-
                     <SidebarMenuItem>
                     {effectiveTenant && (
                         <div>
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start gap-2"
+                                className={cn(
+                                    state === "collapsed" ? "size-8 shrink-0 justify-center p-0" : "w-full justify-start gap-2"
+                                )}
                                 onClick={() => router.visit(`/${effectiveTenant.slug}/dashboard`)}
                             >
                                 <LayoutGrid className="size-4" />
                                 {state === "expanded" && <span>Dashboard</span>}
                             </Button>
-                            {state === "expanded" && <AppNotifications unreadCount={notifications.unread_count} />}
+                            <AppNotifications unreadCount={notifications.unread_count} />
                         </div>
                     )}
                     </SidebarMenuItem>

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Tenant;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 use Modules\User\Models\UserPreference;
 use Modules\Settings\Models\OrganizationInvite;
@@ -130,12 +131,24 @@ class SettingsController extends Controller
             ($user->tenants()->where('tenants.id', $currentTenant->id)->first()?->pivot?->role === 'owner')
         );
 
+        $tenantForPage = $currentTenant ? [
+            'id' => $currentTenant->id,
+            'name' => $currentTenant->name,
+            'slug' => $currentTenant->slug,
+            'logo' => $currentTenant->getAttribute('logo'),
+            'description' => $currentTenant->getAttribute('description'),
+            'website' => $currentTenant->getAttribute('website'),
+            'industry' => $currentTenant->getAttribute('industry'),
+            'size' => $currentTenant->getAttribute('size'),
+        ] : null;
+
         return Inertia::render('settings/organization/general', [
             'user' => [
                 'id' => $user->id,
                 'name' => $user->first_name . ' ' . $user->last_name,
                 'email' => $user->email,
             ],
+            'tenant' => $tenantForPage,
             'all_tenants' => $allTenants->map(function($tenant) {
                 return [
                     'id' => $tenant->id,
@@ -371,6 +384,7 @@ class SettingsController extends Controller
             'industry' => 'required|string|max:255',
             'size' => 'required|string|max:255',
             'default_landing_path' => 'nullable|string|in:dashboard,dashboard/workspace,dashboard/youtuber,dashboard/borrower,dashboard/lender',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         // Generate slug if not provided
@@ -379,9 +393,34 @@ class SettingsController extends Controller
         }
 
         $landingPath = $validated['default_landing_path'] ?? 'dashboard';
-        unset($validated['default_landing_path']);
+        $description = $validated['description'] ?? null;
+        $website = $validated['website'] ?? null;
+        $industry = $validated['industry'] ?? null;
+        $size = $validated['size'] ?? null;
+        unset($validated['default_landing_path'], $validated['logo'], $validated['description'], $validated['website'], $validated['industry'], $validated['size']);
+
+        // Only name and slug are real columns. The rest are stored in the data JSON via Stancl VirtualColumn.
+        // We must set them as attributes and save once; otherwise a save() that only encodes one virtual
+        // attribute would replace the whole data column and wipe the others.
         $tenant->update($validated);
-        $tenant->setDefaultLandingPath($landingPath);
+
+        $tenant->setAttribute('description', $description);
+        $tenant->setAttribute('website', $website);
+        $tenant->setAttribute('industry', $industry);
+        $tenant->setAttribute('size', $size);
+        $tenant->setAttribute('default_landing_path', $landingPath);
+
+        // Store organization logo on central public disk so it is served at /storage/... (not tenant-prefixed)
+        if ($request->hasFile('logo')) {
+            $oldPath = $tenant->getAttribute('logo');
+            if ($oldPath && is_string($oldPath) && !str_starts_with($oldPath, 'public/')) {
+                Storage::disk('public_central')->delete($oldPath);
+            }
+            $path = $request->file('logo')->store('organization-logos/'.$tenant->id, 'public_central');
+            $tenant->setAttribute('logo', $path);
+        }
+
+        $tenant->save();
 
         return back()->with('success', 'Organization settings updated successfully.');
     }

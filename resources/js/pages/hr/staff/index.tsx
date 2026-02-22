@@ -16,6 +16,7 @@ interface User {
 
 interface StaffRecord {
     id: number;
+    uuid: string;
     user_id: number;
     employee_id: string | null;
     department: string | null;
@@ -159,12 +160,12 @@ export default function HRStaffIndex({ members, pagination, filters }: Props) {
                                                         {m.staff ? (
                                                             <>
                                                                 <Button variant="ghost" size="sm" asChild>
-                                                                    <Link href={tenantRouter.route('hr.staff.show', { staff: m.staff.id })}>
+                                                                    <Link href={tenantRouter.route('hr.staff.show', { staff: m.staff.uuid })}>
                                                                         View
                                                                     </Link>
                                                                 </Button>
                                                                 <Button variant="ghost" size="sm" asChild>
-                                                                    <Link href={tenantRouter.route('hr.staff.edit', { staff: m.staff.id })}>
+                                                                    <Link href={tenantRouter.route('hr.staff.edit', { staff: m.staff.uuid })}>
                                                                         Edit
                                                                     </Link>
                                                                 </Button>

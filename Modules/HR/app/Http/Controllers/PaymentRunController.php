@@ -56,11 +56,21 @@ class PaymentRunController extends Controller
 
         $activeStaff = Staff::where('tenant_id', $tenantId)->active()->get();
         $total = 0;
+        $days = $periodStart->diffInDays($periodEnd) + 1;
         foreach ($activeStaff as $s) {
-            if ($s->salary === null || $s->salary <= 0) {
-                continue;
-            }
-            $amount = $this->prorateSalary($s->salary, $s->pay_frequency ?? 'monthly', $periodStart, $periodEnd);
+            $baseProrated = $this->prorateSalary(
+                (float) ($s->salary ?? 0),
+                $s->pay_frequency ?? 'monthly',
+                $periodStart,
+                $periodEnd
+            );
+            $allowances = is_array($s->allowances) ? $s->allowances : [];
+            $deductions = is_array($s->deductions) ? $s->deductions : [];
+            $allowanceTotal = array_sum(array_column($allowances, 'amount'));
+            $deductionTotal = array_sum(array_column($deductions, 'amount'));
+            $allowanceProrated = round($allowanceTotal * ($days / 30), 2);
+            $deductionProrated = round($deductionTotal * ($days / 30), 2);
+            $amount = round($baseProrated + $allowanceProrated - $deductionProrated, 2);
             if ($amount > 0) {
                 PaymentRunItem::create([
                     'payment_run_id' => $run->id,

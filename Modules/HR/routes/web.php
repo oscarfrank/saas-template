@@ -20,9 +20,16 @@ Route::middleware([
     Route::get('hr/staff/create', [StaffController::class, 'create'])->name('hr.staff.create');
     Route::post('hr/staff', [StaffController::class, 'store'])->name('hr.staff.store');
     Route::get('hr/staff/{staff}', [StaffController::class, 'show'])->name('hr.staff.show');
+    Route::get('hr/staff/{staff}/passport', [StaffController::class, 'passportPhoto'])->name('hr.staff.passport');
+    Route::post('hr/staff/{staff}/passport', [StaffController::class, 'updatePassportPhoto'])->name('hr.staff.passport.upload');
     Route::get('hr/staff/{staff}/edit', [StaffController::class, 'edit'])->name('hr.staff.edit');
     Route::put('hr/staff/{staff}', [StaffController::class, 'update'])->name('hr.staff.update');
     Route::delete('hr/staff/{staff}', [StaffController::class, 'destroy'])->name('hr.staff.destroy');
+    Route::post('hr/staff/{staff}/documents', [StaffController::class, 'uploadDocument'])->name('hr.staff.documents.upload');
+    Route::delete('hr/staff/{staff}/documents/{document}', [StaffController::class, 'deleteDocument'])->name('hr.staff.documents.destroy');
+    Route::get('hr/staff/{staff}/documents/{document}/download', [StaffController::class, 'downloadDocument'])->name('hr.staff.documents.download');
+    Route::post('hr/staff/{staff}/events', [StaffController::class, 'storeEvent'])->name('hr.staff.events.store');
+    Route::delete('hr/staff/{staff}/events/{event}', [StaffController::class, 'destroyEvent'])->name('hr.staff.events.destroy');
 
     // Projects
     Route::get('hr/projects', [ProjectController::class, 'index'])->name('hr.projects.index');

@@ -17,6 +17,12 @@ class PaymentRunItem extends Model
         'status',
         'paid_at',
         'notes',
+        'payment_method',
+        'tax_id',
+        'bank_name',
+        'bank_account_number',
+        'bank_account_name',
+        'pay_frequency',
     ];
 
     protected $casts = [

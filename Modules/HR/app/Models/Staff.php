@@ -85,6 +85,11 @@ class Staff extends Model
         return $this->hasMany(PaymentRunItem::class, 'staff_id');
     }
 
+    public function payslips(): HasMany
+    {
+        return $this->hasMany(Payslip::class, 'staff_id');
+    }
+
     public function evaluations(): HasMany
     {
         return $this->hasMany(Evaluation::class, 'staff_id');

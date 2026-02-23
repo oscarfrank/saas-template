@@ -25,6 +25,8 @@ import {
     Award,
     MessageSquare,
     Trash2,
+    Printer,
+    ExternalLink,
 } from 'lucide-react';
 import { useState } from 'react';
 import { router, useForm } from '@inertiajs/react';
@@ -47,6 +49,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface User {
     id: number;
@@ -76,6 +86,7 @@ interface StaffEvent {
     old_values: Record<string, unknown> | null;
     new_values: Record<string, unknown> | null;
     changed_by_user_id: number | null;
+    position_history_id?: number | null;
     created_at: string;
     changed_by?: StaffEventChangedBy | null;
     changedBy?: StaffEventChangedBy | null;
@@ -123,10 +134,34 @@ interface Staff {
     owned_projects?: { id: number; name: string }[];
 }
 
+interface RunItemSummary {
+    run_id: number;
+    item_id: number;
+    period_start: string;
+    period_end: string;
+    amount: string;
+    currency: string;
+}
+
+interface StaffPayslip {
+    id: number;
+    period_start: string;
+    period_end: string;
+    currency: string;
+    net_amount: string;
+}
+
 interface Props {
     staff: Staff;
     eventTypeLabels: Record<string, string>;
     canDeleteEvents?: boolean;
+    runItems?: RunItemSummary[];
+    runItemsTotal?: number;
+    payslipsTotal?: number;
+    totalPaid?: number;
+    eventsTotal?: number;
+    documentsTotal?: number;
+    assignedTasksTotal?: number;
 }
 
 function getInitials(staff: Staff): string {
@@ -164,10 +199,12 @@ function eventTypeIcon(type: string) {
     }
 }
 
-export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = false }: Props) {
+export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = false, runItems = [], runItemsTotal = 0, payslipsTotal = 0, totalPaid = 0, eventsTotal = 0, documentsTotal = 0, assignedTasksTotal = 0 }: Props) {
     const tenantRouter = useTenantRouter();
     const [showAddEvent, setShowAddEvent] = useState(false);
-    const [eventIdToDelete, setEventIdToDelete] = useState<number | null>(null);
+    const [eventToDelete, setEventToDelete] = useState<{ id: number; position_history_id: number | null } | null>(null);
+    const [deletePositionHistoryToo, setDeletePositionHistoryToo] = useState(true);
+    const [documentIdToDelete, setDocumentIdToDelete] = useState<number | null>(null);
     const eventForm = useForm({
         event_type: 'note',
         title: '',
@@ -191,12 +228,42 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
         ? `${staff.user.first_name || ''} ${staff.user.last_name || ''}`.trim() || staff.user.email
         : 'Staff';
     const [removeHrDialogOpen, setRemoveHrDialogOpen] = useState(false);
+    const [generatePayslipOpen, setGeneratePayslipOpen] = useState(false);
+    const [payslipToDelete, setPayslipToDelete] = useState<number | null>(null);
+    const payslipForm = useForm({
+        period_start: '',
+        period_end: '',
+        narration: '',
+        prorate: false as boolean,
+        split_by_period: true as boolean,
+    });
     const handleRemoveHrDetails = () => {
         router.delete(tenantRouter.route('hr.staff.destroy', { staff: staff.uuid }), {
             preserveScroll: false,
         });
         setRemoveHrDialogOpen(false);
     };
+
+    const handleGeneratePayslip = (e: React.FormEvent) => {
+        e.preventDefault();
+        payslipForm.post(tenantRouter.route('hr.staff.payslips.store', { staff: staff.uuid }), {
+            preserveScroll: true,
+            onSuccess: () => {
+                payslipForm.reset();
+                setGeneratePayslipOpen(false);
+            },
+        });
+    };
+
+    const handleDeletePayslip = () => {
+        if (!payslipToDelete) return;
+        router.delete(tenantRouter.route('hr.payslips.destroy', { payslip: payslipToDelete }), {
+            preserveScroll: true,
+            onSuccess: () => setPayslipToDelete(null),
+        });
+    };
+
+    const payslips = (staff.payslips ?? []) as StaffPayslip[];
     const initials = getInitials(staff);
     const passportUrl = staff.passport_photo_path
         ? tenantRouter.route('hr.staff.passport', { staff: staff.uuid })
@@ -454,13 +521,116 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                             </CardContent>
                         </Card>
 
+                        {/* Payslips */}
+                        <Card className="lg:col-span-2">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    Payslips
+                                </CardTitle>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {(runItemsTotal > 5 || payslipsTotal > 5) && (
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <Link href={tenantRouter.route('hr.staff.payslips.index', { staff: staff.uuid })}>
+                                                View all ({runItemsTotal + payslipsTotal})
+                                            </Link>
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="sm" onClick={() => setGeneratePayslipOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Generate payslip
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {totalPaid > 0 && (
+                                    <div className="rounded-lg border border-muted/50 bg-muted/20 px-4 py-3">
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total paid (all time)</p>
+                                        <p className="mt-1 text-xl font-bold tabular-nums">
+                                            {staff.salary_currency ?? 'USD'} {totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </p>
+                                    </div>
+                                )}
+                                {(runItems.length > 0 || payslips.length > 0) ? (
+                                    <div className="space-y-2">
+                                        {runItems.map((ri) => (
+                                            <div
+                                                key={`${ri.run_id}-${ri.item_id}`}
+                                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-muted/50 px-4 py-2.5"
+                                            >
+                                                <span className="text-sm text-muted-foreground">
+                                                    {ri.period_start && ri.period_end
+                                                        ? `${new Date(ri.period_start).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} – ${new Date(ri.period_end).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
+                                                        : 'Payment run'}
+                                                </span>
+                                                <span className="tabular-nums font-medium">{ri.currency} {Number(ri.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <Button variant="ghost" size="sm" className="gap-1" asChild>
+                                                    <a href={tenantRouter.route('hr.payments.slip', { paymentRun: ri.run_id, item: ri.item_id })} target="_blank" rel="noopener noreferrer">
+                                                        <Printer className="h-3.5 w-3.5" />
+                                                        View slip
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        ))}
+                                        {payslips.map((ps) => (
+                                            <div
+                                                key={ps.id}
+                                                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-muted/50 px-4 py-2.5"
+                                            >
+                                                <span className="text-sm text-muted-foreground">
+                                                    {ps.period_start && ps.period_end
+                                                        ? `${new Date(ps.period_start).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} – ${new Date(ps.period_end).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`
+                                                        : 'Standalone'}
+                                                </span>
+                                                <span className="tabular-nums font-medium">{ps.currency} {Number(ps.net_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <div className="flex gap-1">
+                                                    <Button variant="ghost" size="sm" className="gap-1" asChild>
+                                                        <Link href={tenantRouter.route('hr.payslips.show', { payslip: ps.id })} target="_blank">
+                                                            <Printer className="h-3.5 w-3.5" />
+                                                            View
+                                                        </Link>
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" className="gap-1" asChild>
+                                                        <Link href={tenantRouter.route('hr.payslips.edit', { payslip: ps.id })}>
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                            Edit
+                                                        </Link>
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                        onClick={() => setPayslipToDelete(ps.id)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        Delete
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">
+                                        No payslips yet. Generate one for a past period (e.g. before you used this platform) or view slips from payment runs above.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
                         {/* Documents */}
                         <Card className="lg:col-span-2">
-                            <CardHeader>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0">
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                     Documents
                                 </CardTitle>
+                                {documentsTotal > 3 && (
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <Link href={tenantRouter.route('hr.staff.documents.index', { staff: staff.uuid })}>
+                                            View all ({documentsTotal})
+                                        </Link>
+                                    </Button>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 {staff.documents && staff.documents.length > 0 ? (
@@ -477,19 +647,30 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                                                         <p className="text-xs text-muted-foreground">{doc.type}</p>
                                                     </div>
                                                 </div>
-                                                <Button variant="ghost" size="sm" asChild>
-                                                    <a
-                                                        href={tenantRouter.route('hr.staff.documents.download', {
-                                                            staff: staff.uuid,
-                                                            document: doc.id,
-                                                        })}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                <div className="flex items-center gap-1">
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <a
+                                                            href={tenantRouter.route('hr.staff.documents.download', {
+                                                                staff: staff.uuid,
+                                                                document: doc.id,
+                                                            })}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Download className="mr-1.5 h-4 w-4" />
+                                                            Download
+                                                        </a>
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="text-muted-foreground hover:text-destructive"
+                                                        onClick={() => setDocumentIdToDelete(doc.id)}
                                                     >
-                                                        <Download className="mr-1.5 h-4 w-4" />
-                                                        Download
-                                                    </a>
-                                                </Button>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </li>
                                         ))}
                                     </ul>
@@ -552,10 +733,19 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                                     <ClipboardList className="h-4 w-4 text-muted-foreground" />
                                     Event log
                                 </CardTitle>
-                                <Button variant="outline" size="sm" onClick={() => setShowAddEvent((v) => !v)}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add event
-                                </Button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {eventsTotal > 3 && (
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <Link href={tenantRouter.route('hr.staff.events.index', { staff: staff.uuid })}>
+                                                View all ({eventsTotal})
+                                            </Link>
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="sm" onClick={() => setShowAddEvent((v) => !v)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add event
+                                    </Button>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {showAddEvent && (
@@ -648,7 +838,7 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                                                             variant="ghost"
                                                             size="icon"
                                                             className="shrink-0 text-muted-foreground hover:text-destructive"
-                                                            onClick={() => setEventIdToDelete(ev.id)}
+                                                            onClick={() => setEventToDelete({ id: ev.id, position_history_id: ev.position_history_id ?? null })}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
@@ -664,34 +854,45 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                         </Card>
 
                         {/* Assigned tasks */}
-                        {staff.assigned_tasks && staff.assigned_tasks.length > 0 && (
+                        {(staff.assigned_tasks?.length ?? 0) > 0 || assignedTasksTotal > 0 ? (
                             <Card className="lg:col-span-2">
-                                <CardHeader>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <ListTodo className="h-4 w-4 text-muted-foreground" />
                                         Assigned tasks
                                     </CardTitle>
+                                    {assignedTasksTotal > 3 && (
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <Link href={tenantRouter.route('hr.staff.tasks.index', { staff: staff.uuid })}>
+                                                View all ({assignedTasksTotal})
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </CardHeader>
                                 <CardContent>
-                                    <ul className="space-y-2">
-                                        {staff.assigned_tasks.map((t) => (
-                                            <li key={t.id}>
-                                                <Link
-                                                    href={tenantRouter.route('hr.tasks.show', { task: t.uuid })}
-                                                    className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50"
-                                                >
-                                                    <span className="font-medium">{t.title}</span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {t.status}
-                                                        {t.due_at ? ` · Due ${t.due_at}` : ''}
-                                                    </span>
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    {staff.assigned_tasks && staff.assigned_tasks.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {staff.assigned_tasks.map((t) => (
+                                                <li key={t.id}>
+                                                    <Link
+                                                        href={tenantRouter.route('hr.tasks.show', { task: t.uuid })}
+                                                        className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50"
+                                                    >
+                                                        <span className="font-medium">{t.title}</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {t.status}
+                                                            {t.due_at ? ` · Due ${t.due_at}` : ''}
+                                                        </span>
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">No assigned tasks.</p>
+                                    )}
                                 </CardContent>
                             </Card>
-                        )}
+                        ) : null}
 
                         {/* Projects */}
                         {staff.owned_projects && staff.owned_projects.length > 0 && (
@@ -742,12 +943,127 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                 </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog open={eventIdToDelete !== null} onOpenChange={(open) => !open && setEventIdToDelete(null)}>
+            <Dialog open={generatePayslipOpen} onOpenChange={setGeneratePayslipOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Generate payslip</DialogTitle>
+                        <DialogDescription>
+                            Create payslips for a date range. With &quot;Split by pay period&quot; on (default), one slip is generated per month (or per week/bi-week from their profile); narration is set to e.g. &quot;Salary January 2022&quot;. Turn it off to create a single slip for the exact range with your own narration. You cannot generate for a period that already has a payslip (delete it first).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleGeneratePayslip} className="space-y-4">
+                        {payslipForm.errors.period && (
+                            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                                {payslipForm.errors.period}
+                            </div>
+                        )}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="ps_period_start">Period start</Label>
+                                <Input
+                                    id="ps_period_start"
+                                    type="date"
+                                    required
+                                    value={payslipForm.data.period_start}
+                                    onChange={(e) => payslipForm.setData('period_start', e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ps_period_end">Period end</Label>
+                                <Input
+                                    id="ps_period_end"
+                                    type="date"
+                                    required
+                                    value={payslipForm.data.period_end}
+                                    onChange={(e) => payslipForm.setData('period_end', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="ps_split"
+                                checked={payslipForm.data.split_by_period}
+                                onChange={(e) => payslipForm.setData('split_by_period', e.target.checked)}
+                                className="h-4 w-4 rounded border-muted-foreground"
+                            />
+                            <Label htmlFor="ps_split" className="font-normal">
+                                Split by pay period (e.g. one slip per month for monthly pay)
+                            </Label>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="ps_narration">Reference / narration (optional)</Label>
+                            <Input
+                                id="ps_narration"
+                                placeholder={payslipForm.data.split_by_period ? "Auto per period (e.g. Salary January 2022)" : "e.g. Salary Q1 2022"}
+                                value={payslipForm.data.narration}
+                                onChange={(e) => payslipForm.setData('narration', e.target.value)}
+                            />
+                            {!payslipForm.data.split_by_period && (
+                                <p className="text-xs text-muted-foreground">Used for the single slip when not splitting by period.</p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="ps_prorate"
+                                checked={payslipForm.data.prorate}
+                                onChange={(e) => payslipForm.setData('prorate', e.target.checked)}
+                                className="h-4 w-4 rounded border-muted-foreground"
+                            />
+                            <Label htmlFor="ps_prorate" className="font-normal">Prorate by days in period</Label>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setGeneratePayslipOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={payslipForm.processing}>
+                                {payslipForm.processing ? 'Generating…' : 'Generate'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={payslipToDelete !== null} onOpenChange={(open) => !open && setPayslipToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this payslip?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This standalone payslip will be permanently removed. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-white hover:bg-destructive/90 hover:text-white"
+                            onClick={handleDeletePayslip}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={eventToDelete !== null} onOpenChange={(open) => !open && setEventToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete event?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This event log entry will be removed. This cannot be undone.
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-2">
+                                <p>This event log entry will be removed. This cannot be undone.</p>
+                                {eventToDelete?.position_history_id != null && (
+                                    <label className="flex cursor-pointer items-center gap-2 pt-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={deletePositionHistoryToo}
+                                            onChange={(e) => setDeletePositionHistoryToo(e.target.checked)}
+                                            className="h-4 w-4 rounded border-input"
+                                        />
+                                        <span className="text-sm">Also delete the related position history entry</span>
+                                    </label>
+                                )}
+                            </div>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -755,15 +1071,48 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                         <AlertDialogAction
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             onClick={() => {
-                                if (eventIdToDelete !== null) {
+                                if (eventToDelete !== null) {
+                                    let url = tenantRouter.route('hr.staff.events.destroy', {
+                                        staff: staff.uuid,
+                                        event: eventToDelete.id,
+                                    });
+                                    if (deletePositionHistoryToo && eventToDelete.position_history_id != null) {
+                                        url += '?delete_position_history=1';
+                                    }
+                                    router.delete(url, {
+                                        preserveScroll: true,
+                                        onSuccess: () => setEventToDelete(null),
+                                    });
+                                }
+                            }}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={documentIdToDelete !== null} onOpenChange={(open) => !open && setDocumentIdToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete document?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This document will be permanently removed. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (documentIdToDelete !== null) {
                                     router.delete(
-                                        tenantRouter.route('hr.staff.events.destroy', {
+                                        tenantRouter.route('hr.staff.documents.destroy', {
                                             staff: staff.uuid,
-                                            event: eventIdToDelete,
+                                            document: documentIdToDelete,
                                         }),
-                                        { preserveScroll: true }
+                                        { preserveScroll: true, onSuccess: () => setDocumentIdToDelete(null) }
                                     );
-                                    setEventIdToDelete(null);
                                 }
                             }}
                         >

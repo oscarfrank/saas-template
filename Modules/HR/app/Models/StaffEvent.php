@@ -22,6 +22,7 @@ class StaffEvent extends Model
         'old_values',
         'new_values',
         'changed_by_user_id',
+        'position_history_id',
     ];
 
     protected $casts = [
@@ -58,5 +59,10 @@ class StaffEvent extends Model
     public function changedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by_user_id');
+    }
+
+    public function positionHistory(): BelongsTo
+    {
+        return $this->belongsTo(StaffPositionHistory::class, 'position_history_id');
     }
 }

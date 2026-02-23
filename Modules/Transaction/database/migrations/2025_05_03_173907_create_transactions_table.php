@@ -78,6 +78,8 @@ return new class extends Migration
                 'reversed',     // Transaction reversed
                 'refunded'      // Transaction refunded
             ])->default('pending');
+            $table->timestamp('initiated_at')->nullable()->comment('When the transaction was initiated');
+            $table->timestamp('completed_at')->nullable()->comment('When the transaction was completed');
             
             // Payment Method
             $table->foreignId('payment_method_id')->nullable()->constrained('payment_methods')->nullOnDelete();

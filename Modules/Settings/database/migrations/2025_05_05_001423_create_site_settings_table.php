@@ -34,6 +34,8 @@ return new class extends Migration
             $table->text('meta_tags')->nullable();
             $table->text('footer_text')->nullable();
             $table->boolean('maintenance_mode')->default(false);
+            $table->string('homepage_theme', 64)->default('lending');
+            $table->string('homepage_redirect_url', 500)->nullable();
             $table->timestamps();
         });
 
@@ -57,6 +59,7 @@ return new class extends Migration
             'meta_tags' => '<meta name="robots" content="index, follow">',
             'footer_text' => '© 2025 LendFast Inc. All rights reserved.',
             'maintenance_mode' => false,
+            'homepage_theme' => 'lending',
         ]);
     }
 

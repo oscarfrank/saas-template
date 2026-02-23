@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('site_settings', function (Blueprint $table) {
-            $table->string('homepage_theme', 64)->default('lending')->after('maintenance_mode');
+            if (! Schema::hasColumn('site_settings', 'homepage_theme')) {
+                $table->string('homepage_theme', 64)->default('lending')->after('maintenance_mode');
+            }
         });
     }
 

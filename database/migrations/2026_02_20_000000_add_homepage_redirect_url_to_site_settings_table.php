@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('site_settings', function (Blueprint $table) {
-            $table->string('homepage_redirect_url', 500)->nullable()->after('homepage_theme');
+            if (! Schema::hasColumn('site_settings', 'homepage_redirect_url')) {
+                $table->string('homepage_redirect_url', 500)->nullable()->after('homepage_theme');
+            }
         });
     }
 

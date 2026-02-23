@@ -10,7 +10,7 @@ class CreateActivityLogTable extends Migration
     {
         Schema::connection(config('activitylog.database_connection'))->create(config('activitylog.table_name'), function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->string('tenant_id')->after('id');
+            $table->string('tenant_id');
             $table->foreign('tenant_id')
                     ->references('id')
                     ->on('tenants')

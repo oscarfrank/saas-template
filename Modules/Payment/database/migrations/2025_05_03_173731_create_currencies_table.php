@@ -17,9 +17,7 @@ return new class extends Migration
             $table->string('code', 10)->unique()->comment('ISO currency code (USD, EUR, BTC)');
             $table->string('name', 100)->comment('Full currency name');
             $table->string('symbol', 10)->comment('Currency symbol ($, €, ₿)');
-            $table->boolean('is_default')->default(false)->after('is_active');
 
-            
             // Currency Type
             $table->enum('type', ['fiat', 'crypto', 'other'])->default('fiat');
             
@@ -40,7 +38,8 @@ return new class extends Migration
             
             // Status and System Information
             $table->boolean('is_active')->default(true);
-            
+            $table->boolean('is_default')->default(false);
+
             // Limits
             $table->decimal('min_transaction_amount', 20, 8)->nullable();
             $table->decimal('max_transaction_amount', 20, 8)->nullable();

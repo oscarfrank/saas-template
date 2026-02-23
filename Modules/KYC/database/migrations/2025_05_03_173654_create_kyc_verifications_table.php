@@ -13,14 +13,14 @@ return new class extends Migration
     {
         Schema::create('kyc_verifications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->string('tenant_id')->after('id');
+            $table->string('tenant_id');
             $table->foreign('tenant_id')
                     ->references('id')
                     ->on('tenants')
                     ->onUpdate('cascade')
                     ->onDelete('cascade');
-            
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+
             // Personal Information
             $table->string('full_name');
             $table->date('date_of_birth');

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('loans', function (Blueprint $table) {
             $table->id();
-            $table->string('tenant_id')->after('id');
+            $table->string('tenant_id');
             $table->foreign('tenant_id')
                     ->references('id')
                     ->on('tenants')
@@ -28,7 +28,7 @@ return new class extends Migration
             
             // Financial Details
             $table->decimal('amount', 20, 2)->comment('Loan amount');
-            $table->decimal('current_balance', 20, 2)->default(0)->after('total_amount_due')->comment('Current outstanding balance including principal and interest');
+            $table->decimal('current_balance', 20, 2)->default(0)->comment('Current outstanding balance including principal and interest');
             $table->foreignId('currency_id')->constrained()->comment('Currency of the loan');
             $table->decimal('interest_rate', 8, 4)->comment('Interest rate at time of approval');
             $table->enum('interest_type', ['simple', 'compound'])->default('simple');

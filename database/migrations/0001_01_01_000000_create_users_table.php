@@ -20,9 +20,9 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->string('two_factor_secret')->nullable();
+            $table->string('two_factor_method')->default('authenticator');
             $table->string('two_factor_recovery_codes')->nullable();
             $table->timestamp('two_factor_confirmed_at')->nullable();
-            $table->string('two_factor_method')->default('authenticator')->after('two_factor_secret');
             $table->timestamps();
         });
 

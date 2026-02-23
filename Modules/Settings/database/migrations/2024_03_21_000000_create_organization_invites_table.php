@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('organization_invites', function (Blueprint $table) {
             $table->id();
-            $table->string('tenant_id')->after('id');
+            $table->string('tenant_id');
             $table->foreign('tenant_id')
                     ->references('id')
                     ->on('tenants')

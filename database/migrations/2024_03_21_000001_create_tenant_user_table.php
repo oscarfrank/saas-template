@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('tenant_id');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('role')->nullable()->after('tenant_id');
+            $table->string('role')->nullable();
             $table->timestamps();
 
             $table->foreign('tenant_id')

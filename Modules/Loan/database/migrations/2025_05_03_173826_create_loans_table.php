@@ -85,6 +85,7 @@ return new class extends Migration
             $table->integer('completed_payments')->default(0)->comment('Number of completed payments');
             
             // Delinquency Tracking
+            $table->integer('days_past_due')->default(0)->comment('Number of days past due');
             $table->date('next_payment_due_date')->nullable()->comment('Date when next payment is due');
             $table->decimal('next_payment_amount', 15, 2)->nullable()->comment('Amount of next payment due');
             $table->date('last_payment_date')->nullable()->comment('Date of last payment received');

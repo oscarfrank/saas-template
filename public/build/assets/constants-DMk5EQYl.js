@@ -1,0 +1,1 @@
+const e=[{code:"USD",label:"USD",symbol:"$"},{code:"EUR",label:"EUR",symbol:"€"},{code:"GBP",label:"GBP",symbol:"£"},{code:"NGN",label:"NGN (Naira)",symbol:"₦"}],l=[{value:"contract",label:"Contract"},{value:"id",label:"ID document"},{value:"certificate",label:"Certificate"},{value:"other",label:"Other"}];export{e as H,l as S};

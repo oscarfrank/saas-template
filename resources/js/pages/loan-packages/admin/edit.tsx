@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { EditForm } from './components/edit-form';
+import { EditForm } from '@/pages/loan-packages/components/edit-form';
 import { router } from '@inertiajs/react';
 
 const breadcrumbs: BreadcrumbItem[] = [

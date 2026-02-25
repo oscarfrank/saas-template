@@ -8,6 +8,8 @@ interface TenantRouterOptions {
     only?: string[];
     onSuccess?: () => void;
     onError?: (errors: any) => void;
+    onStart?: () => void;
+    onFinish?: () => void;
     replace?: boolean;
 }
 

@@ -1,0 +1,1 @@
+{"name":"Assets","alias":"assets","description":"Asset management: categories, assets, assignments, status (sold, gifted, assigned), value tracking","keywords":[],"priority":0,"providers":["Modules\\Assets\\Providers\\AssetsServiceProvider"],"files":[]}

@@ -1,0 +1,1 @@
+{"name":"modules/assets","description":"Assets module","authors":[],"extra":{"laravel":{"providers":[],"aliases":{}}},"autoload":{"psr-4":{"Modules\\Assets\\":"app/","Modules\\Assets\\Database\\Factories\\":"database/factories/","Modules\\Assets\\Database\\Seeders\\":"database/seeders/"}},"autoload-dev":{"psr-4":{"Modules\\Assets\\Tests\\":"tests/"}}}

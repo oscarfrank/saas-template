@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Inertia\Inertia;
@@ -559,7 +560,14 @@ class AssetController extends Controller
 
     public function importProcess(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt,json|max:2048']);
+        $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'max:2048',
+                File::types(['text/csv', 'text/plain', 'application/json']),
+            ],
+        ]);
         $tenantId = tenant('id');
         $settings = AssetSettings::getForTenant($tenantId);
         $file = $request->file('file');

@@ -59,7 +59,7 @@ export default function AssetsImport({ statusOptions, currencyOptions, flash, im
                         </div>
                         <div>
                             <h1 className="text-2xl font-semibold tracking-tight">Import assets</h1>
-                            <p className="text-muted-foreground text-sm">Upload a CSV file to create assets in bulk.</p>
+                            <p className="text-muted-foreground text-sm">Upload a CSV or JSON file (JSON can include categories for a full restore).</p>
                         </div>
                     </div>
                 </div>
@@ -74,7 +74,7 @@ export default function AssetsImport({ statusOptions, currencyOptions, flash, im
                         </CardHeader>
                         <CardContent className="pt-5">
                             <p className="text-muted-foreground text-sm mb-4">
-                                Download a CSV template with the required columns. Fill in your data and upload below.
+                                Download a CSV template for manual entry, or export assets as JSON from the assets list to get a full backup (categories + assets) that you can re-import here.
                             </p>
                             <Button variant="outline" asChild>
                                 <a href={tenantRouter.route('assets.import.template')} download className="gap-2">
@@ -92,17 +92,17 @@ export default function AssetsImport({ statusOptions, currencyOptions, flash, im
                         <CardHeader className="border-b bg-muted/30 pb-4">
                             <div className="flex items-center gap-2">
                                 <Upload className="h-5 w-5 text-primary" />
-                                <h2 className="font-semibold">Upload CSV</h2>
+                                <h2 className="font-semibold">Upload file</h2>
                             </div>
                         </CardHeader>
                         <CardContent className="pt-5">
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="file">CSV file</Label>
+                                    <Label htmlFor="file">CSV or JSON file</Label>
                                     <Input
                                         id="file"
                                         type="file"
-                                        accept=".csv,.txt"
+                                        accept=".csv,.txt,.json"
                                         onChange={(e) => setData('file', e.target.files?.[0] ?? null)}
                                     />
                                     {errors.file && <p className="text-destructive text-sm">{errors.file}</p>}

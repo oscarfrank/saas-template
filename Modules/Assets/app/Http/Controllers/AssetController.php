@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -558,14 +559,173 @@ class AssetController extends Controller
 
     public function importProcess(Request $request): RedirectResponse
     {
-        $request->validate(['file' => 'required|file|mimes:csv,txt|max:2048']);
+        $request->validate(['file' => 'required|file|mimes:csv,txt,json|max:2048']);
         $tenantId = tenant('id');
         $settings = AssetSettings::getForTenant($tenantId);
+        $file = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        if ($extension === 'json') {
+            return $this->importProcessJson($file->getRealPath(), $tenantId, $settings);
+        }
+        return $this->importProcessCsv($file->getRealPath(), $tenantId, $settings);
+    }
+
+    protected function importProcessJson(string $path, $tenantId, AssetSettings $settings): RedirectResponse
+    {
+        $validStatuses = array_keys(Asset::statusOptions());
+        $validCurrencies = array_keys(Asset::currencyOptions());
+        $validConditions = array_keys(Asset::conditionOptions());
+        $json = json_decode(file_get_contents($path), true);
+        if (! is_array($json)) {
+            return redirect()->route('assets.import', ['tenant' => tenant('slug')])
+                ->with('error', 'Invalid JSON file.');
+        }
+        $categoriesPayload = $json['categories'] ?? null;
+        $assetsPayload = $json['assets'] ?? null;
+        if ($assetsPayload === null && isset($json[0]) && is_array($json[0])) {
+            $assetsPayload = $json;
+            $categoriesPayload = null;
+        }
+        if (! is_array($assetsPayload)) {
+            return redirect()->route('assets.import', ['tenant' => tenant('slug')])
+                ->with('error', 'JSON must contain "assets" array or be an array of asset objects.');
+        }
+        $slugToCategoryId = AssetCategory::where('tenant_id', $tenantId)->get()->keyBy('slug')->map->id->all();
+        $nameToCategoryId = AssetCategory::where('tenant_id', $tenantId)->get()->keyBy(fn ($c) => strtolower(trim($c->name)))->map->id->all();
+        if (is_array($categoriesPayload) && count($categoriesPayload) > 0) {
+            $slugToCategoryId = $this->importCategoriesFromPayload($categoriesPayload, $tenantId, $slugToCategoryId);
+            $nameToCategoryId = AssetCategory::where('tenant_id', $tenantId)->get()->keyBy(fn ($c) => strtolower(trim($c->name)))->map->id->all();
+        }
+        $created = 0;
+        $errors = [];
+        $index = 0;
+        foreach ($assetsPayload as $data) {
+            $index++;
+            $name = isset($data['name']) ? trim((string) $data['name']) : '';
+            $assetTag = isset($data['asset_tag']) ? trim((string) $data['asset_tag']) : '';
+            if ($name === '' && $assetTag === '') {
+                continue;
+            }
+            if ($name === '') {
+                $errors[] = "Asset #{$index}: Name is required.";
+                continue;
+            }
+            $assetTag = $assetTag !== '' ? $assetTag : Asset::generateAssetTag($tenantId);
+            if (Asset::where('tenant_id', $tenantId)->where('asset_tag', $assetTag)->exists()) {
+                $errors[] = "Asset #{$index}: Asset tag \"{$assetTag}\" already exists.";
+                continue;
+            }
+            $status = isset($data['status']) ? strtolower(trim((string) $data['status'])) : 'available';
+            $status = str_replace(' ', '_', $status);
+            if (! in_array($status, $validStatuses, true)) {
+                $errors[] = "Asset #{$index}: Invalid status \"{$status}\".";
+                continue;
+            }
+            $currency = isset($data['currency']) ? strtoupper(trim((string) $data['currency'])) : ($settings->default_currency ?? 'USD');
+            if (! in_array($currency, $validCurrencies, true)) {
+                $currency = $settings->default_currency ?? 'USD';
+            }
+            $categoryId = null;
+            $categorySlug = isset($data['category_slug']) ? trim((string) $data['category_slug']) : null;
+            $categoryName = isset($data['category']) ? trim((string) $data['category']) : null;
+            if ($categorySlug !== null && $categorySlug !== '') {
+                $categoryId = $slugToCategoryId[$categorySlug] ?? $slugToCategoryId[Str::slug($categorySlug)] ?? null;
+            }
+            if ($categoryId === null && $categoryName !== null && $categoryName !== '') {
+                $categoryId = $nameToCategoryId[strtolower($categoryName)] ?? null;
+            }
+            $purchasePrice = $data['purchase_price'] ?? null;
+            $purchasePrice = $purchasePrice !== null && $purchasePrice !== '' ? (is_numeric($purchasePrice) ? (float) $purchasePrice : null) : null;
+            $purchaseDate = isset($data['purchase_date']) ? trim((string) $data['purchase_date']) : null;
+            $purchaseDate = ($purchaseDate !== null && $purchaseDate !== '' && strtotime($purchaseDate)) ? date('Y-m-d', strtotime($purchaseDate)) : null;
+            $condition = isset($data['condition']) ? strtolower(trim((string) $data['condition'])) : null;
+            if ($condition !== null && $condition !== '' && ! in_array($condition, $validConditions, true)) {
+                $condition = null;
+            }
+            $payload = [
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'asset_tag' => $assetTag,
+                'serial_number' => isset($data['serial_number']) ? trim((string) $data['serial_number']) : null,
+                'asset_category_id' => $categoryId,
+                'status' => $status,
+                'purchase_price' => $purchasePrice,
+                'currency' => $currency,
+                'purchase_date' => $purchaseDate,
+                'location' => isset($data['location']) ? trim((string) $data['location']) : null,
+                'condition' => $condition,
+            ];
+            if (in_array($status, Asset::disposedStatuses(), true)) {
+                $payload['disposed_at'] = now();
+            }
+            try {
+                Asset::create($payload);
+                $created++;
+            } catch (\Throwable $e) {
+                $errors[] = "Asset #{$index}: " . $e->getMessage();
+            }
+        }
+        $message = $created . ' asset(s) imported.';
+        if (count($errors) > 0) {
+            $message .= ' ' . count($errors) . ' had errors.';
+        }
+        return redirect()->route('assets.import', ['tenant' => tenant('slug')])
+            ->with(count($errors) > 0 ? 'warning' : 'success', $message)
+            ->with('import_errors', count($errors) > 0 ? $errors : null);
+    }
+
+    /**
+     * Create categories from full-export payload. Returns slug => id map (including existing + newly created).
+     */
+    protected function importCategoriesFromPayload(array $categoriesPayload, $tenantId, array $slugToCategoryId): array
+    {
+        $categories = $categoriesPayload;
+        $maxPasses = count($categories) + 1;
+        $pass = 0;
+        while ($pass < $maxPasses) {
+            $created = 0;
+            foreach ($categories as $c) {
+                $slug = isset($c['slug']) ? trim((string) $c['slug']) : Str::slug($c['name'] ?? '');
+                if ($slug === '' || isset($slugToCategoryId[$slug])) {
+                    continue;
+                }
+                $parentSlug = isset($c['parent_slug']) ? trim((string) $c['parent_slug']) : null;
+                $parentId = null;
+                if ($parentSlug !== null && $parentSlug !== '') {
+                    $parentId = $slugToCategoryId[$parentSlug] ?? null;
+                    if ($parentId === null) {
+                        continue;
+                    }
+                }
+                $category = AssetCategory::create([
+                    'tenant_id' => $tenantId,
+                    'name' => $c['name'] ?? $slug,
+                    'slug' => $slug,
+                    'description' => $c['description'] ?? null,
+                    'parent_id' => $parentId,
+                    'sort_order' => $c['sort_order'] ?? 0,
+                    'depreciation_useful_life_years' => $c['depreciation_useful_life_years'] ?? null,
+                    'depreciation_salvage_value' => $c['depreciation_salvage_value'] ?? null,
+                    'depreciation_method' => $c['depreciation_method'] ?? null,
+                ]);
+                $slugToCategoryId[$slug] = $category->id;
+                $created++;
+            }
+            if ($created === 0) {
+                break;
+            }
+            $pass++;
+        }
+        return $slugToCategoryId;
+    }
+
+    protected function importProcessCsv(string $path, $tenantId, AssetSettings $settings): RedirectResponse
+    {
         $validStatuses = array_keys(Asset::statusOptions());
         $validCurrencies = array_keys(Asset::currencyOptions());
         $validConditions = array_keys(Asset::conditionOptions());
         $categoriesByName = AssetCategory::where('tenant_id', $tenantId)->get()->keyBy(fn ($c) => strtolower(trim($c->name)));
-        $handle = fopen($request->file('file')->getRealPath(), 'r');
+        $handle = fopen($path, 'r');
         $header = fgetcsv($handle);
         if ($header === false) {
             fclose($handle);
@@ -628,7 +788,7 @@ class AssetController extends Controller
                 'purchase_price' => $purchasePrice,
                 'currency' => $currency,
                 'purchase_date' => $purchaseDate,
-                'location' => isset($data['Location']) ? trim((string) $data['Location']) : (isset($data['location']) ? trim((string) $data['location']) : null),
+                'location' => isset($data['Location']) ? trim((string) $data['location']) : (isset($data['location']) ? trim((string) $data['location']) : null),
                 'condition' => $condition,
             ];
             if (in_array($status, Asset::disposedStatuses(), true)) {
@@ -692,23 +852,48 @@ class AssetController extends Controller
         $assets = $query->orderBy('name')->get();
 
         if ($format === 'json') {
-            $data = $assets->map(function (Asset $a) {
+            $categories = AssetCategory::where('tenant_id', $tenantId)
+                ->with('parent:id,slug')
+                ->ordered()
+                ->get()
+                ->map(function (AssetCategory $c) {
+                    return [
+                        'name' => $c->name,
+                        'slug' => $c->slug,
+                        'description' => $c->description,
+                        'sort_order' => $c->sort_order,
+                        'parent_slug' => $c->parent?->slug,
+                        'depreciation_useful_life_years' => $c->depreciation_useful_life_years,
+                        'depreciation_salvage_value' => $c->depreciation_salvage_value !== null ? (float) $c->depreciation_salvage_value : null,
+                        'depreciation_method' => $c->depreciation_method,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $assetsData = $assets->map(function (Asset $a) {
                 return [
                     'uuid' => $a->uuid,
                     'name' => $a->name,
                     'asset_tag' => $a->asset_tag,
                     'serial_number' => $a->serial_number,
                     'category' => $a->category?->name,
+                    'category_slug' => $a->category?->slug,
                     'status' => $a->status,
                     'assigned_to' => $a->assignedToUser ? trim($a->assignedToUser->first_name . ' ' . $a->assignedToUser->last_name) ?: $a->assignedToUser->email : null,
-                    'purchase_price' => $a->purchase_price,
+                    'purchase_price' => $a->purchase_price !== null ? (float) $a->purchase_price : null,
                     'currency' => $a->currency,
                     'purchase_date' => $a->purchase_date?->format('Y-m-d'),
                     'location' => $a->location,
                     'condition' => $a->condition,
                 ];
-            });
-            return response()->json($data->values()->all(), 200, [
+            })->values()->all();
+
+            $payload = [
+                'categories' => $categories,
+                'assets' => $assetsData,
+            ];
+            return response()->json($payload, 200, [
                 'Content-Disposition' => 'attachment; filename="assets-' . date('Y-m-d-His') . '.json"',
             ], JSON_UNESCAPED_UNICODE);
         }

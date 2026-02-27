@@ -24,6 +24,7 @@ import {
     List,
     RotateCcw,
     CalendarDays,
+    Clock,
     Download,
     ArrowDownAZ,
     Filter,
@@ -360,6 +361,26 @@ const platformConfig: Record<string, { label: string; icon: typeof Youtube; clas
     shorts: { label: 'Shorts', icon: Video, className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
 };
 
+/** Format scheduled_at ISO string for card display (relative for near dates, short date otherwise). */
+function formatScheduledAt(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const scheduledDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((scheduledDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays > 1 && diffDays <= 7) return `in ${diffDays} days`;
+    if (diffDays < -1 && diffDays >= -7) return `${-diffDays} days ago`;
+    return d.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+}
+
 interface Props {
     scripts: ScriptItem[];
     trashed?: boolean;
@@ -394,6 +415,11 @@ function ScriptCard({
                             <PlatformIcon className="mr-1 h-3 w-3" />
                             {platform.label}
                         </Badge>
+                        {script.status && (
+                            <Badge variant="secondary" className="w-fit text-xs capitalize">
+                                {STATUS_OPTIONS.find((s) => s.value === script.status)?.label ?? script.status}
+                            </Badge>
+                        )}
                         {script.is_co_author && (
                             <Badge variant="secondary" className="w-fit text-xs">
                                 Co-author
@@ -490,9 +516,24 @@ function ScriptCard({
             </CardHeader>
             <CardContent className="flex-1 pt-0">
                 <p className="text-muted-foreground line-clamp-3 text-sm">{script.excerpt}</p>
-                <p className="text-muted-foreground/80 mt-3 text-xs">
-                    {trashed && script.deleted_at_human ? `Deleted ${script.deleted_at_human}` : `Updated ${script.updatedAt}`}
-                </p>
+                <div className="mt-3 space-y-1">
+                    <p className="text-muted-foreground/80 flex items-center gap-1.5 text-xs">
+                        {trashed && script.deleted_at_human ? (
+                            <>Deleted {script.deleted_at_human}</>
+                        ) : (
+                            <>
+                                <Clock className="h-3 w-3 shrink-0" />
+                                Updated {script.updatedAt}
+                            </>
+                        )}
+                    </p>
+                    {!trashed && script.scheduled_at && (
+                        <p className="text-muted-foreground/80 flex items-center gap-1.5 text-xs">
+                            <CalendarDays className="h-3 w-3 shrink-0" />
+                            Scheduled {formatScheduledAt(script.scheduled_at)}
+                        </p>
+                    )}
+                </div>
             </CardContent>
         </Card>
     );

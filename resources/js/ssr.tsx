@@ -4,13 +4,22 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import ReactDOMServer from 'react-dom/server';
 import { type RouteName, route } from 'ziggy-js';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const defaultAppName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+function getTitleSuffixFromPage(page: { props?: Record<string, unknown> }) {
+    const p = page?.props;
+    return (
+        (p?.siteSettings as { site_name?: string } | null)?.site_name ??
+        (typeof p?.name === 'string' ? p.name : null) ??
+        defaultAppName
+    );
+}
 
 createServer((page) =>
     createInertiaApp({
         page,
         render: ReactDOMServer.renderToString,
-        title: (title) => `${title} - ${appName}`,
+        title: (title) => `${title} - ${getTitleSuffixFromPage(page)}`,
         resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
         setup: ({ App, props }) => {
             /* eslint-disable */

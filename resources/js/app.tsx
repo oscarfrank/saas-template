@@ -5,15 +5,30 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { initializeTheme } from './hooks/use-appearance';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+// Title suffix: use shared props (site settings / app name) so it updates without rebuilding.
+let titleSuffix = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+function updateTitleSuffixFromProps(initialPage: { props?: Record<string, unknown> } | null) {
+    const p = initialPage?.props;
+    titleSuffix =
+        (p?.siteSettings as { site_name?: string } | null)?.site_name ??
+        (typeof p?.name === 'string' ? p.name : null) ??
+        import.meta.env.VITE_APP_NAME ??
+        'Laravel';
+}
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    title: (title) => `${title} - ${titleSuffix}`,
     resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-        root.render(<App {...props} />);
+        function AppWithTitleSync(setupProps: typeof props) {
+            updateTitleSuffixFromProps(setupProps.initialPage);
+            return <App {...setupProps} />;
+        }
+
+        root.render(<AppWithTitleSync {...props} />);
     },
     progress: {
         delay: 150,

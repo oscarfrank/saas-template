@@ -6,8 +6,11 @@ use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 // Public published script view: no auth, no tenant in URL. Anyone with the link can view.
 Route::get('script/shared/{token}', [ScriptController::class, 'sharedShow'])->name('script.shared');
-// Public read-only production calendar: no auth, no tenant in URL.
-Route::get('production-calendar', [ScriptController::class, 'publicCalendar'])->name('script.public-calendar');
+
+// Public read-only production calendar per org: no auth, tenant from path → /{tenant}/production-calendar
+Route::middleware([InitializeTenancyByPath::class])->prefix('{tenant}')->group(function () {
+    Route::get('production-calendar', [ScriptController::class, 'publicCalendar'])->name('script.public-calendar');
+});
 
 Route::middleware([
     'auth',

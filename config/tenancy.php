@@ -27,6 +27,12 @@ return [
         Stancl\Tenancy\IdentificationStrategies\PathIdentification::class,
     ],
 
+    /**
+     * Domains that host the "central" app. PreventAccessFromCentralDomains blocks tenant routes when request host is in this list.
+     * With path-based tenancy (same domain for central and tenant, e.g. /org/...), leave empty so tenant routes work for guests on any host.
+     */
+    'central_domains' => [],
+
     'middleware_groups' => [
         'web' => [
             InitializeTenancyByPath::class,
@@ -75,6 +81,7 @@ return [
     ],
 
     'bootstrappers' => [
+        Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
         Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
@@ -94,7 +101,6 @@ return [
             '/admin/*',
             '/_debugbar/*',
             '/script/shared/*',
-            '/production-calendar',
         ],
     ],
 ];

@@ -2302,20 +2302,15 @@ PROMPT;
     }
 
     /**
-     * Public read-only production calendar (no auth, no tenant path).
-     * Route is excluded from tenancy path identification so it always runs on central domain.
+     * Public read-only production calendar for the current org. No auth required.
+     * URL: /{tenant}/production-calendar — tenant is set by path (InitializeTenancyByPath).
      */
     public function publicCalendar(Request $request): Response
     {
-        $slug = config('script.public_calendar_tenant_slug');
-        $tenant = $slug
-            ? Tenant::where('slug', $slug)->first()
-            : Tenant::first();
+        $tenant = tenant();
         if (! $tenant) {
-            abort(404, $slug ? 'Tenant for public calendar not found.' : 'No tenant configured.');
+            abort(404, 'Organization not found.');
         }
-
-        tenancy()->initialize($tenant);
 
         $query = Script::query()
             ->where('tenant_id', $tenant->id)

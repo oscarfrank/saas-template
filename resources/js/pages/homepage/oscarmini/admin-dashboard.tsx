@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import { useGreeting } from '@/hooks/use-greeting';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,6 +43,7 @@ interface Props {
 export default function OscarMiniAdminDashboard({ quickStats, recentActivity }: Props) {
     const { user } = useAuth();
     const { getGreeting } = useGreeting();
+    const isSuperAdmin = (usePage().props as { auth?: { is_superadmin?: boolean } }).auth?.is_superadmin === true;
 
     const quickStatsData = [
         { title: 'Staff / users', value: quickStats.total_users.toLocaleString(), icon: Users, color: 'text-emerald-500' },
@@ -61,6 +62,7 @@ export default function OscarMiniAdminDashboard({ quickStats, recentActivity }: 
                 { name: 'User Roles', href: '/admin/roles' },
                 { name: 'User Activity', href: '/admin/activity' },
                 { name: 'User KYC', href: '/admin/kyc' },
+                ...(isSuperAdmin ? [{ name: 'Add members to org', href: '/organizations/add-members' }] : []),
             ],
         },
         {

@@ -48,7 +48,7 @@ class HandleInertiaRequests extends Middleware
                 ...parent::share($request),
                 'name' => config('app.name'),
                 'quote' => ['message' => '', 'author' => ''],
-                'auth' => ['user' => null],
+                'auth' => ['user' => null, 'is_superadmin' => false],
                 'ziggy' => fn () => [
                     ...$ziggyData,
                     'location' => $request->url(),
@@ -147,6 +147,7 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $user?->load('roles'),
+                'is_superadmin' => $user && ($user->hasRole('superadmin') || $user->hasRole('super-admin')),
             ],
             'ziggy' => fn () => [
                 ...$ziggyData,

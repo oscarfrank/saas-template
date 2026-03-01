@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Table } from './components/table';
 import { createColumns } from './components/table-columns';
 import { type Tenant } from './components/table-columns';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { CustomAlertDialog } from '@/components/ui/custom-alert-dialog';
@@ -28,6 +28,8 @@ interface Props {
 }
 
 export default function Index({ tenants, pagination }: Props) {
+    const { auth } = usePage().props as { auth?: { is_superadmin?: boolean } };
+    const isSuperAdmin = auth?.is_superadmin === true;
     const [search, setSearch] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -213,6 +215,14 @@ export default function Index({ tenants, pagination }: Props) {
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <div className="flex justify-between items-center">
                     <div className="flex gap-2">
+                        {isSuperAdmin && (
+                            <Link href={route('tenants.add-members')}>
+                                <Button variant="outline" className="cursor-pointer">
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    Add members to org
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                     <Link href={route('tenants.create')}>
                         <Button className="cursor-pointer">

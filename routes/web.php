@@ -58,5 +58,10 @@ Route::middleware('web')->group(function () {
         Route::delete('/organizations/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
         Route::post('/organization/invites/{invite}/accept', [TenantController::class, 'acceptInvite'])->name('tenants.invites.accept');
         Route::post('/organization/invites/{invite}/decline', [TenantController::class, 'declineInvite'])->name('tenants.invites.decline');
+
+        // Super admin only: add members to an organization without sending invites
+        Route::get('/organizations/add-members', [TenantController::class, 'addMembersPage'])->name('tenants.add-members');
+        Route::post('/organizations/add-members', [TenantController::class, 'addMembers'])->name('tenants.add-members.store');
+        Route::get('/organizations/add-members/search-users', [TenantController::class, 'searchUsers'])->name('tenants.add-members.search-users');
     });
 });

@@ -7,9 +7,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Modules\User\Models\User;
 
 class TenantController extends Controller
 {
+    /**
+     * Ensure the current user is a super admin (central add-members feature).
+     */
+    private function authorizeSuperAdmin(): void
+    {
+        $user = auth()->user();
+        if (!$user || (!$user->hasRole('superadmin') && !$user->hasRole('super-admin'))) {
+            abort(403, 'Only super admins can add members directly to organizations.');
+        }
+    }
     public function index()
     {
         $tenants = Tenant::latest()->paginate(10);
@@ -240,4 +251,113 @@ class TenantController extends Controller
         }
     }
 
+    /**
+     * Super admin only: show the "Add members to organization" page (no invites, no emails).
+     */
+    public function addMembersPage()
+    {
+        $this->authorizeSuperAdmin();
+
+        $tenants = Tenant::orderBy('name')->get(['id', 'name', 'slug'])->map(fn ($t) => [
+            'id' => $t->id,
+            'name' => $t->name,
+            'slug' => $t->slug,
+        ]);
+
+        return Inertia::render('tenants/add-members', [
+            'tenants' => $tenants,
+            'roles' => [
+                ['value' => 'admin', 'label' => 'Admin'],
+                ['value' => 'editor', 'label' => 'Editor'],
+                ['value' => 'member', 'label' => 'Member'],
+            ],
+        ]);
+    }
+
+    /**
+     * Super admin only: search users by name/email for the add-members combobox.
+     */
+    public function searchUsers(Request $request)
+    {
+        $this->authorizeSuperAdmin();
+
+        $q = $request->input('q', '');
+        $q = is_string($q) ? trim($q) : '';
+
+        if (strlen($q) < 2) {
+            return response()->json(['users' => []]);
+        }
+
+        $users = User::query()
+            ->where(function ($query) use ($q) {
+                $query->where('first_name', 'like', '%' . $q . '%')
+                    ->orWhere('last_name', 'like', '%' . $q . '%')
+                    ->orWhere('email', 'like', '%' . $q . '%');
+            })
+            ->orderBy('first_name')
+            ->limit(20)
+            ->get(['id', 'first_name', 'last_name', 'email'])
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'first_name' => $u->first_name,
+                'last_name' => $u->last_name,
+                'email' => $u->email,
+                'name' => trim($u->first_name . ' ' . $u->last_name) ?: $u->email,
+            ]);
+
+        return response()->json(['users' => $users]);
+    }
+
+    /**
+     * Super admin only: add users to an organization with a role (no invites, no notifications).
+     */
+    public function addMembers(Request $request)
+    {
+        $this->authorizeSuperAdmin();
+
+        $validated = $request->validate([
+            'tenant_id' => 'required|string|exists:tenants,id',
+            'role' => 'required|in:admin,editor,member',
+            'user_ids' => 'nullable|array',
+            'user_ids.*' => 'integer|exists:users,id',
+            'emails' => 'nullable|array',
+            'emails.*' => 'email',
+        ]);
+
+        $tenant = Tenant::findOrFail($validated['tenant_id']);
+        $userIds = array_unique(array_filter($validated['user_ids'] ?? []));
+        $emails = array_unique(array_filter(array_map('strtolower', $validated['emails'] ?? [])));
+
+        // Resolve emails to user ids
+        foreach ($emails as $email) {
+            $user = User::where('email', $email)->first();
+            if ($user) {
+                $userIds[] = $user->id;
+            }
+        }
+        $userIds = array_unique($userIds);
+
+        $added = 0;
+        $alreadyMember = 0;
+
+        foreach ($userIds as $userId) {
+            if ($tenant->users()->where('users.id', $userId)->exists()) {
+                $alreadyMember++;
+                continue;
+            }
+            $tenant->users()->attach($userId, ['role' => $validated['role']]);
+            $added++;
+        }
+
+        \Log::info('Super admin added members to organization', [
+            'super_admin_id' => auth()->id(),
+            'tenant_id' => $tenant->id,
+            'tenant_name' => $tenant->name,
+            'role' => $validated['role'],
+            'added' => $added,
+            'already_member' => $alreadyMember,
+        ]);
+
+        return back()->with('success', "Added {$added} member(s) to {$tenant->name}." . ($alreadyMember > 0 ? " {$alreadyMember} were already members." : ''));
+    }
 } 

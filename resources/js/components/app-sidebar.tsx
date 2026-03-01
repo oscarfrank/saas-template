@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { router } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, Link, ScrollText, Users, Package } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, Link, ScrollText, Users, Package, PenTool } from 'lucide-react';
 import AppLogo from './app-logo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -98,6 +98,11 @@ export const AppSidebar = memo(function AppSidebar() {
             title: 'Dashboard',
             href: `/${effectiveTenant?.slug}/dashboard`,
             icon: LayoutGrid,
+        },
+        {
+            title: 'Creator',
+            href: `/${effectiveTenant?.slug}/creator`,
+            icon: PenTool,
         },
         {
             title: 'Products',

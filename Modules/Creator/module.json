@@ -1,0 +1,1 @@
+{"name":"Creator","alias":"creator","description":"Creator module: dashboard and tools for content creators","keywords":[],"priority":0,"providers":["Modules\\Creator\\Providers\\CreatorServiceProvider"],"files":[]}

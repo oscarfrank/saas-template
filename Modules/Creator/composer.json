@@ -1,0 +1,1 @@
+{"name":"modules/creator","description":"Creator module","authors":[],"extra":{"laravel":{"providers":[],"aliases":{}}},"autoload":{"psr-4":{"Modules\\Creator\\":"app/","Modules\\Creator\\Database\\Factories\\":"database/factories/","Modules\\Creator\\Database\\Seeders\\":"database/seeders/"}},"autoload-dev":{"psr-4":{"Modules\\Creator\\Tests\\":"tests/"}}}

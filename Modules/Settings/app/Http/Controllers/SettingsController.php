@@ -334,6 +334,68 @@ class SettingsController extends Controller
     }
 
     /**
+     * Display sidebar customization (order + visibility of pages). Owner or admin only.
+     */
+    public function organizationSidebar()
+    {
+        $tenant = tenant();
+        if (! $tenant) {
+            return redirect()->route('profile.edit')
+                ->with('error', 'You must be part of an organization to customize the sidebar.');
+        }
+        $user = auth()->user();
+        $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        $role = $pivot?->role ?? null;
+        if (! in_array($role, ['owner', 'admin'], true)) {
+            abort(403, 'Only organization owners or admins can customize the sidebar.');
+        }
+        // VirtualColumn decodes data into separate attributes; read the virtual attribute
+        $sidebarConfig = $tenant->getAttribute('sidebar_pages') ?? ['order' => [], 'enabled' => []];
+
+        return Inertia::render('settings/organization/sidebar', [
+            'sidebarConfig' => $sidebarConfig,
+        ]);
+    }
+
+    /**
+     * Update sidebar order and visibility. Owner or admin only.
+     */
+    public function updateSidebar(Request $request)
+    {
+        $tenant = tenant();
+        if (! $tenant) {
+            return redirect()->route('profile.edit')
+                ->with('error', 'You must be part of an organization to update the sidebar.');
+        }
+        $user = auth()->user();
+        $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
+        $role = $pivot?->role ?? null;
+        if (! in_array($role, ['owner', 'admin'], true)) {
+            abort(403, 'Only organization owners or admins can update the sidebar.');
+        }
+        $validated = $request->validate([
+            'order' => 'nullable|array',
+            'order.*' => 'string|max:64',
+            'enabled' => 'nullable|array',
+        ]);
+        $order = $validated['order'] ?? [];
+        $enabledRaw = $validated['enabled'] ?? [];
+        // Normalize enabled to booleans (request may send "true"/"false" strings)
+        $enabled = [];
+        foreach ($enabledRaw as $key => $value) {
+            $enabled[(string) $key] = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        }
+        // Store as virtual attribute so Stancl VirtualColumn encodes it into the tenants.data JSON on save
+        $tenant->setAttribute('sidebar_pages', [
+            'order' => array_values($order),
+            'enabled' => $enabled,
+        ]);
+        $tenant->save();
+
+        return back()->with('success', 'Sidebar updated. Changes will appear on the next page load.');
+    }
+
+    /**
      * Display API keys settings.
      */
     public function apiKeys()

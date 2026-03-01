@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 use App\Models\Tenant;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class HandleInertiaRequests extends Middleware
@@ -94,16 +95,23 @@ class HandleInertiaRequests extends Middleware
                 $currentTenant = $tenants[0];
             }
 
-            // Add workspace (organization) logo to each tenant for sidebar and TeamSwitcher; always read from central DB
+            // Add workspace (organization) logo and data (e.g. sidebar_pages) for each tenant; read from central DB
             $centralConnection = config('tenancy.database.central_connection');
             $tenantIds = collect($tenants)->pluck('id')->filter()->unique()->values()->all();
             $tenantModels = $tenantIds ? Tenant::on($centralConnection)->whereIn('id', $tenantIds)->get()->keyBy('id') : collect();
+            // VirtualColumn clears in-memory 'data' after retrieval; read raw data column so frontend gets sidebar_pages etc.
+            $tenantDataRaw = $tenantIds ? DB::connection($centralConnection)->table('tenants')->whereIn('id', $tenantIds)->get()->keyBy('id') : collect();
             foreach ($tenants as &$t) {
-                $t['logo'] = $tenantModels->get($t['id'])?->getAttribute('logo');
+                $model = $tenantModels->get($t['id']);
+                $t['logo'] = $model?->getAttribute('logo');
+                $row = $tenantDataRaw->get($t['id']);
+                $t['data'] = $row && $row->data !== null ? (is_string($row->data) ? json_decode($row->data, true) ?? [] : (array) $row->data) : [];
             }
             unset($t);
             if ($currentTenant) {
                 $currentTenant['logo'] = $tenantModels->get($currentTenant['id'])?->getAttribute('logo');
+                $row = $tenantDataRaw->get($currentTenant['id']);
+                $currentTenant['data'] = $row && $row->data !== null ? (is_string($row->data) ? json_decode($row->data, true) ?? [] : (array) $row->data) : [];
             }
 
             // If we're on the homepage and have a tenant, redirect to org default or last visited (per user preference)

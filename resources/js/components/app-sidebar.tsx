@@ -4,7 +4,8 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { router } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, ShoppingBag, ShoppingCart, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, Link, ScrollText, Users, Package, PenTool } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, ShoppingBag, FileText, Bell, Wallet, Handshake, UserRoundCog, Ticket, Building2, ScrollText, Users, Package, PenTool } from 'lucide-react';
+import { buildSidebarPages } from '@/config/sidebar-pages';
 import AppLogo from './app-logo';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -71,8 +72,6 @@ export const AppSidebar = memo(function AppSidebar() {
     const { notifications, effectiveTenant, tenants, preferences } = useEffectiveTenant();
     const { state } = useSidebar();
 
-    console.log('Notif', notifications);
-
     // Memoize the teams data: pass logo URL when tenant has one, else default icon for TeamSwitcher
     const teams = useMemo(() => tenants.map((t: Tenant) => {
         const logoUrl = organizationLogoUrl(t.logo ?? null);
@@ -92,74 +91,14 @@ export const AppSidebar = memo(function AppSidebar() {
         });
     };
 
-    // Memoize the main navigation items
-    const mainNavItems = useMemo(() => [
-        {
-            title: 'Dashboard',
-            href: `/${effectiveTenant?.slug}/dashboard`,
-            icon: LayoutGrid,
-        },
-        {
-            title: 'Creator',
-            href: `/${effectiveTenant?.slug}/creator`,
-            icon: PenTool,
-        },
-        {
-            title: 'Products',
-            href: `/${effectiveTenant?.slug}/products`,
-            icon: ShoppingBag,
-        },
-        {
-            title: 'KYC',
-            href: `/${effectiveTenant?.slug}/kyc`,
-            icon: FileText,
-        },
-        {
-            title: 'Script',
-            href: `/${effectiveTenant?.slug}/script`,
-            icon: ScrollText,
-        },
-        {
-            title: 'HR',
-            href: `/${effectiveTenant?.slug}/hr`,
-            icon: Users,
-        },
-        {
-            title: 'Assets',
-            href: `/${effectiveTenant?.slug}/assets`,
-            icon: Package,
-        },
-        {
-            title: 'Transactions',
-            href: `/${effectiveTenant?.slug}/transactions`,
-            icon: Wallet,
-        },
-        {
-            title: 'Notifications',
-            href: `/${effectiveTenant?.slug}/activity`,
-            icon: Bell,
-        },
-        {
-            title: 'Loan Packages',
-            href: `/${effectiveTenant?.slug}/loan-packages`,
-            icon: Handshake,
-        },
-        {
-            title: 'My Loans',
-            href: `/${effectiveTenant?.slug}/loans`,
-            icon: Handshake,
-        },
-        {
-            title: 'Borrows',
-            href: `/${effectiveTenant?.slug}/borrows`,
-            icon: Handshake,
-        },
-        {
-            title: 'Tickets',
-            href: `/${effectiveTenant?.slug}/tickets`,
-            icon: Ticket,
-        },
-    ], [effectiveTenant?.slug]);
+    // Pages section: order and visibility from tenant.data.sidebar_pages
+    const mainNavItems = useMemo(() => {
+        if (!effectiveTenant?.slug) return [];
+        return buildSidebarPages(
+            effectiveTenant.slug,
+            effectiveTenant.data?.sidebar_pages
+        ).map(({ title, href, icon }) => ({ title, href, icon }));
+    }, [effectiveTenant?.slug, effectiveTenant?.data?.sidebar_pages]);
 
     const footerNavItems: NavItem[] = [
         {

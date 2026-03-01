@@ -39,6 +39,8 @@ Route::middleware([
                 Route::post('invites/{invite}/cancel', [SettingsController::class, 'cancelInvite'])->name('settings.organization.invites.cancel');
                 Route::post('invites/{invite}/resend', [SettingsController::class, 'resendInvite'])->name('settings.organization.invites.resend');
                 Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
+                Route::get('sidebar', [SettingsController::class, 'organizationSidebar'])->name('settings.organization.sidebar');
+                Route::patch('sidebar', [SettingsController::class, 'updateSidebar'])->name('settings.organization.sidebar.update');
                 Route::post('members/{member}/update-role', [SettingsController::class, 'updateMemberRole'])->name('settings.organization.members.update-role');
                 Route::post('/members/{member}/remove', [SettingsController::class, 'removeMember'])->name('settings.organization.members.remove');
             });

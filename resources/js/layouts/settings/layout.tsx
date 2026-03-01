@@ -19,6 +19,7 @@ import {
     Building2,
     Users,
     LayoutGrid,
+    PanelLeft,
     UserPlus,
     KeyRound,
     Webhook,
@@ -89,6 +90,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     title: 'Teamspaces',
                     href: `/${effectiveTenant?.slug}/settings/organization/teamspaces`,
                     icon: LayoutGrid,
+                },
+                {
+                    title: 'Sidebar pages',
+                    href: `/${effectiveTenant?.slug}/settings/organization/sidebar`,
+                    icon: PanelLeft,
                 },
                 {
                     title: 'Invites',

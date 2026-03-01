@@ -110,7 +110,7 @@ export default function ExportImportPage({ sections, success, error }: Props) {
                                 Export
                             </CardTitle>
                             <CardDescription>
-                                Choose what to include in the export, then download as JSON or XML.
+                                Choose what to include in the export, then download as JSON or XML. Exporting &quot;Tenants&quot; includes each organization&apos;s sidebar page order and visibility.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">

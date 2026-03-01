@@ -91,6 +91,7 @@ export default function VaultAdminDashboard({ quickStats, recentActivity }: Prop
                 { name: 'System Settings', href: '/admin/settings' },
                 { name: 'Loan Settings', href: '/admin/settings/loan' },
                 { name: 'API Management', href: '/admin/settings/api' },
+                ...(isSuperAdmin ? [{ name: 'Export / Import', href: '/admin/export-import' }] : []),
             ],
         },
     ];

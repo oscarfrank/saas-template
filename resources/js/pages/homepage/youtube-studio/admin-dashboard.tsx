@@ -80,6 +80,7 @@ export default function YouTubeStudioAdminDashboard({ quickStats, recentActivity
             items: [
                 { name: 'System Settings', href: '/admin/settings' },
                 { name: 'API Management', href: '/admin/settings/api' },
+                ...(isSuperAdmin ? [{ name: 'Export / Import', href: '/admin/export-import' }] : []),
             ],
         },
     ];

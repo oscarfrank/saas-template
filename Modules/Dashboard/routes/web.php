@@ -9,6 +9,7 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 // Local Modular Dependencies
 use Modules\Dashboard\Http\Controllers\DashboardController;
 use Modules\Loan\Http\Controllers\LoanDashboardController;
+use App\Http\Controllers\Admin\ExportImportController;
 
 use App\Traits\LevelBasedAuthorization;
 use App\Helpers\AccessLevel;
@@ -49,8 +50,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('admin')->middleware(['except.user'])->group(function () {
 
         Route::get('dashboard', [LoanDashboardController::class, 'adminDashboard'])->name('admin.dashboard');
-       
-
+        Route::get('export-import', [ExportImportController::class, 'index'])->name('admin.export-import');
+        Route::match(['get', 'post'], 'export', [ExportImportController::class, 'export'])->name('admin.export');
+        Route::post('import', [ExportImportController::class, 'import'])->name('admin.import');
     });
 
 

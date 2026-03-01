@@ -1,0 +1,1 @@
+import{r as s,j as t}from"./app-C6kPN11i.js";/* empty css            */function n({checkoutUrl:e}){return s.useEffect(()=>{e&&(window.location.href=e)},[e]),t.jsx("div",{className:"flex items-center justify-center min-h-screen",children:t.jsx("div",{className:"text-center",children:t.jsx("p",{className:"text-lg",children:"Redirecting to checkout..."})})})}export{n as default};

@@ -166,6 +166,10 @@ class HandleInertiaRequests extends Middleware
                 'landing_behavior' => $user->getPreferences()->getLandingBehavior(),
             ] : null,
             'message' => fn () => $request->session()->get('message'),
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
         ];
     }
 }

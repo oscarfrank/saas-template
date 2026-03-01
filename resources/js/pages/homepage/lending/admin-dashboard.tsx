@@ -125,6 +125,7 @@ export default function LendingAdminDashboard({ quickStats, loanStats, recentAct
                 { name: 'Security', href: '/admin/security' },
                 { name: 'API Management', href: '/admin/settings/api' },
                 { name: 'Currencies', href: '/admin/currencies' },
+                ...(isSuperAdmin ? [{ name: 'Export / Import', href: '/admin/export-import' }] : []),
             ],
         },
     ];

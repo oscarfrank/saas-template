@@ -83,12 +83,24 @@ class ExportImportController extends Controller
 
     /**
      * Import from uploaded JSON or XML file.
+     * Note: If the upload never reaches Laravel (e.g. "POST data is too large"), PHP has rejected
+     * the request. Increase post_max_size and upload_max_filesize in php.ini.
      */
     public function import(Request $request)
     {
         $this->ensureSuperAdmin();
+
+        // When PHP rejects the request due to post_max_size, $_FILES is empty and we get no file
+        if (! $request->hasFile('file') && $request->isMethod('post') && $request->header('Content-Length')) {
+            $contentLength = (int) $request->header('Content-Length');
+            $postMaxSize = $this->parsePhpSize(ini_get('post_max_size'));
+            if ($postMaxSize > 0 && $contentLength > $postMaxSize) {
+                return redirect()->back()->with('error', 'The file or request is larger than the server allows (PHP post_max_size is ' . ini_get('post_max_size') . '). Increase post_max_size and upload_max_filesize in php.ini, then restart the web server.');
+            }
+        }
+
         $request->validate([
-            'file' => 'required|file|mimes:json,xml|max:512000', // 512MB max
+            'file' => 'required|file|mimes:json,xml|max:512000', // 512MB max (Laravel); server may limit lower
         ]);
 
         $file = $request->file('file');
@@ -141,5 +153,24 @@ class ExportImportController extends Controller
             $out['tenant_data'] = [];
         }
         return $out;
+    }
+
+    /**
+     * Parse PHP size string (e.g. "8M", "128M") to bytes. Returns 0 if unparseable.
+     */
+    protected function parsePhpSize(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '' || $value === '-1') {
+            return 0;
+        }
+        $unit = strtoupper(substr($value, -1));
+        $num = (int) substr($value, 0, -1);
+        return match ($unit) {
+            'G' => $num * 1024 * 1024 * 1024,
+            'M' => $num * 1024 * 1024,
+            'K' => $num * 1024,
+            default => (int) $value,
+        };
     }
 }

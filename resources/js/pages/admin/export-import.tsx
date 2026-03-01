@@ -198,6 +198,9 @@ export default function ExportImportPage({ sections, success, error }: Props) {
                                     {importForm.errors.file && (
                                         <p className="text-sm text-destructive">{importForm.errors.file}</p>
                                     )}
+                                    <p className="text-xs text-muted-foreground">
+                                        If you see &quot;The POST data is too large&quot;, the file exceeds your server limit. Increase PHP <code className="rounded bg-muted px-1">post_max_size</code> and <code className="rounded bg-muted px-1">upload_max_filesize</code> in php.ini (and Nginx <code className="rounded bg-muted px-1">client_max_body_size</code> if used), then restart the web server.
+                                    </p>
                                 </div>
                                 <div className="space-y-3">
                                     <Label>Import only</Label>

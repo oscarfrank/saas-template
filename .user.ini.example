@@ -1,0 +1,4 @@
+; Copy to .user.ini (or set in php.ini) if admin Export/Import uploads fail with
+; "The POST data is too large". Adjust values as needed; restart web server after change.
+post_max_size = 128M
+upload_max_filesize = 128M

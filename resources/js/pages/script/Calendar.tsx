@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Film, Smartphone } from 'lucide-react';
 
 interface ScriptCalendarItem {
     id: number;
@@ -202,16 +202,12 @@ export default function ScriptCalendarPage({ scripts }: Props) {
                                     const p = arg.event.extendedProps.production_status as string | undefined;
                                     const scriptType = arg.event.extendedProps.script_type as string | undefined;
                                     const extra = getEventStyleClass(s ?? '', p);
-                                    const typeLabel = scriptType === 'Shorts' ? 'Shorts' : scriptType === 'Long Form' ? 'Long' : scriptType ?? null;
-                                    const typeBorderClass = scriptType === 'Shorts'
-                                        ? 'border-l-2 border-l-blue-500'
-                                        : scriptType === 'Long Form'
-                                            ? 'border-l-2 border-l-pink-500'
-                                            : '';
+                                    const TypeIcon = scriptType === 'Shorts' ? Smartphone : scriptType === 'Long Form' ? Film : null;
+                                    const iconColor = scriptType === 'Shorts' ? 'text-blue-500' : scriptType === 'Long Form' ? 'text-pink-500' : '';
                                     return (
-                                        <div className={`fc-script-event-title ${extra} ${typeBorderClass}`}>
+                                        <div className={`fc-script-event-title ${extra} inline-flex items-center gap-1.5`}>
+                                            {TypeIcon && <TypeIcon className={`h-3.5 w-3.5 shrink-0 ${iconColor}`} aria-hidden />}
                                             <span>{arg.event.title}</span>
-                                            {typeLabel && <span className="ml-1 opacity-80 text-[10px]">· {typeLabel}</span>}
                                         </div>
                                     );
                                 }}
@@ -232,11 +228,11 @@ export default function ScriptCalendarPage({ scripts }: Props) {
                     <span className="inline-block rounded px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground border-b-2 border-emerald-500">
                         Ready: {summary.ready}
                     </span>
-                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-muted-foreground border-l-2 border-pink-500 pl-2">
-                        Long Form: {summary.longForm}
+                    <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        <Film className="h-3.5 w-3.5 shrink-0 text-pink-500" aria-hidden /> Long Form: {summary.longForm}
                     </span>
-                    <span className="inline-block rounded px-2 py-0.5 text-xs font-medium text-muted-foreground border-l-2 border-blue-500 pl-2">
-                        Shorts: {summary.shorts}
+                    <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        <Smartphone className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-hidden /> Shorts: {summary.shorts}
                     </span>
                 </div>
                 <style>{`
@@ -247,7 +243,9 @@ export default function ScriptCalendarPage({ scripts }: Props) {
                         white-space: normal;
                         font-size: 0.75rem;
                         line-height: 1rem;
-                        display: inline-block;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.375rem;
                         padding: 2px 4px;
                         border-radius: 4px;
                     }

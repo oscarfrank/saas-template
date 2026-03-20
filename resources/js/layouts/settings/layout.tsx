@@ -24,6 +24,7 @@ import {
     KeyRound,
     Webhook,
     History,
+    Sparkles,
 } from 'lucide-react';
 
 interface SettingsGroup {
@@ -95,6 +96,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     title: 'Sidebar pages',
                     href: `/${effectiveTenant?.slug}/settings/organization/sidebar`,
                     icon: PanelLeft,
+                },
+                {
+                    title: 'AI prompts',
+                    href: `/${effectiveTenant?.slug}/settings/organization/ai-prompts`,
+                    icon: Sparkles,
                 },
                 {
                     title: 'Invites',

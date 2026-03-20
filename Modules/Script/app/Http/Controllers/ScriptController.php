@@ -5,34 +5,37 @@ namespace Modules\Script\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\TenantScriptRole;
+use App\Services\TenantAiPromptResolver;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\HttpFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\HttpFactory;
-use MrMySQL\YoutubeTranscript\Exception\NoTranscriptAvailableException;
-use MrMySQL\YoutubeTranscript\Exception\NoTranscriptFoundException;
-use MrMySQL\YoutubeTranscript\Exception\TranscriptsDisabledException;
-use MrMySQL\YoutubeTranscript\Exception\TooManyRequestsException;
-use MrMySQL\YoutubeTranscript\Exception\YouTubeRequestFailedException;
-use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Script\Models\Script;
-use Modules\Script\Models\ScriptAccessDenied;
-use Modules\Script\Models\ScriptCoAuthor;
 use Modules\Script\Models\ScriptCollaborator;
 use Modules\Script\Models\ScriptThumbnail;
 use Modules\Script\Models\ScriptType;
+use MrMySQL\YoutubeTranscript\Exception\NoTranscriptAvailableException;
+use MrMySQL\YoutubeTranscript\Exception\NoTranscriptFoundException;
+use MrMySQL\YoutubeTranscript\Exception\TooManyRequestsException;
+use MrMySQL\YoutubeTranscript\Exception\TranscriptsDisabledException;
+use MrMySQL\YoutubeTranscript\Exception\YouTubeRequestFailedException;
+use MrMySQL\YoutubeTranscript\TranscriptListFetcher;
 use OpenAI\Laravel\Facades\OpenAI;
 
 final class ScriptController extends Controller
 {
+    public function __construct(
+        private readonly TenantAiPromptResolver $aiPrompts,
+    ) {}
+
     protected function ensureDefaultScriptTypes(string $tenantId): void
     {
         if (ScriptType::where('tenant_id', $tenantId)->exists()) {
@@ -196,7 +199,8 @@ final class ScriptController extends Controller
             if (count($creatorIds) > 0) {
                 $creatorUsers = \Modules\User\Models\User::whereIn('id', $creatorIds)->get(['id', 'first_name', 'last_name', 'email']);
                 $writers = $creatorUsers->map(function ($u) {
-                    $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+                    $name = trim(($u->first_name ?? '').' '.($u->last_name ?? ''));
+
                     return [
                         'user_id' => $u->id,
                         'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
@@ -353,7 +357,7 @@ final class ScriptController extends Controller
                     'due_at' => $t->due_at?->toIso8601String(),
                     'completed_at' => $t->completed_at?->toIso8601String(),
                     'assignee' => $t->assignee?->user
-                        ? trim($t->assignee->user->first_name . ' ' . $t->assignee->user->last_name)
+                        ? trim($t->assignee->user->first_name.' '.$t->assignee->user->last_name)
                         : null,
                 ])
                 ->values()
@@ -361,6 +365,7 @@ final class ScriptController extends Controller
         }
 
         $user = $request->user();
+
         return Inertia::render('script/Form', [
             'script' => Inertia::defer(fn () => $this->formatScriptForEdit($script, $user)),
             'scriptTypes' => $scriptTypes,
@@ -454,6 +459,7 @@ final class ScriptController extends Controller
             abort(403, 'You do not have permission to delete this script.');
         }
         $script->delete();
+
         return redirect()->route('script.index', ['tenant' => tenant('slug')])
             ->with('success', 'Script moved to recycle bin.');
     }
@@ -472,6 +478,7 @@ final class ScriptController extends Controller
             abort(403, 'You do not have permission to restore this script.');
         }
         $scriptModel->restore();
+
         return redirect()->route('script.index', ['tenant' => tenant('slug')])
             ->with('success', 'Script restored.');
     }
@@ -490,6 +497,7 @@ final class ScriptController extends Controller
             abort(403, 'You do not have permission to permanently delete this script.');
         }
         $scriptModel->forceDelete();
+
         return redirect()->route('script.index', ['tenant' => tenant('slug'), 'trashed' => 1])
             ->with('success', 'Script permanently deleted.');
     }
@@ -552,44 +560,12 @@ final class ScriptController extends Controller
         $content = $validated['content'];
         $styles = $validated['styles'];
         $stylesLabel = implode(', ', array_map('ucfirst', $styles));
+        $tenantId = tenant('id');
+        $systemPrompt = $this->aiPrompts->resolve($tenantId, 'script.title_ideas', [
+            'stylesLabel' => $stylesLabel,
+        ]);
 
-        $systemPrompt = <<<PROMPT
-You are a YouTube growth-focused content strategist.
-
-Your task is to analyze the video script/transcript provided and generate high-performing YouTube titles and thumbnail text optimized for:
-- High CTR (click-through rate)
-- Strong search intent (SEO) where relevant
-- Curiosity + clarity balance
-- Human, natural phrasing (not robotic or keyword-stuffed)
-
-Think deeply before responding. Do not rush. Optimize like a creator with experience scaling videos.
-
-DELIVERABLES (output only these, as JSON):
-
-1. TITLES
-Generate exactly 5 YouTube titles.
-Each title must:
-- Be under 70 characters
-- Sound natural and conversational
-- Trigger curiosity or tension without clickbait lies
-- Be optimized for search where relevant
-- Avoid repeating the exact same structure across all 5 titles
-- Match the requested style(s): {$stylesLabel}
-
-2. THUMBNAIL TEXT
-Generate ONE thumbnail text option per title (5 total).
-Each thumbnail text must:
-- Be 2–3 words max
-- Be emotionally punchy or curiosity-driven
-- Complement the title (do NOT repeat it)
-- Be readable at a glance on mobile
-
-OUTPUT FORMAT
-Respond with a single JSON array of exactly 5 objects, no other text or markdown. Each object must have exactly two keys: "title" (string) and "thumbnailText" (string).
-Example: [{"title":"Your first title here","thumbnailText":"Two Words"},{"title":"Second title","thumbnailText":"Punchy Phrase"}, ...]
-PROMPT;
-
-        $userPrompt = "Requested title style(s): {$stylesLabel}.\n\nHere is the video script/transcript:\n\n" . $content;
+        $userPrompt = "Requested title style(s): {$stylesLabel}.\n\nHere is the video script/transcript:\n\n".$content;
 
         try {
             $response = OpenAI::chat()->create([
@@ -609,6 +585,7 @@ PROMPT;
             $decoded = json_decode($text, true);
             if (! is_array($decoded)) {
                 Log::warning('ScriptController::generateTitleIdeas invalid JSON', ['response' => $text]);
+
                 return response()->json(['message' => 'Invalid response from AI'], 502);
             }
 
@@ -627,6 +604,7 @@ PROMPT;
             return response()->json(['titles' => $titles]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::generateTitleIdeas failed', ['error' => $e->getMessage()]);
+
             return response()->json(
                 ['message' => 'Failed to generate ideas. Please try again.'],
                 500
@@ -649,16 +627,9 @@ PROMPT;
         $selectedText = $validated['selected_text'];
         $instruction = $validated['instruction'];
 
-        $systemPrompt = <<<'PROMPT'
-You are an expert editor. The user will give you:
-1. A full script (for context)
-2. A selected excerpt from that script
-3. An instruction (e.g. "rewrite to be more conversational", "make the intro punchier")
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.ai_edit_selection');
 
-Your task: apply the instruction ONLY to the selected excerpt. Return ONLY the rewritten excerpt as plain text. Do not include the rest of the script, no markdown, no quotes, no explanation. Preserve the same general length and structure unless the instruction asks otherwise.
-PROMPT;
-
-        $userPrompt = "Full script (for context):\n\n" . $content . "\n\n---\n\nSelected excerpt to rewrite:\n\n" . $selectedText . "\n\n---\n\nInstruction: " . $instruction;
+        $userPrompt = "Full script (for context):\n\n".$content."\n\n---\n\nSelected excerpt to rewrite:\n\n".$selectedText."\n\n---\n\nInstruction: ".$instruction;
 
         try {
             $response = OpenAI::chat()->create([
@@ -678,6 +649,7 @@ PROMPT;
             return response()->json(['rewritten' => $rewritten]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::aiEditSelection failed', ['error' => $e->getMessage()]);
+
             return response()->json(
                 ['message' => 'AI edit failed. Please try again.'],
                 500
@@ -699,24 +671,21 @@ PROMPT;
         $content = $validated['content'] ?? '';
         $fullScript = $validated['full_script'] ?? $content;
 
-        $anchorFramework = <<<'ANCHORS'
-Use this hook/anchor framework. The 10 anchors are: Risk; Conflict / Accusation; Remove Soft Language; Short, Punchy Sentences; Uncomfortable Truth; Contradiction; Bigger Question Framing; Shift from Review to Revelation; Stronger Conviction; Higher Emotional Tension.
-You MUST: (1) Pick ONE of these as the primary anchor for the hook. (2) Weave in at least TWO other anchors from the list as supporting enhancers. Apply them in the writing—do not list their names in the output. Then output only the script, no explanation or labels.
-ANCHORS;
-
+        $tid = tenant('id');
+        $anchorFramework = $this->aiPrompts->resolve($tid, 'script.ai_script_action.anchor_framework');
         $instructions = [
-            'intro' => $anchorFramework . ' Write a short, punchy YouTube video intro (first 30–60 seconds). Hook the viewer immediately.',
-            'outro' => 'Write a short YouTube video outro. Include a clear call to action (subscribe, like, link in description). Output only the outro script, no explanation.',
-            'hook' => $anchorFramework . ' Write a strong hook for the first 15–30 seconds of this script. One or two sentences that grab attention.',
-            'shorten' => 'Shorten this text while keeping the main point. Keep it conversational. Output only the shortened text.',
-            'expand' => 'Expand this with a bit more detail or an example. Keep the same tone. Output only the expanded text.',
-            'casual' => 'Rewrite this to sound more casual and conversational, as if speaking to a friend. Output only the rewritten text.',
-            'add_example' => 'Add a brief, concrete example to illustrate the point. Keep the original and add the example naturally. Output only the revised text.',
+            'intro' => $anchorFramework.$this->aiPrompts->resolve($tid, 'script.ai_script_action.suffix_intro'),
+            'outro' => $this->aiPrompts->resolve($tid, 'script.ai_script_action.instruction_outro'),
+            'hook' => $anchorFramework.$this->aiPrompts->resolve($tid, 'script.ai_script_action.suffix_hook'),
+            'shorten' => $this->aiPrompts->resolve($tid, 'script.ai_script_action.instruction_shorten'),
+            'expand' => $this->aiPrompts->resolve($tid, 'script.ai_script_action.instruction_expand'),
+            'casual' => $this->aiPrompts->resolve($tid, 'script.ai_script_action.instruction_casual'),
+            'add_example' => $this->aiPrompts->resolve($tid, 'script.ai_script_action.instruction_add_example'),
         ];
-        $systemPrompt = 'You are an expert YouTube script editor. Apply the user\'s instruction. Return ONLY the requested text—no markdown, no quotes, no meta-commentary.';
+        $systemPrompt = $this->aiPrompts->resolve($tid, 'script.ai_script_action.system');
         $userPrompt = $action === 'intro' || $action === 'outro' || $action === 'hook'
-            ? "Script (for context):\n\n" . $fullScript . "\n\n---\n\nInstruction: " . $instructions[$action]
-            : "Text to edit:\n\n" . $content . "\n\n---\n\nInstruction: " . $instructions[$action];
+            ? "Script (for context):\n\n".$fullScript."\n\n---\n\nInstruction: ".$instructions[$action]
+            : "Text to edit:\n\n".$content."\n\n---\n\nInstruction: ".$instructions[$action];
 
         try {
             $response = OpenAI::chat()->create([
@@ -731,9 +700,11 @@ ANCHORS;
             if ($text === '') {
                 return response()->json(['message' => 'No response from AI. Try again.'], 422);
             }
+
             return response()->json(['text' => $text]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::aiScriptAction failed', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => 'AI action failed. Please try again.'], 500);
         }
     }
@@ -752,6 +723,7 @@ ANCHORS;
             ->where('user_id', $userId)
             ->orderBy('title')
             ->get(['id', 'title', 'body']);
+
         return response()->json(['snippets' => $snippets]);
     }
 
@@ -775,6 +747,7 @@ ANCHORS;
             'title' => $validated['title'],
             'body' => $validated['body'],
         ]);
+
         return response()->json(['snippet' => ['id' => $snippet->id, 'title' => $snippet->title, 'body' => $snippet->body]]);
     }
 
@@ -790,6 +763,7 @@ ANCHORS;
             return response()->json(['message' => 'Snippet not found.'], 404);
         }
         $snippet->delete();
+
         return response()->json(['success' => true]);
     }
 
@@ -814,6 +788,7 @@ ANCHORS;
                 return substr($text, $start, $end - $start + 1);
             }
         }
+
         return $text;
     }
 
@@ -839,53 +814,12 @@ ANCHORS;
             ]);
         }
 
-        $retentionSystemPrompt = <<<'PROMPT'
-You are a YouTube retention strategist. Optimize for: viewer retention, emotional engagement, personality, authority, watch time. Creator style: tech YouTuber, calm authority, rational, slightly playful.
-
-Your output has two parts only:
-
-1. A SHORT explanation (2–4 sentences): overall retention strength, the main thing to improve, and that the suggestions below are the concrete edits to consider. No long lists, no scores, no section-by-section breakdown. Keep it brief.
-
-2. Concrete replacement suggestions: specific phrases or short passages in the script that you rewrite for better retention/engagement. Each suggestion will be inserted above the original so the user can compare.
-
-You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
-- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
-- "suggestions": array of objects, each with "label" (short name, e.g. "Hook", "Pacing"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim so we can locate it), "suggestedText" (the rewritten version to insert above the original). Provide at least 1 and up to 5 suggestions. The originalSnippet must be copied exactly from the script.
-PROMPT;
-
-        $ctaSystemPrompt = <<<'PROMPT'
-You are a YouTube growth strategist focused on calls to action and conversion. The creator wants to drive actions (subscribe, like, link in description, product, etc.) without feeling pushy.
-
-Your output has two parts only:
-
-1. A SHORT explanation (2–4 sentences): how strong the CTAs are, where they land, and the main thing to improve. Then say the suggestions below are concrete edits to consider. Keep it brief.
-
-2. Concrete replacement suggestions: specific phrases or short passages in the script where the CTA is weak, missing, or could be more effective. Rewrite them so the ask feels earned and clear. Each suggestion will be inserted above the original so the user can compare. Provide at least 1 and up to 5 suggestions. The originalSnippet must be an exact 15–40 word quote from the script so we can locate it.
-
-You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
-- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
-- "suggestions": array of objects, each with "label" (short name, e.g. "Subscribe CTA", "Link CTA"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim), "suggestedText" (the rewritten version to insert above the original). The originalSnippet must be copied exactly from the script.
-PROMPT;
-
-        $storytellingSystemPrompt = <<<'PROMPT'
-You are a storytelling and narrative coach for video scripts. Focus on: narrative arc, tension and release, clarity of the "story", and where the script goes flat or loses the thread.
-
-Your output has two parts only:
-
-1. A SHORT explanation (2–4 sentences): overall narrative strength, where the story holds or drops, and the main thing to improve. Then say the suggestions below are concrete edits to consider. Keep it brief.
-
-2. Concrete replacement suggestions: specific phrases or short passages in the script where the narrative could be stronger—better transitions, clearer stakes, a punchier beat, or a line that reinforces the arc. Each suggestion will be inserted above the original so the user can compare. Provide at least 1 and up to 5 suggestions. The originalSnippet must be an exact 15–40 word quote from the script so we can locate it.
-
-You MUST respond with ONLY valid JSON (no markdown code fence, no extra text). Use exactly these keys:
-- "analysis": string, the SHORT explanation only (2–4 sentences, plain text or minimal markdown).
-- "suggestions": array of objects, each with "label" (short name, e.g. "Transition", "Stakes"), "originalSnippet" (exact 15–40 word quote from the script that must appear verbatim), "suggestedText" (the rewritten version to insert above the original). The originalSnippet must be copied exactly from the script.
-PROMPT;
-
+        $tid = tenant('id');
         $systemPrompt = match ($type) {
-            'retention' => $retentionSystemPrompt,
-            'cta' => $ctaSystemPrompt,
-            'storytelling' => $storytellingSystemPrompt,
-            default => $retentionSystemPrompt,
+            'retention' => $this->aiPrompts->resolve($tid, 'script.analyze_retention'),
+            'cta' => $this->aiPrompts->resolve($tid, 'script.analyze_cta'),
+            'storytelling' => $this->aiPrompts->resolve($tid, 'script.analyze_storytelling'),
+            default => $this->aiPrompts->resolve($tid, 'script.analyze_retention'),
         };
 
         try {
@@ -893,7 +827,7 @@ PROMPT;
                 'model' => config('openai.chat_model'),
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => "Here is my script:\n\n" . $content],
+                    ['role' => 'user', 'content' => "Here is my script:\n\n".$content],
                 ],
                 'max_completion_tokens' => 4096,
                 'temperature' => 0.4,
@@ -903,6 +837,7 @@ PROMPT;
             $data = json_decode($text, true);
             if (! is_array($data)) {
                 Log::warning('ScriptController::analyzeScript invalid JSON', ['response' => substr($text, 0, 500)]);
+
                 return response()->json(['message' => 'Invalid response from AI. Please try again.'], 502);
             }
             $analysis = isset($data['analysis']) && is_string($data['analysis']) ? $data['analysis'] : $text;
@@ -918,12 +853,14 @@ PROMPT;
                     }
                 }
             }
+
             return response()->json([
                 'analysis' => $analysis,
                 'suggestions' => $suggestions,
             ]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::analyzeScript failed', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => 'Analysis failed. Please try again.'], 500);
         }
     }
@@ -940,25 +877,14 @@ PROMPT;
         ]);
         $content = $validated['content'];
 
-        $systemPrompt = <<<'PROMPT'
-You are a short-form video script writer. Turn a long-form script into a SHORT version (e.g. for YouTube Shorts, TikTok, Reels).
-
-The short must be:
-- Interactive and engaging: hooks, questions, direct address to the viewer
-- Conversational and natural, like talking to a friend
-- Punchy and concise: short sentences, no fluff
-- Optionally funny or witty where it fits the topic
-- Designed for vertical/short format: strong opening, clear beats, satisfying end in 60–90 seconds when read aloud
-
-Output ONLY the short script as plain text. No titles, no stage directions, no "Short script:" prefix. Just the script the creator will read. Use line breaks between paragraphs/beats. Do not add meta commentary.
-PROMPT;
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.generate_short');
 
         try {
             $response = OpenAI::chat()->create([
                 'model' => config('openai.chat_model'),
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => "Turn this full script into a short:\n\n" . $content],
+                    ['role' => 'user', 'content' => "Turn this full script into a short:\n\n".$content],
                 ],
                 'max_completion_tokens' => 2048,
                 'temperature' => 0.6,
@@ -967,9 +893,11 @@ PROMPT;
             if ($shortScript === '') {
                 return response()->json(['message' => 'No short script generated. Try again.'], 422);
             }
+
             return response()->json(['short_script' => $shortScript]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::generateShort failed', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => 'Could not generate short. Please try again.'], 500);
         }
     }
@@ -984,31 +912,9 @@ PROMPT;
         ]);
         $content = $validated['content'];
 
-        $systemPrompt = <<<'PROMPT'
-You are a YouTube growth-focused content strategist.
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.description_assets');
 
-Analyze the video script/transcript and generate the following. Output ONLY valid JSON with no markdown or extra text.
-Do NOT generate related videos — the user will add those manually as "video 1 - ", "video 2 - ", "video 3 - ".
-
-1. SHORT YOUTUBE DESCRIPTION (key "shortDescription")
-   - Hook the viewer in the first 2 lines
-   - Clearly explain what the video delivers
-   - Human, conversational tone
-   - Naturally include relevant keywords (no stuffing)
-   - Optimized for both viewers and the algorithm
-
-2. TIMESTAMPS (key "timestamps")
-   - Based on the script structure. Each object: "time" (e.g. "0:00", "1:23"), "label" (string)
-   - Engaging but clear section titles, skimmable
-
-3. META TAGS (key "metaTags")
-   - Single string: comma-separated tags. Include broad, mid, and long-tail keywords for search discoverability.
-
-JSON shape (use exactly these keys):
-{"shortDescription":"...","timestamps":[{"time":"0:00","label":"..."},...],"metaTags":"tag1, tag2, tag3, ..."}
-PROMPT;
-
-        $userPrompt = "Here is the video script/transcript:\n\n" . $content;
+        $userPrompt = "Here is the video script/transcript:\n\n".$content;
 
         try {
             $response = OpenAI::chat()->create([
@@ -1028,6 +934,7 @@ PROMPT;
             $data = json_decode($text, true);
             if (! is_array($data)) {
                 Log::warning('ScriptController::generateDescriptionAssets invalid JSON', ['response' => $text]);
+
                 return response()->json(['message' => 'Invalid response from AI'], 502);
             }
 
@@ -1054,6 +961,7 @@ PROMPT;
             ]);
         } catch (\Throwable $e) {
             Log::error('ScriptController::generateDescriptionAssets failed', ['error' => $e->getMessage()]);
+
             return response()->json(
                 ['message' => 'Failed to generate description assets. Please try again.'],
                 500
@@ -1092,6 +1000,7 @@ PROMPT;
             $row['deleted_at'] = $script->deleted_at?->toIso8601String();
             $row['deleted_at_human'] = $script->deleted_at?->diffForHumans();
         }
+
         return $row;
     }
 
@@ -1120,7 +1029,7 @@ PROMPT;
             'thumbnails' => $script->thumbnails->map(fn ($t) => [
                 'id' => $t->id,
                 'type' => $t->type,
-                'url' => $t->storage_path ? asset('storage/' . $t->storage_path) : null,
+                'url' => $t->storage_path ? asset('storage/'.$t->storage_path) : null,
                 'filename' => $t->filename,
                 'sort_order' => $t->sort_order,
             ])->values()->all(),
@@ -1143,18 +1052,18 @@ PROMPT;
                 : null,
             'author' => $script->creator ? [
                 'user_id' => $script->creator->id,
-                'name' => trim(($script->creator->first_name ?? '') . ' ' . ($script->creator->last_name ?? '')) ?: $script->creator->email ?? 'Unknown',
+                'name' => trim(($script->creator->first_name ?? '').' '.($script->creator->last_name ?? '')) ?: $script->creator->email ?? 'Unknown',
                 'email' => $script->creator->email ?? '',
             ] : null,
             'co_authors' => $script->coAuthors()->with('user')->orderBy('sort_order')->get()->map(fn ($ca) => [
                 'user_id' => $ca->user_id,
-                'name' => trim(($ca->user->first_name ?? '') . ' ' . ($ca->user->last_name ?? '')) ?: $ca->user->email ?? 'Unknown',
+                'name' => trim(($ca->user->first_name ?? '').' '.($ca->user->last_name ?? '')) ?: $ca->user->email ?? 'Unknown',
                 'email' => $ca->user->email ?? '',
                 'sort_order' => $ca->sort_order,
             ])->values()->all(),
             'last_edited_by' => $script->updater ? [
                 'user_id' => $script->updater->id,
-                'name' => trim(($script->updater->first_name ?? '') . ' ' . ($script->updater->last_name ?? '')) ?: $script->updater->email ?? 'Unknown',
+                'name' => trim(($script->updater->first_name ?? '').' '.($script->updater->last_name ?? '')) ?: $script->updater->email ?? 'Unknown',
                 'email' => $script->updater->email ?? '',
             ] : null,
             'updated_at' => $script->updated_at?->toIso8601String(),
@@ -1178,7 +1087,7 @@ PROMPT;
             'locked' => true,
             'locked_by' => $locker ? [
                 'user_id' => $locker->id,
-                'name' => trim(($locker->first_name ?? '') . ' ' . ($locker->last_name ?? '')) ?: $locker->email ?? 'Unknown',
+                'name' => trim(($locker->first_name ?? '').' '.($locker->last_name ?? '')) ?: $locker->email ?? 'Unknown',
             ] : null,
             'locked_at' => $script->locked_at?->toIso8601String(),
         ];
@@ -1279,27 +1188,14 @@ PROMPT;
             return response()->json(['message' => 'Script has no content to generate captions from.'], 422);
         }
 
-        $systemPrompt = <<<'PROMPT'
-You are a social media copywriter. Create short-form captions for reels/shorts that work across Instagram Reels, TikTok, Facebook Reels, and X (Twitter).
-
-Given a video script, output exactly 3 different caption options. Each caption must:
-- Hook viewers in the first line (ideal for feeds)
-- Be concise (roughly 1–3 short sentences or a punchy phrase; can use line breaks)
-- Include 2–5 relevant hashtags: place them at the end of the caption (or after a line break). Use hashtags that fit the topic and help discoverability on IG/TikTok/FB (e.g. #tech #tips #howto). No generic spam.
-- Feel native to reels/shorts: conversational, engaging
-- Work for IG Reels, TikTok, Facebook Reels, and X (avoid platform-specific jargon)
-- Vary in tone: e.g. one more curiosity-driven, one direct, one playful
-
-Output ONLY a JSON object with one key: "captions" (array of exactly 3 strings). No other text or markdown.
-Example: {"captions": ["Hook line here.\n\n#topic #niche", "Second caption with #hashtags at the end.", "Third option.\n\n#relevant #tags"]}
-PROMPT;
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.reel_captions');
 
         try {
             $response = OpenAI::chat()->create([
                 'model' => config('openai.chat_model'),
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => "Video script:\n\n" . $content],
+                    ['role' => 'user', 'content' => "Video script:\n\n".$content],
                 ],
                 'max_completion_tokens' => 1024,
                 'temperature' => 0.7,
@@ -1318,6 +1214,7 @@ PROMPT;
             $data = json_decode($text, true);
             if (! is_array($data) || ! isset($data['captions']) || ! is_array($data['captions'])) {
                 Log::warning('ScriptController::generateReelCaptions invalid JSON', ['response' => substr($text, 0, 300)]);
+
                 return response()->json(['message' => 'Invalid response from AI. Please try again.'], 502);
             }
             $captions = array_slice(array_filter(array_map(function ($c) {
@@ -1337,6 +1234,7 @@ PROMPT;
             return response()->json($payload);
         } catch (\Throwable $e) {
             Log::error('ScriptController::generateReelCaptions failed', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => 'Could not generate captions. Please try again.'], 500);
         }
     }
@@ -1361,6 +1259,7 @@ PROMPT;
             'generated_at' => now()->toIso8601String(),
         ];
         $script->update(['custom_attributes' => $existing]);
+
         return response()->json(['ok' => true]);
     }
 
@@ -1384,6 +1283,7 @@ PROMPT;
             'generated_at' => now()->toIso8601String(),
         ];
         $script->update(['custom_attributes' => $existing]);
+
         return response()->json(['ok' => true]);
     }
 
@@ -1407,6 +1307,7 @@ PROMPT;
             'generated_at' => now()->toIso8601String(),
         ];
         $script->update(['custom_attributes' => $existing]);
+
         return response()->json(['ok' => true]);
     }
 
@@ -1426,6 +1327,7 @@ PROMPT;
                 'suggestedText' => Str::limit((string) $item['suggestedText'], 10000),
             ];
         }
+
         return $suggestions;
     }
 
@@ -1467,7 +1369,7 @@ PROMPT;
             'thumbnail' => [
                 'id' => $thumb->id,
                 'type' => $thumb->type,
-                'url' => asset('storage/' . $thumb->storage_path),
+                'url' => asset('storage/'.$thumb->storage_path),
                 'filename' => $thumb->filename,
                 'sort_order' => $thumb->sort_order,
             ],
@@ -1594,7 +1496,7 @@ PROMPT;
                 'type' => $t->type,
                 'filename' => $t->filename,
                 'storage_path' => $t->storage_path,
-                'url' => $t->storage_path ? asset('storage/' . $t->storage_path) : null,
+                'url' => $t->storage_path ? asset('storage/'.$t->storage_path) : null,
                 'sort_order' => $t->sort_order,
             ])->values()->all(),
             'created_at' => $script->created_at?->toIso8601String(),
@@ -1672,6 +1574,7 @@ PROMPT;
         $header = fgetcsv($handle);
         if (! $header) {
             fclose($handle);
+
             return back()->with('error', 'CSV file is empty.');
         }
 
@@ -1713,7 +1616,7 @@ PROMPT;
                 $type = ScriptType::where('tenant_id', $tenantId)
                     ->where(function ($q) use ($data) {
                         $q->where('slug', $data['script_type'])
-                          ->orWhere('name', $data['script_type']);
+                            ->orWhere('name', $data['script_type']);
                     })
                     ->first();
                 $scriptTypeId = $type?->id;
@@ -1847,7 +1750,7 @@ PROMPT;
                             'type' => $t->type,
                             'filename' => $t->filename,
                             'storage_path' => $t->storage_path,
-                            'url' => $t->storage_path ? asset('storage/' . $t->storage_path) : null,
+                            'url' => $t->storage_path ? asset('storage/'.$t->storage_path) : null,
                             'sort_order' => $t->sort_order,
                         ])->values()->all()
                     ),
@@ -1917,7 +1820,8 @@ PROMPT;
 
         $collaborators = $script->collaborators->map(function (ScriptCollaborator $c) {
             $u = $c->user;
-            $name = $u ? trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? '')) : '';
+            $name = $u ? trim(($u->first_name ?? '').' '.($u->last_name ?? '')) : '';
+
             return [
                 'user_id' => $c->user_id,
                 'name' => $name !== '' ? $name : ($u?->email ?? 'Unknown'),
@@ -1927,7 +1831,7 @@ PROMPT;
         })->values()->all();
 
         $owner = $script->creator;
-        $ownerName = $owner ? trim(($owner->first_name ?? '') . ' ' . ($owner->last_name ?? '')) : '';
+        $ownerName = $owner ? trim(($owner->first_name ?? '').' '.($owner->last_name ?? '')) : '';
         $ownerRow = [
             'user_id' => $owner?->id,
             'name' => $ownerName !== '' ? $ownerName : ($owner?->email ?? 'Unknown'),
@@ -1937,12 +1841,13 @@ PROMPT;
 
         $publicUrl = null;
         if ($script->visibility === 'published' && $script->share_token) {
-            $publicUrl = url('/script/shared/' . $script->share_token);
+            $publicUrl = url('/script/shared/'.$script->share_token);
         }
 
         $tenant = tenant();
         $orgMembers = $tenant->users()->get()->map(function ($u) {
-            $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+            $name = trim(($u->first_name ?? '').' '.($u->last_name ?? ''));
+
             return [
                 'user_id' => $u->id,
                 'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
@@ -1986,7 +1891,7 @@ PROMPT;
         ]);
 
         $tenantSlug = tenant('slug');
-        $publicUrl = url('/script/shared/' . $script->share_token);
+        $publicUrl = url('/script/shared/'.$script->share_token);
 
         return response()->json([
             'visibility' => 'published',
@@ -2043,7 +1948,8 @@ PROMPT;
         $existing = $script->collaborators()->where('user_id', $user->id)->first();
         if ($existing) {
             $existing->update(['role' => $validated['role']]);
-            $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+            $name = trim(($user->first_name ?? '').' '.($user->last_name ?? ''));
+
             return response()->json([
                 'collaborator' => [
                     'user_id' => $user->id,
@@ -2060,7 +1966,7 @@ PROMPT;
         ]);
         $script->accessDenied()->where('user_id', $user->id)->delete();
 
-        $name = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
+        $name = trim(($user->first_name ?? '').' '.($user->last_name ?? ''));
 
         return response()->json([
             'collaborator' => [
@@ -2138,8 +2044,9 @@ PROMPT;
         }
 
         $members = $tenant->users()->get()->map(function ($u) use ($tenant) {
-            $name = trim(($u->first_name ?? '') . ' ' . ($u->last_name ?? ''));
+            $name = trim(($u->first_name ?? '').' '.($u->last_name ?? ''));
             $scriptRole = TenantScriptRole::where('tenant_id', $tenant->id)->where('user_id', $u->id)->value('role');
+
             return [
                 'user_id' => $u->id,
                 'name' => $name !== '' ? $name : ($u->email ?? 'Unknown'),
@@ -2174,6 +2081,7 @@ PROMPT;
         $role = $request->input('role');
         if ($role === null || $role === '') {
             TenantScriptRole::where('tenant_id', $tenant->id)->where('user_id', $userId)->delete();
+
             return response()->json(['script_role' => null]);
         }
         $validated = $request->validate(['role' => 'required|string|in:view,edit,admin']);
@@ -2182,6 +2090,7 @@ PROMPT;
             ['tenant_id' => $tenant->id, 'user_id' => $userId],
             ['role' => $role]
         );
+
         return response()->json(['script_role' => $role]);
     }
 
@@ -2223,7 +2132,8 @@ PROMPT;
             $script->accessDenied()->where('user_id', $userId)->delete();
         }
 
-        $name = trim(($target->first_name ?? '') . ' ' . ($target->last_name ?? ''));
+        $name = trim(($target->first_name ?? '').' '.($target->last_name ?? ''));
+
         return response()->json([
             'co_author' => [
                 'user_id' => $target->id,
@@ -2248,6 +2158,7 @@ PROMPT;
         }
 
         $script->coAuthors()->where('user_id', $userId)->delete();
+
         return response()->json(['removed' => true]);
     }
 
@@ -2268,6 +2179,7 @@ PROMPT;
         foreach ($validated['user_ids'] as $index => $id) {
             $script->coAuthors()->where('user_id', $id)->update(['sort_order' => $index]);
         }
+
         return response()->json(['reordered' => true]);
     }
 
@@ -2406,9 +2318,7 @@ PROMPT;
             'prompt' => 'required|string|max:150000',
         ]);
 
-        $systemPrompt = <<<'PROMPT'
-You are an expert YouTube script writer. The user will provide a request and supporting materials (scripts from other videos, specs, observations). Write a single, conversational YouTube script that fulfills their request. Output only the script: no meta-commentary, no "Here is your script", no bullet points. Use section headings if they asked for them. Write in a natural, read-aloud style—not one sentence per line like a poem. Do not add cues like [pause] or [cut]. Output plain text/markdown only.
-PROMPT;
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.generate_from_transcripts');
 
         try {
             $response = OpenAI::chat()->create([
@@ -2452,7 +2362,7 @@ PROMPT;
         $count = (int) ($validated['count'] ?? 10);
         $tone = trim($validated['tone'] ?? 'conversational and engaging');
 
-        $systemPrompt = 'You are a creative YouTube content strategist. Generate video or script ideas that would work well on YouTube. Output a numbered list only: no intro, no outro, no extra commentary. Each idea should be one clear title or one-line concept.';
+        $systemPrompt = $this->aiPrompts->resolve(tenant('id'), 'script.generate_ideas');
 
         $userPrompt = "Topic or niche: {$topic}\n\nGenerate exactly {$count} YouTube video/script ideas. Tone: {$tone}. Reply with only the numbered list (e.g. 1. Idea one\n2. Idea two).";
 

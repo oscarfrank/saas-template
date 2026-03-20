@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
+use Illuminate\Support\Facades\Artisan;
+use Modules\User\Models\User;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
-use Illuminate\Support\Facades\Artisan;
-use Modules\User\Models\User;
-use App\Models\TenantScriptRole;
+use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
@@ -44,7 +43,7 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         static::created(function ($tenant) {
             // Run migrations for the new tenant
             Artisan::call('tenants:migrate', [
-                '--tenants' => [$tenant->id]
+                '--tenants' => [$tenant->id],
             ]);
         });
     }
@@ -61,6 +60,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function scriptRoles()
     {
         return $this->hasMany(TenantScriptRole::class);
+    }
+
+    /**
+     * Per-organization overrides for AI system prompts (built-in keys and custom.* keys).
+     */
+    public function aiPrompts()
+    {
+        return $this->hasMany(TenantAiPrompt::class, 'tenant_id');
     }
 
     /**
@@ -82,4 +89,4 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         $this->setAttribute('default_landing_path', $path);
         $this->save();
     }
-} 
+}

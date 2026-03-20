@@ -1,25 +1,16 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-use Modules\Settings\Http\Controllers\SettingsController;
-use Modules\Settings\Http\Controllers\ProfileController;
+use Modules\Settings\Http\Controllers\ApiSettingsController;
+use Modules\Settings\Http\Controllers\OrganizationAiPromptController;
 use Modules\Settings\Http\Controllers\PasswordController;
+use Modules\Settings\Http\Controllers\ProfileController;
+use Modules\Settings\Http\Controllers\SettingsController;
+use Modules\Settings\Http\Controllers\SiteSettingsController;
 use Modules\Settings\Http\Controllers\TwoFactorAuthController;
+// Local Modular Dependencies
 use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
-
-
-
-// Local Modular Dependencies
-use Modules\Settings\Http\Controllers\SiteSettingsController; 
-use Modules\Settings\Http\Controllers\ApiSettingsController;
-
-
-use App\Traits\LevelBasedAuthorization;
-use App\Helpers\AccessLevel;
-
-
 
 // Tenant Routes - These should be tenant-aware
 Route::middleware([
@@ -30,20 +21,26 @@ Route::middleware([
     // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 
-            // Organization Settings
-            Route::prefix('settings/organization')->group(function () {
-                Route::get('general', [SettingsController::class, 'organizationGeneral'])->name('settings.organization.general');
-                Route::patch('general', [SettingsController::class, 'updateOrganization'])->name('settings.organization.update');
-                Route::get('people', [SettingsController::class, 'organizationPeople'])->name('settings.organization.people');
-                Route::post('invites', [SettingsController::class, 'sendInvite'])->name('settings.organization.invites.send');
-                Route::post('invites/{invite}/cancel', [SettingsController::class, 'cancelInvite'])->name('settings.organization.invites.cancel');
-                Route::post('invites/{invite}/resend', [SettingsController::class, 'resendInvite'])->name('settings.organization.invites.resend');
-                Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
-                Route::get('sidebar', [SettingsController::class, 'organizationSidebar'])->name('settings.organization.sidebar');
-                Route::patch('sidebar', [SettingsController::class, 'updateSidebar'])->name('settings.organization.sidebar.update');
-                Route::post('members/{member}/update-role', [SettingsController::class, 'updateMemberRole'])->name('settings.organization.members.update-role');
-                Route::post('/members/{member}/remove', [SettingsController::class, 'removeMember'])->name('settings.organization.members.remove');
-            });
+    // Organization Settings
+    Route::prefix('settings/organization')->group(function () {
+        Route::get('general', [SettingsController::class, 'organizationGeneral'])->name('settings.organization.general');
+        Route::patch('general', [SettingsController::class, 'updateOrganization'])->name('settings.organization.update');
+        Route::get('people', [SettingsController::class, 'organizationPeople'])->name('settings.organization.people');
+        Route::post('invites', [SettingsController::class, 'sendInvite'])->name('settings.organization.invites.send');
+        Route::post('invites/{invite}/cancel', [SettingsController::class, 'cancelInvite'])->name('settings.organization.invites.cancel');
+        Route::post('invites/{invite}/resend', [SettingsController::class, 'resendInvite'])->name('settings.organization.invites.resend');
+        Route::get('teamspaces', [SettingsController::class, 'organizationTeamspaces'])->name('settings.organization.teamspaces');
+        Route::get('sidebar', [SettingsController::class, 'organizationSidebar'])->name('settings.organization.sidebar');
+        Route::patch('sidebar', [SettingsController::class, 'updateSidebar'])->name('settings.organization.sidebar.update');
+        Route::get('ai-prompts', [OrganizationAiPromptController::class, 'index'])->name('settings.organization.ai-prompts');
+        Route::patch('ai-prompts', [OrganizationAiPromptController::class, 'updateBuiltin'])->name('settings.organization.ai-prompts.update');
+        Route::post('ai-prompts/reset', [OrganizationAiPromptController::class, 'resetBuiltin'])->name('settings.organization.ai-prompts.reset');
+        Route::post('ai-prompts/custom', [OrganizationAiPromptController::class, 'storeCustom'])->name('settings.organization.ai-prompts.custom.store');
+        Route::patch('ai-prompts/custom', [OrganizationAiPromptController::class, 'updateCustom'])->name('settings.organization.ai-prompts.custom.update');
+        Route::post('ai-prompts/custom/delete', [OrganizationAiPromptController::class, 'destroyCustom'])->name('settings.organization.ai-prompts.custom.destroy');
+        Route::post('members/{member}/update-role', [SettingsController::class, 'updateMemberRole'])->name('settings.organization.members.update-role');
+        Route::post('/members/{member}/remove', [SettingsController::class, 'removeMember'])->name('settings.organization.members.remove');
+    });
 
 });
 
@@ -76,7 +73,6 @@ Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function ()
         Route::patch('preferences', [SettingsController::class, 'updatePreferences'])->name('preferences.update');
         Route::get('connections', [SettingsController::class, 'connections'])->name('settings.connections');
 
-
         // Other Settings
         Route::get('api-keys', [SettingsController::class, 'apiKeys'])->name('settings.api-keys');
         Route::post('api-keys', [SettingsController::class, 'createApiKey'])->name('settings.api-keys.create');
@@ -96,23 +92,17 @@ Route::middleware(['auth', 'verified', 'track.last.visited'])->group(function ()
     // Admin routes group
     Route::prefix('admin')->middleware(['except.user'])->group(function () {
 
-       
         // Site Settings routes
         Route::get('settings', [SiteSettingsController::class, 'index'])->name('admin.settings.system');
         Route::put('settings', [SiteSettingsController::class, 'update'])->name('admin.settings.update');
-
 
         // API Settings routes
         Route::get('/settings/api', [ApiSettingsController::class, 'index'])->name('admin.settings.api');
         Route::post('/settings/api', [ApiSettingsController::class, 'update'])->name('admin.settings.api.update');
 
-
     });
 
-
-
 });
-
 
 // Two-factor authentication routes
 Route::post('two-factor-challenge/send-code', [TwoFactorAuthController::class, 'sendChallengeCode'])

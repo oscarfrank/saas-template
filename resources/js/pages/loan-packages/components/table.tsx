@@ -48,7 +48,7 @@ export function Table<TData extends LoanPackage, TValue>({
 }: TableProps<TData, TValue>) {
     const handlePrint = async () => {
         try {
-            const response = await axios.post(route('loan-packages.all'), {}, {
+            const response = await axios.post(route('admin.loan-packages.all'), {}, {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -64,7 +64,7 @@ export function Table<TData extends LoanPackage, TValue>({
 
     const handleExport = async (format: 'csv' | 'json') => {
         try {
-            const response = await axios.post(route('loan-packages.export'), { format });
+            const response = await axios.post(route('admin.loan-packages.export'), { format });
             return response.data;
         } catch (error) {
             console.error('Export failed:', error);

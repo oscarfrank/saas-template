@@ -37,7 +37,7 @@ export default function Index({ loanPackages }: Props) {
 
         setIsDeleting(true);
         try {
-            await router.post(route('loan-packages.bulk-delete'), {
+            await router.post(route('admin.loan-packages.bulk-delete'), {
                 ids: selectedRows.map(row => row.id)
             }, {
                 preserveState: true,
@@ -64,7 +64,7 @@ export default function Index({ loanPackages }: Props) {
 
         setIsArchiving(true);
         try {
-            await router.post(route('loan-packages.bulk-archive'), {
+            await router.post(route('admin.loan-packages.bulk-archive'), {
                 ids: selectedRows.map(row => row.id)
             }, {
                 preserveState: true,

@@ -318,7 +318,7 @@ export default function Show({ loan, payment_methods, auth }: Props) {
             data.end_date = new Date(Date.now() + loan.duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         }
         
-        tenantRouter.put('loans.update-status', data, { loan: loan.id }, {
+        tenantRouter.put('admin.loans.update-status', data, { loan: loan.id }, {
             onSuccess: () => {
                 toast.success(`Loan status updated to ${pendingStatus}`);
                 setStatusDialogOpen(false);

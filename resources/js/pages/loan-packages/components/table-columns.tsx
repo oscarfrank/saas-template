@@ -164,7 +164,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<LoanPa
 
             const handleToggleStatus = () => {
                 setIsToggling(true);
-                router.put(route('loan-packages.update-status', loanPackage.id), {
+                router.put(route('admin.loan-packages.update-status', loanPackage.id), {
                     is_active: !loanPackage.is_active
                 }, {
                     preserveState: true,

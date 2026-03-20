@@ -146,7 +146,7 @@ export default function Index({ loans }: Props) {
         setError(null);
         
         try {
-            await tenantRouter.post('loans.bulk-delete', {
+            await tenantRouter.post('admin.loans.bulk-delete', {
                 ids: selectedLoans.map(loan => loan.id)
             }, {}, {
                 preserveState: true,

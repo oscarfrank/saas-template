@@ -261,7 +261,7 @@ export const createColumns = ({ onDelete }: TableColumnsProps): ColumnDef<Loan>[
             };
 
             const handleStatusChange = (newStatus: string, action: string) => {
-                tenantRouter.put('loans.update-status', { status: newStatus }, { id: loan.id }, {
+                tenantRouter.put('admin.loans.update-status', { status: newStatus }, { id: loan.id }, {
                     preserveState: true,
                     preserveScroll: true,
                     onSuccess: () => {

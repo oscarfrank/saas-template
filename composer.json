@@ -19,6 +19,7 @@
         "laravel/socialite": "^5.21",
         "laravel/tinker": "^2.10.1",
         "mrmysql/youtube-transcript": "^0.0.5",
+        "neuron-core/neuron-ai": "^3.2",
         "nwidart/laravel-modules": "^12.0",
         "openai-php/laravel": "^0.13.0",
         "pragmarx/google2fa-laravel": "^2.3",

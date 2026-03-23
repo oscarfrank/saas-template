@@ -1,0 +1,11 @@
+{
+    "name": "Cortex",
+    "alias": "cortex",
+    "description": "Cortex: AI agents and tools (Neuron), starting with a YouTube video analyst",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Cortex\\Providers\\CortexServiceProvider"
+    ],
+    "files": []
+}

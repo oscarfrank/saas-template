@@ -9,6 +9,7 @@ import {
     Bell,
     Handshake,
     Ticket,
+    Brain,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export interface SidebarPageDefinition {
 
 /** Default order of page ids in the sidebar "Pages" section. */
 export const SIDEBAR_PAGE_IDS = [
+    'cortex',
     'creator',
     'products',
     'kyc',
@@ -38,6 +40,7 @@ export const SIDEBAR_PAGE_IDS = [
 export type SidebarPageId = (typeof SIDEBAR_PAGE_IDS)[number];
 
 export const SIDEBAR_PAGE_DEFINITIONS: SidebarPageDefinition[] = [
+    { id: 'cortex', title: 'Cortex', pathSuffix: 'cortex', icon: Brain },
     { id: 'creator', title: 'Creator', pathSuffix: 'creator', icon: PenTool },
     { id: 'products', title: 'Products', pathSuffix: 'products', icon: ShoppingBag },
     { id: 'kyc', title: 'KYC', pathSuffix: 'kyc', icon: FileText },

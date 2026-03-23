@@ -18,6 +18,7 @@ class PulseSetting extends Model
         'auto_pull_time',
         'digest_timezone',
         'last_auto_digest_date',
+        'tweet_style_prompt',
     ];
 
     protected function casts(): array

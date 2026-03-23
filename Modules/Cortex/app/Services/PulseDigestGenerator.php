@@ -6,6 +6,7 @@ namespace Modules\Cortex\Services;
 
 use Illuminate\Support\Facades\Log;
 use Modules\Cortex\Models\PulseDailyDigest;
+use Modules\Cortex\Models\PulseSetting;
 use Modules\Cortex\Neuron\Output\PulseDigestIdeaItem;
 use Modules\Cortex\Neuron\Output\PulseDigestOutput;
 use Modules\Cortex\Neuron\PulseDigestAgent;
@@ -26,8 +27,17 @@ final class PulseDigestGenerator
             throw new \RuntimeException('No feed signals available. Refresh feeds first.');
         }
 
-        $body = "Here are today's cached feed signals:\n\n".$signals."\n\n---\n\n".
-            'Generate the digest: intro_summary plus tweets, shorts, and youtube idea lists as specified.';
+        $setting = PulseSetting::query()->where('tenant_id', $tenantId)->first();
+        $tweetStylePrompt = $setting !== null && is_string($setting->tweet_style_prompt)
+            ? trim($setting->tweet_style_prompt)
+            : '';
+
+        $body = "Here are today's cached feed signals:\n\n".$signals."\n\n---\n\n";
+        if ($tweetStylePrompt !== '') {
+            $body .= "Tweet style guidance (apply this heavily to the tweets list while still staying grounded in feed signals):\n".
+                $tweetStylePrompt."\n\n---\n\n";
+        }
+        $body .= 'Generate the digest: intro_summary plus tweets, shorts, and youtube idea lists as specified.';
 
         try {
             $agent = PulseDigestAgent::make()

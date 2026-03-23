@@ -103,11 +103,13 @@ class PulseController extends Controller
         $autoPullEnabled = false;
         $autoPullTime = '07:00';
         $digestTimezone = null;
+        $tweetStylePrompt = null;
         if (is_string($tenantId) && $tenantId !== '') {
             $s = PulseSetting::getOrCreateForTenant($tenantId);
             $autoPullEnabled = (bool) $s->auto_pull_enabled;
             $autoPullTime = is_string($s->auto_pull_time) && $s->auto_pull_time !== '' ? $s->auto_pull_time : '07:00';
             $digestTimezone = $s->digest_timezone;
+            $tweetStylePrompt = $s->tweet_style_prompt;
         }
 
         return Inertia::render('cortex/agents/pulse/settings', [
@@ -116,6 +118,7 @@ class PulseController extends Controller
             'auto_pull_enabled' => $autoPullEnabled,
             'auto_pull_time' => $autoPullTime,
             'digest_timezone' => $digestTimezone,
+            'tweet_style_prompt' => $tweetStylePrompt,
         ]);
     }
 
@@ -131,6 +134,7 @@ class PulseController extends Controller
             'auto_pull_enabled' => ['sometimes', 'boolean'],
             'auto_pull_time' => ['nullable', 'string', 'regex:/^\d{2}:\d{2}$/'],
             'digest_timezone' => ['nullable', 'string', 'max:64'],
+            'tweet_style_prompt' => ['nullable', 'string', 'max:10000'],
         ]);
 
         $row = PulseSetting::getOrCreateForTenant($tenantId);
@@ -146,6 +150,11 @@ class PulseController extends Controller
                 ? (string) $validated['digest_timezone']
                 : null;
         }
+        if (array_key_exists('tweet_style_prompt', $validated)) {
+            $row->tweet_style_prompt = isset($validated['tweet_style_prompt']) && trim((string) $validated['tweet_style_prompt']) !== ''
+                ? trim((string) $validated['tweet_style_prompt'])
+                : null;
+        }
         $row->save();
 
         if ($request->wantsJson() || $request->expectsJson()) {
@@ -157,6 +166,7 @@ class PulseController extends Controller
                 'auto_pull_enabled' => (bool) $row->auto_pull_enabled,
                 'auto_pull_time' => $row->auto_pull_time ?? '07:00',
                 'digest_timezone' => $row->digest_timezone,
+                'tweet_style_prompt' => $row->tweet_style_prompt,
             ]);
         }
 

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 
 import { ArrowLeft, Clock, Settings2, Sparkles } from 'lucide-react';
 
@@ -20,6 +21,7 @@ interface Props {
     auto_pull_enabled: boolean;
     auto_pull_time: string;
     digest_timezone: string | null;
+    tweet_style_prompt: string | null;
 }
 
 export default function PulseSettingsPage({
@@ -28,6 +30,7 @@ export default function PulseSettingsPage({
     auto_pull_enabled,
     auto_pull_time,
     digest_timezone,
+    tweet_style_prompt,
 }: Props) {
     const tenantRouter = useTenantRouter();
 
@@ -45,6 +48,7 @@ export default function PulseSettingsPage({
         auto_pull_enabled: auto_pull_enabled,
         auto_pull_time: auto_pull_time,
         digest_timezone: digest_timezone ?? '',
+        tweet_style_prompt: tweet_style_prompt ?? '',
     });
 
     const submit = (e: React.FormEvent) => {
@@ -114,6 +118,29 @@ export default function PulseSettingsPage({
                                         <p className="text-destructive text-sm">{form.errors.max_items_per_feed}</p>
                                     )}
                                 </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-border/80 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+                            <CardHeader>
+                                <CardTitle className="text-lg">Tweet style prompt</CardTitle>
+                                <CardDescription>
+                                    Optional. This guides how Pulse writes the <strong>tweets</strong> list in your daily digest.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Label htmlFor="tweet_style_prompt">X/Twitter writing profile</Label>
+                                <Textarea
+                                    id="tweet_style_prompt"
+                                    value={form.data.tweet_style_prompt}
+                                    onChange={(e) => form.setData('tweet_style_prompt', e.target.value)}
+                                    rows={14}
+                                    placeholder="Paste your preferred tweet voice, tone, and constraints…"
+                                    className="text-sm"
+                                />
+                                {form.errors.tweet_style_prompt && (
+                                    <p className="text-destructive text-sm">{form.errors.tweet_style_prompt}</p>
+                                )}
                             </CardContent>
                         </Card>
 

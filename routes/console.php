@@ -9,3 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('script:prune-trashed')->daily()->at('02:00');
+
+Schedule::command('cortex:pulse-scheduled-digests')->everyMinute();

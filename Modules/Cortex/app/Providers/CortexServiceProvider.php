@@ -4,6 +4,8 @@ namespace Modules\Cortex\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\Cortex\Console\PulseScheduledDigestsCommand;
+use Modules\Cortex\Services\PulseRssFetcher;
 use Modules\Cortex\Services\YoutubeTranscriptService;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
@@ -36,6 +38,7 @@ class CortexServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(YoutubeTranscriptService::class);
+        $this->app->singleton(PulseRssFetcher::class);
 
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
@@ -46,7 +49,9 @@ class CortexServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            PulseScheduledDigestsCommand::class,
+        ]);
     }
 
     /**

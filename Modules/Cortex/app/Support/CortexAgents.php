@@ -27,7 +27,7 @@ final class CortexAgents
             [
                 'id' => 'pulse',
                 'name' => 'Pulse',
-                'description' => 'Ideation and research: trends, topic angles, wild creative concepts—brainstorm with optional pasted feeds and signals.',
+                'description' => 'Ideation chat from your saved RSS feeds; manage sources on Pulse → Feeds, then brainstorm trends and angles here.',
                 'route' => 'cortex.agents.pulse',
             ],
             [

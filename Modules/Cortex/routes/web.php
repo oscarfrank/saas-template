@@ -2,10 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Cortex\Http\Controllers\CortexController;
+use Modules\Cortex\Http\Controllers\MirageController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
 use Modules\Cortex\Http\Controllers\PulseController;
 use Modules\Cortex\Http\Controllers\QuillController;
-use Modules\Cortex\Http\Controllers\MirageController;
 use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 Route::middleware([
@@ -24,7 +24,19 @@ Route::middleware([
     Route::post('cortex/agents/nexus/apply', [NexusPlannerController::class, 'apply'])->name('cortex.agents.nexus.apply');
 
     Route::get('cortex/agents/pulse', [PulseController::class, 'index'])->name('cortex.agents.pulse');
+    Route::get('cortex/agents/pulse/digest/today', [PulseController::class, 'digestToday'])->name('cortex.agents.pulse.digest.today');
+    Route::post('cortex/agents/pulse/digest/run', [PulseController::class, 'digestRun'])->name('cortex.agents.pulse.digest.run');
+    Route::get('cortex/agents/pulse/feeds', [PulseController::class, 'feedsIndex'])->name('cortex.agents.pulse.feeds');
+    Route::get('cortex/agents/pulse/settings', [PulseController::class, 'settingsIndex'])->name('cortex.agents.pulse.settings');
+    Route::patch('cortex/agents/pulse/settings', [PulseController::class, 'settingsUpdate'])->name('cortex.agents.pulse.settings.update');
     Route::post('cortex/agents/pulse/chat', [PulseController::class, 'chat'])->name('cortex.agents.pulse.chat');
+    Route::post('cortex/agents/pulse/feeds', [PulseController::class, 'storeFeed'])->name('cortex.agents.pulse.feeds.store');
+    Route::get('cortex/agents/pulse/feeds/export', [PulseController::class, 'exportFeeds'])->name('cortex.agents.pulse.feeds.export');
+    Route::post('cortex/agents/pulse/feeds/import', [PulseController::class, 'importFeeds'])->name('cortex.agents.pulse.feeds.import');
+    Route::post('cortex/agents/pulse/feeds/refresh-all', [PulseController::class, 'refreshAllFeeds'])->name('cortex.agents.pulse.feeds.refresh_all');
+    Route::patch('cortex/agents/pulse/feeds/{pulseFeed}', [PulseController::class, 'updateFeed'])->name('cortex.agents.pulse.feeds.update');
+    Route::delete('cortex/agents/pulse/feeds/{pulseFeed}', [PulseController::class, 'destroyFeed'])->name('cortex.agents.pulse.feeds.destroy');
+    Route::post('cortex/agents/pulse/feeds/{pulseFeed}/refresh', [PulseController::class, 'refreshFeed'])->name('cortex.agents.pulse.feeds.refresh');
 
     Route::get('cortex/agents/quill', [QuillController::class, 'index'])->name('cortex.agents.quill');
     Route::post('cortex/agents/quill/chat', [QuillController::class, 'chat'])->name('cortex.agents.quill.chat');

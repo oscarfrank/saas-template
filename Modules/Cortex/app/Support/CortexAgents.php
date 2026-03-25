@@ -19,6 +19,12 @@ final class CortexAgents
                 'route' => 'cortex.agents.youtube',
             ],
             [
+                'id' => 'youtube-doc',
+                'name' => 'Youtube Doc',
+                'description' => 'Connect YouTube Analytics via OAuth and chat about what’s working, what to improve, and what to test next.',
+                'route' => 'cortex.agents.youtube_doc',
+            ],
+            [
                 'id' => 'nexus-planner',
                 'name' => 'Nexus planner',
                 'description' => 'Plans the creator workflow (shoot/edit/publish) and proposes HR task candidates for the week.',

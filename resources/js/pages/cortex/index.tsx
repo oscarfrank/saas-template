@@ -19,6 +19,7 @@ interface Props {
 function agentIcon(id: string) {
     const map: Record<string, any> = {
         'youtube-video': Youtube,
+        'youtube-doc': Youtube,
         'nexus-planner': Brain,
         pulse: Sparkles,
         quill: PenLine,

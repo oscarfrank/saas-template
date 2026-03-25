@@ -6,6 +6,7 @@ use Modules\Cortex\Http\Controllers\MirageController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
 use Modules\Cortex\Http\Controllers\PulseController;
 use Modules\Cortex\Http\Controllers\QuillController;
+use Modules\Cortex\Http\Controllers\YoutubeDocController;
 use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 Route::middleware([
@@ -43,4 +44,16 @@ Route::middleware([
 
     Route::get('cortex/agents/mirage', [MirageController::class, 'index'])->name('cortex.agents.mirage');
     Route::post('cortex/agents/mirage/chat', [MirageController::class, 'chat'])->name('cortex.agents.mirage.chat');
+
+    Route::get('cortex/agents/youtube-doc', [YoutubeDocController::class, 'index'])->name('cortex.agents.youtube_doc');
+    Route::get('cortex/agents/youtube-doc/connect', [YoutubeDocController::class, 'connect'])->name('cortex.agents.youtube_doc.connect');
+    Route::get('cortex/agents/youtube-doc/channels', [YoutubeDocController::class, 'channels'])->name('cortex.agents.youtube_doc.channels');
+    Route::post('cortex/agents/youtube-doc/channel', [YoutubeDocController::class, 'setChannel'])->name('cortex.agents.youtube_doc.channel');
+    Route::post('cortex/agents/youtube-doc/chat', [YoutubeDocController::class, 'chat'])->name('cortex.agents.youtube_doc.chat');
 });
+
+// Fixed OAuth callback (not tenant-prefixed) — state maps back to a tenant.
+Route::middleware(['auth', 'verified'])->get('cortex/agents/youtube-doc/oauth/callback', [
+    YoutubeDocController::class,
+    'oauthCallback',
+])->name('cortex.agents.youtube_doc.oauth.callback');

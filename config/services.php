@@ -56,26 +56,35 @@ return [
     'github' => [
         'client_id' => env('AUTH_GITHUB_CLIENT_ID'),
         'client_secret' => env('AUTH_GITHUB_CLIENT_SECRET'),
-        'redirect' => env('AUTH_GITHUB_REDIRECT', env('APP_URL') . ':8000/auth/github/callback'),
+        'redirect' => env('AUTH_GITHUB_REDIRECT', env('APP_URL').':8000/auth/github/callback'),
     ],
 
     // Google
     'google' => [
         'client_id' => env('AUTH_GOOGLE_CLIENT_ID'),
         'client_secret' => env('AUTH_GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('AUTH_GOOGLE_REDIRECT', env('APP_URL') . ':8000/auth/google/callback'),
+        'redirect' => env('AUTH_GOOGLE_REDIRECT', env('APP_URL').':8000/auth/google/callback'),
     ],
 
     // Facebook
     'facebook' => [
         'client_id' => env('AUTH_FACEBOOK_CLIENT_ID'),
         'client_secret' => env('AUTH_FACEBOOK_CLIENT_SECRET'),
-        'redirect' => env('AUTH_FACEBOOK_REDIRECT', env('APP_URL') . ':8000/auth/facebook/callback'),
+        'redirect' => env('AUTH_FACEBOOK_REDIRECT', env('APP_URL').':8000/auth/facebook/callback'),
     ],
-
 
     // Tenancy Mode
     'tenancy' => [
         'mode' => env('TENANCY_MODE', 'multi'),
+    ],
+
+    /*
+    | Midjourney-compatible HTTP API (Mirage). POST JSON { "prompt": "..." }.
+    | Response must include a top-level image URL or common nested keys (see MirageImageService).
+    */
+    'midjourney' => [
+        'api_url' => env('MIDJOURNEY_API_URL'),
+        'api_key' => env('MIDJOURNEY_API_KEY'),
+        'timeout' => (int) env('MIDJOURNEY_API_TIMEOUT', 180),
     ],
 ];

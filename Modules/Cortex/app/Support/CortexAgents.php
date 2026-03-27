@@ -45,7 +45,7 @@ final class CortexAgents
             [
                 'id' => 'mirage',
                 'name' => 'Mirage',
-                'description' => 'High-CTR title and thumbnail ideas; guides you on curiosity, emotion, and provocation before generating options.',
+                'description' => 'Describe your video, choose how many thumbnails and what to show (face, product, scene), and get realistic thumbnail images.',
                 'route' => 'cortex.agents.mirage',
             ],
         ];

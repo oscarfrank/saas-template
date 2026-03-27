@@ -5,6 +5,8 @@ namespace Modules\Cortex\Providers;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Cortex\Console\PulseScheduledDigestsCommand;
+use Modules\Cortex\Services\MirageImageService;
+use Modules\Cortex\Services\MirageReferenceVisionService;
 use Modules\Cortex\Services\PulseRssFetcher;
 use Modules\Cortex\Services\YoutubeTranscriptService;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -39,6 +41,8 @@ class CortexServiceProvider extends ServiceProvider
     {
         $this->app->singleton(YoutubeTranscriptService::class);
         $this->app->singleton(PulseRssFetcher::class);
+        $this->app->singleton(MirageImageService::class);
+        $this->app->singleton(MirageReferenceVisionService::class);
 
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);

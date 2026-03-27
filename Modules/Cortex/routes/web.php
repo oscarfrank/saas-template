@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Cortex\Http\Controllers\CortexController;
 use Modules\Cortex\Http\Controllers\MirageController;
+use Modules\Cortex\Http\Controllers\MirageSettingsController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
 use Modules\Cortex\Http\Controllers\PulseController;
 use Modules\Cortex\Http\Controllers\QuillController;
@@ -43,7 +44,11 @@ Route::middleware([
     Route::post('cortex/agents/quill/chat', [QuillController::class, 'chat'])->name('cortex.agents.quill.chat');
 
     Route::get('cortex/agents/mirage', [MirageController::class, 'index'])->name('cortex.agents.mirage');
+    Route::get('cortex/agents/mirage/settings', [MirageSettingsController::class, 'index'])->name('cortex.agents.mirage.settings');
+    Route::patch('cortex/agents/mirage/settings', [MirageSettingsController::class, 'update'])->name('cortex.agents.mirage.settings.update');
     Route::post('cortex/agents/mirage/chat', [MirageController::class, 'chat'])->name('cortex.agents.mirage.chat');
+    Route::post('cortex/agents/mirage/ideas', [MirageController::class, 'ideas'])->name('cortex.agents.mirage.ideas');
+    Route::post('cortex/agents/mirage/images', [MirageController::class, 'images'])->name('cortex.agents.mirage.images');
 
     Route::get('cortex/agents/youtube-doc', [YoutubeDocController::class, 'index'])->name('cortex.agents.youtube_doc');
     Route::get('cortex/agents/youtube-doc/connect', [YoutubeDocController::class, 'connect'])->name('cortex.agents.youtube_doc.connect');

@@ -2,6 +2,7 @@
 
 namespace Modules\Dashboard\Http\Controllers;
 
+use App\Attributes\RouteCatalogEntry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,6 +24,10 @@ class DashboardController extends Controller
     /**
      * Optional hub where users pick Workspace / YouTuber / Borrower / Lender (not linked from sidebar).
      */
+    #[RouteCatalogEntry(
+        title: 'Dashboard hub',
+        description: 'Chooser for workspace, YouTuber, borrower, and lender surfaces (direct URL only).'
+    )]
     public function hub(Request $request)
     {
         return Inertia::render('dashboard/user/dashboard');
@@ -41,6 +46,10 @@ class DashboardController extends Controller
     /**
      * Notion-like workspace: upcoming events (scripts), tasks, and YouTube helpers.
      */
+    #[RouteCatalogEntry(
+        title: 'Workspace dashboard',
+        description: 'Org workspace home: upcoming scripts, tasks, and quick links.'
+    )]
     public function workspaceDashboard(Request $request)
     {
         $tenantId = tenant('id');

@@ -93,6 +93,7 @@ export default function VaultAdminDashboard({ quickStats, recentActivity }: Prop
                 { name: 'API Management', href: '/admin/settings/api' },
                 ...(isSuperAdmin ? [{ name: 'AI API usage (all tenants)', href: '/admin/ai-usage' }] : []),
                 ...(isSuperAdmin ? [{ name: 'Export / Import', href: '/admin/export-import' }] : []),
+                ...(isSuperAdmin ? [{ name: 'Route catalog', href: '/admin/route-catalog' }] : []),
             ],
         },
     ];

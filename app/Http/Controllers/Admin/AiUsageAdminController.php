@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Attributes\RouteCatalogEntry;
 use App\Http\Controllers\Controller;
 use App\Models\AiCallLog;
 use App\Models\Tenant;
@@ -13,6 +14,10 @@ use Inertia\Response;
 
 final class AiUsageAdminController extends Controller
 {
+    #[RouteCatalogEntry(
+        title: 'AI API usage',
+        description: 'Super-admin view of AI call logs, tokens, and filters across tenants.'
+    )]
     public function index(Request $request): Response
     {
         $user = $request->user();

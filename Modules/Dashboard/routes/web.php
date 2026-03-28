@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AiUsageAdminController;
 use App\Http\Controllers\Admin\ExportImportController;
+use App\Http\Controllers\Admin\RouteCatalogController;
 // Local Modular Dependencies
 use Illuminate\Support\Facades\Route;
 use Modules\Dashboard\Http\Controllers\DashboardController;
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('dashboard', [LoanDashboardController::class, 'adminDashboard'])->name('admin.dashboard');
         Route::get('ai-usage', [AiUsageAdminController::class, 'index'])->name('admin.ai-usage');
         Route::get('export-import', [ExportImportController::class, 'index'])->name('admin.export-import');
+        Route::get('route-catalog', [RouteCatalogController::class, 'index'])->name('admin.route-catalog');
         Route::match(['get', 'post'], 'export', [ExportImportController::class, 'export'])->name('admin.export');
         Route::post('import', [ExportImportController::class, 'import'])->name('admin.import');
     });

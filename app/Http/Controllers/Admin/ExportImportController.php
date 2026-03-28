@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Attributes\RouteCatalogEntry;
 use App\Http\Controllers\Controller;
 use App\Services\ExportImportService;
 use Illuminate\Http\Request;
@@ -28,9 +29,14 @@ class ExportImportController extends Controller
     /**
      * Export / Import page (super admin only).
      */
+    #[RouteCatalogEntry(
+        title: 'Export / import',
+        description: 'Download or upload selected central data sections as JSON or XML.'
+    )]
     public function index()
     {
         $this->ensureSuperAdmin();
+
         return Inertia::render('admin/export-import', [
             'sections' => ExportImportService::getAvailableSections(),
         ]);
@@ -53,10 +59,11 @@ class ExportImportController extends Controller
 
         $data = $this->exportImport->exportToArray($include ?: null);
 
-        $filename = 'export-' . now()->format('Y-m-d-His') . '.' . $format;
+        $filename = 'export-'.now()->format('Y-m-d-His').'.'.$format;
 
         if ($format === 'xml') {
             $content = $this->exportImport->arrayToXml($data, 'export');
+
             return response()->streamDownload(
                 function () use ($content) {
                     echo $content;
@@ -64,7 +71,7 @@ class ExportImportController extends Controller
                 $filename,
                 [
                     'Content-Type' => 'application/xml',
-                    'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                    'Content-Disposition' => 'attachment; filename="'.$filename.'"',
                 ]
             );
         }
@@ -76,7 +83,7 @@ class ExportImportController extends Controller
             $filename,
             [
                 'Content-Type' => 'application/json',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             ]
         );
     }
@@ -95,7 +102,7 @@ class ExportImportController extends Controller
             $contentLength = (int) $request->header('Content-Length');
             $postMaxSize = $this->parsePhpSize(ini_get('post_max_size'));
             if ($postMaxSize > 0 && $contentLength > $postMaxSize) {
-                return redirect()->back()->with('error', 'The file or request is larger than the server allows (PHP post_max_size is ' . ini_get('post_max_size') . '). Increase post_max_size and upload_max_filesize in php.ini, then restart the web server.');
+                return redirect()->back()->with('error', 'The file or request is larger than the server allows (PHP post_max_size is '.ini_get('post_max_size').'). Increase post_max_size and upload_max_filesize in php.ini, then restart the web server.');
             }
         }
 
@@ -118,7 +125,7 @@ class ExportImportController extends Controller
             } else {
                 $data = json_decode($content, true);
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \InvalidArgumentException('Invalid JSON: ' . json_last_error_msg());
+                    throw new \InvalidArgumentException('Invalid JSON: '.json_last_error_msg());
                 }
             }
 
@@ -129,7 +136,8 @@ class ExportImportController extends Controller
             $this->exportImport->importFromArray($data, $include ?: null);
         } catch (\Throwable $e) {
             Log::error('Export/Import: import failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Import failed: '.$e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Import completed successfully.');
@@ -152,6 +160,7 @@ class ExportImportController extends Controller
         } else {
             $out['tenant_data'] = [];
         }
+
         return $out;
     }
 
@@ -166,6 +175,7 @@ class ExportImportController extends Controller
         }
         $unit = strtoupper(substr($value, -1));
         $num = (int) substr($value, 0, -1);
+
         return match ($unit) {
             'G' => $num * 1024 * 1024 * 1024,
             'M' => $num * 1024 * 1024,

@@ -1,23 +1,23 @@
 <?php
 
 namespace Modules\Loan\Http\Controllers;
-use App\Http\Controllers\Controller;
 
+use App\Attributes\RouteCatalogEntry;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Modules\Loan\Models\Loan;
-use Modules\User\Models\User;
-use Modules\Ticket\Models\Ticket;
 use Modules\Payment\Models\Currency;
 use Modules\Settings\Models\SiteSettings;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
+use Modules\Ticket\Models\Ticket;
+use Modules\User\Models\User;
 
 class LoanDashboardController extends Controller
 {
     public function index()
     {
         $user = auth()->user();
-        
+
         // Get current active loan
         $currentLoan = Loan::where('user_id', $user->id)
             ->where('status', 'active')
@@ -35,7 +35,7 @@ class LoanDashboardController extends Controller
             ->map(function ($loan) {
                 return [
                     'id' => $loan->reference_number,
-                    'amount' => $loan->currency->symbol . number_format($loan->amount, 2),
+                    'amount' => $loan->currency->symbol.number_format($loan->amount, 2),
                     'status' => ucfirst($loan->status),
                     'date' => $loan->submitted_at ? $loan->submitted_at->format('F j, Y') : $loan->created_at->format('F j, Y'),
                     'icon' => $this->getStatusIcon($loan->status),
@@ -47,30 +47,34 @@ class LoanDashboardController extends Controller
         $upcomingPayments = [];
         if ($currentLoan && $currentLoan->next_payment_due_date) {
             $upcomingPayments[] = [
-                'date' => $currentLoan->next_payment_due_date instanceof \Carbon\Carbon 
+                'date' => $currentLoan->next_payment_due_date instanceof \Carbon\Carbon
                     ? $currentLoan->next_payment_due_date->format('F j, Y')
                     : \Carbon\Carbon::parse($currentLoan->next_payment_due_date)->format('F j, Y'),
-                'amount' => $currentLoan->currency->symbol . number_format($currentLoan->next_payment_amount, 2),
+                'amount' => $currentLoan->currency->symbol.number_format($currentLoan->next_payment_amount, 2),
                 'days_remaining' => now()->diffInDays($currentLoan->next_payment_due_date),
             ];
         }
 
         return Inertia::render('dashboard/user/borrower-dashboard', [
             'currentLoan' => $currentLoan ? [
-                'current_balance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
+                'current_balance' => $currentLoan->currency->symbol.number_format($currentLoan->current_balance, 2),
                 'status' => ucfirst($currentLoan->status),
-                'nextPayment' => $currentLoan->next_payment_due_date 
-                    ? ($currentLoan->next_payment_due_date instanceof \Carbon\Carbon 
+                'nextPayment' => $currentLoan->next_payment_due_date
+                    ? ($currentLoan->next_payment_due_date instanceof \Carbon\Carbon
                         ? $currentLoan->next_payment_due_date->format('F j, Y')
                         : \Carbon\Carbon::parse($currentLoan->next_payment_due_date)->format('F j, Y'))
                     : null,
-                'remainingBalance' => $currentLoan->currency->symbol . number_format($currentLoan->current_balance, 2),
+                'remainingBalance' => $currentLoan->currency->symbol.number_format($currentLoan->current_balance, 2),
             ] : null,
             'applications' => $recentApplications,
             'upcomingPayments' => $upcomingPayments,
         ]);
     }
 
+    #[RouteCatalogEntry(
+        title: 'Admin dashboard (loan theme)',
+        description: 'Super-admin home with themed stats and quick links for the active homepage theme.'
+    )]
     public function adminDashboard()
     {
         $quickStats = [
@@ -188,8 +192,8 @@ class LoanDashboardController extends Controller
 
         $percentageChange = (($currentMonth - $lastMonth) / $lastMonth) * 100;
         $sign = $percentageChange >= 0 ? '+' : '';
-        
-        return $sign . number_format($percentageChange, 1) . '% from last month';
+
+        return $sign.number_format($percentageChange, 1).'% from last month';
     }
 
     private function calculateDefaultRate($currencyId)
@@ -203,7 +207,7 @@ class LoanDashboardController extends Controller
             return 0;
         }
 
-        return number_format(($defaultedLoans / $totalLoans) * 100, 1) . '%';
+        return number_format(($defaultedLoans / $totalLoans) * 100, 1).'%';
     }
 
     private function getRecentActivity()
@@ -270,4 +274,4 @@ class LoanDashboardController extends Controller
             default => 'text-gray-500',
         };
     }
-} 
+}

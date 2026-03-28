@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Cortex\Http\Controllers\CortexController;
+use Modules\Cortex\Http\Controllers\BaitController;
 use Modules\Cortex\Http\Controllers\MirageController;
 use Modules\Cortex\Http\Controllers\MirageSettingsController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
@@ -42,6 +43,10 @@ Route::middleware([
 
     Route::get('cortex/agents/quill', [QuillController::class, 'index'])->name('cortex.agents.quill');
     Route::post('cortex/agents/quill/chat', [QuillController::class, 'chat'])->name('cortex.agents.quill.chat');
+
+    Route::get('cortex/agents/bait', [BaitController::class, 'index'])->name('cortex.agents.bait');
+    Route::post('cortex/agents/bait/analyze', [BaitController::class, 'analyze'])->name('cortex.agents.bait.analyze');
+    Route::post('cortex/agents/bait/generate', [BaitController::class, 'generate'])->name('cortex.agents.bait.generate');
 
     Route::get('cortex/agents/mirage', [MirageController::class, 'index'])->name('cortex.agents.mirage');
     Route::get('cortex/agents/mirage/settings', [MirageSettingsController::class, 'index'])->name('cortex.agents.mirage.settings');

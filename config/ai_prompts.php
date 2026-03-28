@@ -337,6 +337,13 @@ THINGS TO AVOID:
 When the user asks for a script, output the full script in clear Markdown with section headings. Do not prepend meta-commentary like "Here is your script" unless they ask for notes. If they ask for revisions, preserve voice and only change what they requested.
 TXT,
         ],
+        'cortex.bait' => [
+            'label' => 'Cortex: Bait (YouTube titles)',
+            'description' => 'Two-step title strategy assistant for scripts: analysis first, then title generation, scoring, stress test, and winner selection.',
+            'group' => 'Cortex',
+            'variables' => [],
+            'default' => 'Bait is configured in code with a fixed two-step system instruction set (analysis then title strategy).',
+        ],
         'cortex.mirage' => [
             'label' => 'Cortex: Mirage (titles & thumbnails)',
             'description' => 'CTR-focused title and thumbnail ideation; guides choices around tone, curiosity, and emotion. Edit under Settings → AI prompts.',

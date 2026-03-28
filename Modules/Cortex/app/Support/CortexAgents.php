@@ -43,6 +43,12 @@ final class CortexAgents
                 'route' => 'cortex.agents.quill',
             ],
             [
+                'id' => 'bait',
+                'name' => 'Bait',
+                'description' => 'Two-step title optimizer for full scripts: analyze first, then generate, score, stress-test, and pick a winner.',
+                'route' => 'cortex.agents.bait',
+            ],
+            [
                 'id' => 'mirage',
                 'name' => 'Mirage',
                 'description' => 'Describe your video, choose how many thumbnails and what to show (face, product, scene), and get realistic thumbnail images.',

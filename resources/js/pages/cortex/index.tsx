@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, Image, PenLine, Sparkles, Youtube } from 'lucide-react';
+import { Brain, Image, PenLine, Sparkles, Type, Youtube } from 'lucide-react';
 
 export interface CortexAgentDefinition {
     id: string;
@@ -23,6 +23,7 @@ function agentIcon(id: string) {
         'nexus-planner': Brain,
         pulse: Sparkles,
         quill: PenLine,
+        bait: Type,
         mirage: Image,
     };
     return map[id] ?? Youtube;

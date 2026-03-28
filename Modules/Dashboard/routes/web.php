@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AiUsageAdminController;
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\ExportImportController;
 use App\Http\Controllers\Admin\RouteCatalogController;
 // Local Modular Dependencies
@@ -48,6 +49,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('ai-usage', [AiUsageAdminController::class, 'index'])->name('admin.ai-usage');
         Route::get('export-import', [ExportImportController::class, 'index'])->name('admin.export-import');
         Route::get('route-catalog', [RouteCatalogController::class, 'index'])->name('admin.route-catalog');
+        Route::get('backup', [BackupController::class, 'index'])->name('admin.backup');
+        Route::get('backup/database', [BackupController::class, 'downloadDatabase'])->name('admin.backup.database');
+        Route::get('backup/storage', [BackupController::class, 'downloadStorage'])->name('admin.backup.storage');
+        Route::post('backup/settings', [BackupController::class, 'updateSettings'])->name('admin.backup.settings');
+        Route::get('backup/google-drive/connect', [BackupController::class, 'googleDriveConnect'])->name('admin.backup.google-drive.connect');
+        Route::get('backup/google-drive/callback', [BackupController::class, 'googleDriveCallback'])->name('admin.backup.google-drive.callback');
+        Route::post('backup/google-drive/disconnect', [BackupController::class, 'googleDriveDisconnect'])->name('admin.backup.google-drive.disconnect');
         Route::match(['get', 'post'], 'export', [ExportImportController::class, 'export'])->name('admin.export');
         Route::post('import', [ExportImportController::class, 'import'])->name('admin.import');
     });

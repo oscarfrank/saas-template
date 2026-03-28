@@ -64,6 +64,8 @@ return [
         'client_id' => env('AUTH_GOOGLE_CLIENT_ID'),
         'client_secret' => env('AUTH_GOOGLE_CLIENT_SECRET'),
         'redirect' => env('AUTH_GOOGLE_REDIRECT', env('APP_URL').':8000/auth/google/callback'),
+        /** OAuth redirect for admin backups (Drive). Add this exact URL in Google Cloud Console. */
+        'backup_redirect' => env('BACKUP_GOOGLE_REDIRECT', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/admin/backup/google-drive/callback'),
     ],
 
     // Facebook

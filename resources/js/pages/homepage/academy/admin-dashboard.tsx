@@ -97,7 +97,12 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
                 { name: 'Loan Settings', href: '/admin/settings/loan' },
                 { name: 'API Management', href: '/admin/settings/api' },
                 ...(isSuperAdmin ? [{ name: 'AI API usage (all tenants)', href: '/admin/ai-usage' }] : []),
-                ...(isSuperAdmin ? [{ name: 'Export / Import', href: '/admin/export-import' }] : []),
+                ...(isSuperAdmin
+                    ? [
+                          { name: 'Export / Import', href: '/admin/export-import' },
+                          { name: 'Backups', href: '/admin/backup' },
+                      ]
+                    : []),
                 ...(isSuperAdmin ? [{ name: 'Route catalog', href: '/admin/route-catalog' }] : []),
             ],
         },

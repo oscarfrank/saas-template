@@ -1,14 +1,15 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
-use Modules\Assets\Http\Controllers\AssetController;
 use Modules\Assets\Http\Controllers\AssetCategoryController;
+use Modules\Assets\Http\Controllers\AssetController;
 use Modules\Assets\Http\Controllers\AssetSettingsController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 Route::middleware([
     'auth',
     'verified',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {

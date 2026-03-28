@@ -10,6 +10,7 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 Route::middleware([
     'auth',
     'verified',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
     // PreventAccessFromCentralDomains::class,

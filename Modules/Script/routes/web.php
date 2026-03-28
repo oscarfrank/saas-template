@@ -15,6 +15,7 @@ Route::middleware([InitializeTenancyByPath::class])->prefix('{tenant}')->group(f
 Route::middleware([
     'auth',
     'verified',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {

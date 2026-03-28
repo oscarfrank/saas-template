@@ -1,17 +1,18 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
-use Modules\HR\Http\Controllers\StaffController;
-use Modules\HR\Http\Controllers\ProjectController;
-use Modules\HR\Http\Controllers\TaskController;
+use Modules\HR\Http\Controllers\EvaluationController;
 use Modules\HR\Http\Controllers\PaymentRunController;
 use Modules\HR\Http\Controllers\PayslipController;
-use Modules\HR\Http\Controllers\EvaluationController;
+use Modules\HR\Http\Controllers\ProjectController;
+use Modules\HR\Http\Controllers\StaffController;
+use Modules\HR\Http\Controllers\TaskController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 Route::middleware([
     'auth',
     'verified',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {

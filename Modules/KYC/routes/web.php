@@ -1,37 +1,27 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-
-
 // Local Modular Dependencies
 
 use Modules\KYC\Http\Controllers\KYCController;
-
 use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
-
-
-use App\Traits\LevelBasedAuthorization;
-use App\Helpers\AccessLevel;
-
 
 // Tenant Routes - These should be tenant-aware
 Route::middleware([
     'auth',
     'verified',
+    'track.last.visited',
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
     // PreventAccessFromCentralDomains::class,
 ])->prefix('{tenant}')->group(function () {
 
+    // KYC routes
+    Route::get('kyc', [KYCController::class, 'show'])->name('kyc.show');
+    Route::get('kyc/submit', [KYCController::class, 'create'])->name('kyc.create');
+    Route::post('kyc', [KYCController::class, 'store'])->name('kyc.store');
 
-        // KYC routes
-        Route::get('kyc', [KYCController::class, 'show'])->name('kyc.show');
-        Route::get('kyc/submit', [KYCController::class, 'create'])->name('kyc.create');
-        Route::post('kyc', [KYCController::class, 'store'])->name('kyc.store');
-
-    
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
     // ======================================================================
@@ -49,9 +39,6 @@ Route::middleware([
         Route::put('kyc/{kycVerification}', [KYCController::class, 'update'])->name('kyc.update');
         Route::get('kyc/{kycVerification}', [KYCController::class, 'show'])->name('admin.kyc.show');
 
-
     });
-
-
 
 });

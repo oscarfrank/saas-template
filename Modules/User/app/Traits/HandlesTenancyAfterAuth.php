@@ -5,7 +5,6 @@ namespace Modules\User\Traits;
 use App\Models\Tenant;
 use App\Services\LandingUrlService;
 use Modules\User\Models\User;
-use Illuminate\Support\Facades\Log;
 
 trait HandlesTenancyAfterAuth
 {
@@ -24,22 +23,20 @@ trait HandlesTenancyAfterAuth
         if ($tenancyMode === 'single') {
             // Single tenancy mode
             $tenant = null;
-            
-            // First check last tenant
+
             if ($lastTenantId) {
-                $tenant = Tenant::where('id', $lastTenantId)->first();
+                $tenant = $user->tenants()->where('tenants.id', $lastTenantId)->first();
             }
-            
-            // If no last tenant, check if user belongs to any tenant
-            if (!$tenant) {
+
+            if (! $tenant) {
                 $tenant = $user->tenants()->first();
             }
-            
+
             // If still no tenant, create or get the 'home' tenant
-            if (!$tenant) {
+            if (! $tenant) {
                 $tenant = Tenant::where('slug', 'home')->first();
-                
-                if (!$tenant) {
+
+                if (! $tenant) {
                     // Create the home tenant
                     $tenant = Tenant::create([
                         'id' => 'home',
@@ -52,31 +49,30 @@ trait HandlesTenancyAfterAuth
                     $tenant->users()->attach(1, ['role' => 'owner']);
 
                 }
-                
+
                 // Add user to the tenant
                 $tenant->users()->attach($user->id, ['role' => 'member']);
             }
-            
+
             return $this->redirectToLanding($user, $tenant);
         } else {
             // Multi tenancy mode
             $tenant = null;
-            
-            // First check last tenant
+
+            // Prefer last active org from preferences (must still be a membership)
             if ($lastTenantId) {
-                $tenant = Tenant::where('id', $lastTenantId)->first();
+                $tenant = $user->tenants()->where('tenants.id', $lastTenantId)->first();
             }
-            
-            // If no last tenant, get first available tenant
-            if (!$tenant) {
+
+            if (! $tenant) {
                 $tenant = $user->tenants()->first();
             }
-            
+
             // If we have a tenant, redirect to landing (org default or last visited)
             if ($tenant) {
                 return $this->redirectToLanding($user, $tenant);
             }
-            
+
             // If no tenant is available, redirect to tenant creation
             return redirect()->route('tenants.create');
         }
@@ -88,6 +84,7 @@ trait HandlesTenancyAfterAuth
     protected function redirectToLanding(User $user, Tenant $tenant): \Illuminate\Http\RedirectResponse
     {
         $url = LandingUrlService::forUser($user, $tenant);
+
         return redirect()->to($url);
     }
-} 
+}

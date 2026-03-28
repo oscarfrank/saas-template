@@ -1,9 +1,8 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { useMemo } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { useRole } from '@/hooks/use-role';
 import { useGreeting } from '@/hooks/use-greeting';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,6 @@ import {
     Type,
     Clock,
     TrendingUp,
-    BarChart3,
     FileText,
     Brain,
     Bell,
@@ -27,10 +25,49 @@ import {
     Zap,
     Lightbulb,
     Target,
-    Users
+    Users,
+    type LucideIcon,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+
+export type YoutubeCreatorDashboard = {
+    connected: boolean;
+    channel_title?: string | null;
+    channel_id?: string | null;
+    error?: string;
+    subscribers?: number | null;
+    lifetime_views?: number | null;
+    period_views?: number;
+    watch_time_hours?: number;
+    avg_thumbnail_ctr_percent?: number | null;
+    analytics_period_days?: number;
+    analytics_range?: { startDate: string; endDate: string };
+    youtube_doc_url?: string | null;
+    connect_url?: string | null;
+    cache_ttl_seconds?: number;
+};
+
+function formatInt(n: number | null | undefined): string {
+    if (n == null || Number.isNaN(n)) {
+        return '—';
+    }
+    return new Intl.NumberFormat().format(n);
+}
+
+function formatHours(n: number | null | undefined): string {
+    if (n == null || Number.isNaN(n)) {
+        return '—';
+    }
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n)} hours`;
+}
+
+function formatCtrPercent(n: number | null | undefined): string {
+    if (n == null || Number.isNaN(n)) {
+        return '—';
+    }
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n)}%`;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -39,18 +76,72 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function CreatorIndex() {
+type ChannelStat = {
+    title: string;
+    value: string;
+    icon: LucideIcon;
+    color: string;
+    caption: string;
+};
+
+export default function CreatorIndex({ youtubeCreator }: { youtubeCreator: YoutubeCreatorDashboard }) {
     const tenantRouter = useTenantRouter();
     const { user } = useAuth();
-    const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
 
-    const channelStats = [
-        { title: 'Subscribers', value: '125,432', icon: Users, color: 'text-red-500', trend: '+2.5% this week' },
-        { title: 'Total Views', value: '1.2M', icon: Video, color: 'text-blue-500', trend: '+15.3% this month' },
-        { title: 'Average CTR', value: '8.2%', icon: Target, color: 'text-green-500', trend: '+1.2% this month' },
-        { title: 'Watch Time', value: '45,678 hours', icon: Clock, color: 'text-purple-500', trend: '+12.8% this month' },
-    ];
+    const periodDays = youtubeCreator.analytics_period_days ?? 28;
+    const periodLabel = `Last ${periodDays} days (YouTube Analytics)`;
+
+    const channelStats: ChannelStat[] = useMemo(() => {
+        const y = youtubeCreator;
+        if (!y.connected) {
+            return [
+                { title: 'Subscribers', value: '—', icon: Users, color: 'text-red-500', caption: 'Connect to load' },
+                { title: 'Total Views', value: '—', icon: Video, color: 'text-blue-500', caption: 'Connect to load' },
+                { title: 'Average CTR', value: '—', icon: Target, color: 'text-green-500', caption: 'Connect to load' },
+                { title: 'Watch Time', value: '—', icon: Clock, color: 'text-purple-500', caption: 'Connect to load' },
+            ];
+        }
+        if (y.error) {
+            return [
+                { title: 'Subscribers', value: '—', icon: Users, color: 'text-red-500', caption: 'Could not refresh' },
+                { title: 'Total Views', value: '—', icon: Video, color: 'text-blue-500', caption: 'Could not refresh' },
+                { title: 'Average CTR', value: '—', icon: Target, color: 'text-green-500', caption: 'Could not refresh' },
+                { title: 'Watch Time', value: '—', icon: Clock, color: 'text-purple-500', caption: 'Could not refresh' },
+            ];
+        }
+
+        return [
+            {
+                title: 'Subscribers',
+                value: formatInt(y.subscribers),
+                icon: Users,
+                color: 'text-red-500',
+                caption: 'Channel total (YouTube Data API)',
+            },
+            {
+                title: 'Total Views',
+                value: formatInt(y.lifetime_views),
+                icon: Video,
+                color: 'text-blue-500',
+                caption: 'Lifetime channel views',
+            },
+            {
+                title: 'Average CTR',
+                value: formatCtrPercent(y.avg_thumbnail_ctr_percent),
+                icon: Target,
+                color: 'text-green-500',
+                caption: `${periodLabel} · thumbnail impressions CTR`,
+            },
+            {
+                title: 'Watch Time',
+                value: formatHours(y.watch_time_hours),
+                icon: Clock,
+                color: 'text-purple-500',
+                caption: `${periodLabel} · estimated minutes watched`,
+            },
+        ];
+    }, [youtubeCreator, periodLabel]);
 
     const creativeTools = [
         {
@@ -59,6 +150,7 @@ export default function CreatorIndex() {
             icon: Image,
             color: 'bg-gradient-to-br from-pink-500 to-purple-600',
             href: '/tools/thumbnail-generator',
+            routeName: 'cortex.agents.mirage' as const,
         },
         {
             title: 'Title Generator',
@@ -66,6 +158,7 @@ export default function CreatorIndex() {
             icon: Type,
             color: 'bg-gradient-to-br from-blue-500 to-cyan-600',
             href: '/tools/title-generator',
+            routeName: 'cortex.agents.bait' as const,
         },
         {
             title: 'Script to Description',
@@ -90,6 +183,7 @@ export default function CreatorIndex() {
             icon: TrendingUp,
             color: 'bg-gradient-to-br from-yellow-500 to-orange-600',
             href: '/tools/trending-topics',
+            routeName: 'cortex.agents.pulse' as const,
         },
         {
             title: 'Hashtag Generator',
@@ -168,6 +262,56 @@ export default function CreatorIndex() {
                     </div>
                 </div>
 
+                {youtubeCreator.error && (
+                    <Alert variant="destructive">
+                        <AlertTitle>Could not load YouTube stats</AlertTitle>
+                        <AlertDescription className="flex flex-col gap-2">
+                            <span>{youtubeCreator.error}</span>
+                            {youtubeCreator.youtube_doc_url && (
+                                <Link
+                                    href={youtubeCreator.youtube_doc_url}
+                                    className="font-medium underline underline-offset-4"
+                                >
+                                    Open Youtube Doc (Cortex)
+                                </Link>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {!youtubeCreator.connected && youtubeCreator.connect_url && (
+                    <Alert>
+                        <AlertTitle>Connect YouTube once</AlertTitle>
+                        <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <span>
+                                Channel stats use the same Google connection as{' '}
+                                <span className="font-medium">Youtube Doc</span> in Cortex. Connect there to see live
+                                numbers here (cached ~{Math.round((youtubeCreator.cache_ttl_seconds ?? 600) / 60)} min).
+                            </span>
+                            <Button variant="default" size="sm" asChild>
+                                <a href={youtubeCreator.connect_url}>Connect YouTube</a>
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                {youtubeCreator.connected && !youtubeCreator.error && youtubeCreator.channel_title && (
+                    <p className="text-sm text-muted-foreground">
+                        Showing data for <span className="font-medium text-foreground">{youtubeCreator.channel_title}</span>
+                        {youtubeCreator.youtube_doc_url && (
+                            <>
+                                {' · '}
+                                <Link
+                                    href={youtubeCreator.youtube_doc_url}
+                                    className="underline underline-offset-4"
+                                >
+                                    Cortex
+                                </Link>
+                            </>
+                        )}
+                    </p>
+                )}
+
                 {/* Channel Stats */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {channelStats.map((stat, index) => (
@@ -180,7 +324,7 @@ export default function CreatorIndex() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{stat.value}</div>
-                                <p className="text-xs text-green-500">{stat.trend}</p>
+                                <p className="text-xs text-muted-foreground">{stat.caption}</p>
                             </CardContent>
                         </Card>
                     ))}
@@ -198,7 +342,11 @@ export default function CreatorIndex() {
                                 <div
                                     key={index}
                                     className={`${tool.color} rounded-xl p-6 text-white hover:scale-105 transition-transform cursor-pointer`}
-                                    onClick={() => window.location.href = tool.href}
+                                    onClick={() =>
+                                        'routeName' in tool && tool.routeName
+                                            ? tenantRouter.visit(tool.routeName)
+                                            : (window.location.href = tool.href)
+                                    }
                                 >
                                     <div className="flex flex-col items-center text-center gap-2">
                                         <tool.icon className="h-8 w-8" />
@@ -223,7 +371,11 @@ export default function CreatorIndex() {
                                 <div
                                     key={index}
                                     className={`${tool.color} rounded-xl p-6 text-white hover:scale-105 transition-transform cursor-pointer`}
-                                    onClick={() => window.location.href = tool.href}
+                                    onClick={() =>
+                                        'routeName' in tool && tool.routeName
+                                            ? tenantRouter.visit(tool.routeName)
+                                            : (window.location.href = tool.href)
+                                    }
                                 >
                                     <div className="flex flex-col items-center text-center gap-2">
                                         <tool.icon className="h-8 w-8" />

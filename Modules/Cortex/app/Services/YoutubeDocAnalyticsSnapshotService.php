@@ -55,7 +55,8 @@ final class YoutubeDocAnalyticsSnapshotService
             : 'MINE';
 
         // Include channel id in key so switching channels does not serve stale analytics.
-        $cacheKey = 'youtube_doc_snapshot:'.$tenantId.':'.$channelKey.':'.$start.':'.$end;
+        // v2: includes thumbnail impression CTR aggregate for creator dashboard.
+        $cacheKey = 'youtube_doc_snapshot:v2:'.$tenantId.':'.$channelKey.':'.$start.':'.$end;
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && $this->snapshotIsCacheable($cached)) {
@@ -70,6 +71,89 @@ final class YoutubeDocAnalyticsSnapshotService
         }
 
         return $snapshot;
+    }
+
+    /**
+     * Stats for the Creator dashboard: same OAuth and cache as Youtube Doc (Cortex).
+     *
+     * @return array<string, mixed>
+     */
+    public function creatorDashboardSummary(int $days = 28): array
+    {
+        $tenantId = tenant('id');
+        $tenantSlug = tenant('slug');
+        if (! is_string($tenantId) || $tenantId === '' || ! is_string($tenantSlug) || $tenantSlug === '') {
+            return [
+                'connected' => false,
+                'youtube_doc_url' => null,
+                'connect_url' => null,
+            ];
+        }
+
+        $setting = YoutubeDocSetting::query()->where('tenant_id', $tenantId)->first();
+        if ($setting === null || ! $setting->hasConnectedChannel()) {
+            return [
+                'connected' => false,
+                'youtube_doc_url' => route('cortex.agents.youtube_doc', ['tenant' => $tenantSlug]),
+                'connect_url' => route('cortex.agents.youtube_doc.connect', ['tenant' => $tenantSlug]),
+            ];
+        }
+
+        try {
+            $snapshot = $this->snapshotForLastDays($days);
+        } catch (\Throwable $e) {
+            return [
+                'connected' => true,
+                'error' => $e->getMessage(),
+                'youtube_doc_url' => route('cortex.agents.youtube_doc', ['tenant' => $tenantSlug]),
+                'connect_url' => route('cortex.agents.youtube_doc.connect', ['tenant' => $tenantSlug]),
+                'channel_title' => $setting->youtube_channel_title,
+            ];
+        }
+
+        $stats = $snapshot['meta']['data_api_channel_stats'] ?? null;
+        $totals = $snapshot['totals'];
+        $ctrRaw = $totals['videoThumbnailImpressionsClickRate'] ?? null;
+        $ctrPercent = null;
+        if (is_float($ctrRaw) || is_int($ctrRaw)) {
+            $ctrPercent = $this->normalizeCtrToPercent((float) $ctrRaw);
+        }
+
+        $range = $snapshot['range'];
+
+        return [
+            'connected' => true,
+            'channel_title' => $snapshot['channel']['title'] ?? null,
+            'channel_id' => $snapshot['channel']['id'] ?? null,
+            'analytics_period_days' => $days,
+            'analytics_range' => [
+                'startDate' => $range['startDate'] ?? '',
+                'endDate' => $range['endDate'] ?? '',
+            ],
+            'subscribers' => is_array($stats) ? ($stats['subscriber_count'] ?? null) : null,
+            'lifetime_views' => is_array($stats) ? ($stats['view_count'] ?? null) : null,
+            'period_views' => (int) round((float) ($totals['views'] ?? 0)),
+            'watch_time_hours' => round(((float) ($totals['estimatedMinutesWatched'] ?? 0)) / 60.0, 1),
+            'avg_thumbnail_ctr_percent' => $ctrPercent,
+            'youtube_doc_url' => route('cortex.agents.youtube_doc', ['tenant' => $tenantSlug]),
+            'connect_url' => route('cortex.agents.youtube_doc.connect', ['tenant' => $tenantSlug]),
+            'cache_ttl_seconds' => self::CACHE_TTL_SECONDS,
+        ];
+    }
+
+    /**
+     * YouTube returns thumbnail CTR as a ratio for this metric; Studio shows percent.
+     */
+    private function normalizeCtrToPercent(float $rate): ?float
+    {
+        if (! is_finite($rate)) {
+            return null;
+        }
+        if ($rate >= 0 && $rate <= 1) {
+            return round($rate * 100, 2);
+        }
+
+        return round($rate, 2);
     }
 
     /**
@@ -365,6 +449,15 @@ MD;
         $reportErrors['top_videos'] = $topVideosResult['error'];
         $topVideoRows = $topVideosResult['rows'];
 
+        // Thumbnail reach (same date window as other channel totals) — optional; failures do not block caching.
+        $thumbnailReach = $this->queryAnalyticsChannelAggregate(
+            accessToken: $accessToken,
+            ids: $idsParam,
+            startDateYmd: $startDateYmd,
+            endDateYmd: $endDateYmd,
+            metrics: 'videoThumbnailImpressions,videoThumbnailImpressionsClickRate',
+        );
+
         $daily = [];
         $totals = [
             'views' => 0.0,
@@ -373,7 +466,23 @@ MD;
             'comments' => 0.0,
             'subscribersGained' => null,
             'subscribersLost' => null,
+            'videoThumbnailImpressions' => null,
+            'videoThumbnailImpressionsClickRate' => null,
         ];
+
+        if ($thumbnailReach['error'] === null && $thumbnailReach['rows'] !== []) {
+            $tr = $thumbnailReach['rows'][0];
+            $totals['videoThumbnailImpressions'] = isset($tr['videoThumbnailImpressions'])
+                ? (float) $tr['videoThumbnailImpressions']
+                : null;
+            $totals['videoThumbnailImpressionsClickRate'] = isset($tr['videoThumbnailImpressionsClickRate'])
+                ? (float) $tr['videoThumbnailImpressionsClickRate']
+                : null;
+        } elseif ($thumbnailReach['error'] !== null) {
+            Log::warning('YouTube Analytics thumbnail reach aggregate failed (creator CTR may be unavailable)', [
+                'message' => $thumbnailReach['error'],
+            ]);
+        }
 
         foreach ($dailyRows as $row) {
             $day = (string) ($row['day'] ?? '');
@@ -711,6 +820,84 @@ MD;
 
             return ['id' => null, 'title' => null];
         }
+    }
+
+    /**
+     * Channel-level aggregate (no dimensions) — one row of metrics for the date range.
+     *
+     * @return array{rows: list<array<string, mixed>>, error: string|null}
+     */
+    private function queryAnalyticsChannelAggregate(
+        string $accessToken,
+        string $ids,
+        string $startDateYmd,
+        string $endDateYmd,
+        string $metrics,
+    ): array {
+        $response = Http::withToken($accessToken)
+            ->timeout(60)
+            ->get('https://youtubeanalytics.googleapis.com/v2/reports', [
+                'ids' => $ids,
+                'startDate' => $startDateYmd,
+                'endDate' => $endDateYmd,
+                'metrics' => $metrics,
+            ]);
+
+        if ($response->failed()) {
+            $json = $response->json();
+            $message = 'HTTP '.$response->status();
+            if (is_array($json) && isset($json['error']['message'])) {
+                $message .= ': '.(string) $json['error']['message'];
+            } else {
+                $body = $response->body();
+                $message .= $body !== '' ? ': '.$body : '';
+            }
+
+            Log::warning('YouTube Analytics API channel aggregate failed', [
+                'ids' => $ids,
+                'metrics' => $metrics,
+                'message' => $message,
+            ]);
+
+            return ['rows' => [], 'error' => $message];
+        }
+
+        $resp = $response->json();
+        if (! is_array($resp)) {
+            return ['rows' => [], 'error' => 'Invalid JSON from YouTube Analytics API.'];
+        }
+
+        $rows = $resp['rows'] ?? [];
+        $headers = $resp['columnHeaders'] ?? [];
+
+        if (! is_array($rows) || ! is_array($headers) || $headers === []) {
+            return ['rows' => [], 'error' => null];
+        }
+
+        $names = [];
+        foreach ($headers as $h) {
+            if (is_array($h) && isset($h['name'])) {
+                $names[] = (string) $h['name'];
+            }
+        }
+
+        if ($names === []) {
+            return ['rows' => [], 'error' => null];
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (! is_array($r)) {
+                continue;
+            }
+            $assoc = [];
+            foreach ($names as $i => $name) {
+                $assoc[$name] = $r[$i] ?? null;
+            }
+            $out[] = $assoc;
+        }
+
+        return ['rows' => $out, 'error' => null];
     }
 
     /**

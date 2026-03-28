@@ -25,6 +25,7 @@ import {
     Webhook,
     History,
     Sparkles,
+    BarChart3,
 } from 'lucide-react';
 
 interface SettingsGroup {
@@ -101,6 +102,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     title: 'AI prompts',
                     href: `/${effectiveTenant?.slug}/settings/organization/ai-prompts`,
                     icon: Sparkles,
+                },
+                {
+                    title: 'AI usage',
+                    href: `/${effectiveTenant?.slug}/settings/organization/ai-usage`,
+                    icon: BarChart3,
                 },
                 {
                     title: 'Invites',

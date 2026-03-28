@@ -85,7 +85,9 @@
     },
     "extra": {
         "laravel": {
-            "dont-discover": []
+            "dont-discover": [
+                "openai-php/laravel"
+            ]
         },
         "merge-plugin": {
             "include": [

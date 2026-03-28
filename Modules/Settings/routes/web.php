@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Settings\Http\Controllers\ApiSettingsController;
 use Modules\Settings\Http\Controllers\OrganizationAiPromptController;
+use Modules\Settings\Http\Controllers\OrganizationAiUsageController;
 use Modules\Settings\Http\Controllers\PasswordController;
 use Modules\Settings\Http\Controllers\ProfileController;
 use Modules\Settings\Http\Controllers\SettingsController;
@@ -33,6 +34,7 @@ Route::middleware([
         Route::get('sidebar', [SettingsController::class, 'organizationSidebar'])->name('settings.organization.sidebar');
         Route::patch('sidebar', [SettingsController::class, 'updateSidebar'])->name('settings.organization.sidebar.update');
         Route::get('ai-prompts', [OrganizationAiPromptController::class, 'index'])->name('settings.organization.ai-prompts');
+        Route::get('ai-usage', [OrganizationAiUsageController::class, 'index'])->name('settings.organization.ai-usage');
         Route::patch('ai-prompts', [OrganizationAiPromptController::class, 'updateBuiltin'])->name('settings.organization.ai-prompts.update');
         Route::post('ai-prompts/reset', [OrganizationAiPromptController::class, 'resetBuiltin'])->name('settings.organization.ai-prompts.reset');
         Route::post('ai-prompts/custom', [OrganizationAiPromptController::class, 'storeCustom'])->name('settings.organization.ai-prompts.custom.store');

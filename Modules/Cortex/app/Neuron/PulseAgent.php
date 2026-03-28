@@ -6,7 +6,7 @@ namespace Modules\Cortex\Neuron;
 
 use NeuronAI\Agent\Agent;
 use NeuronAI\Agent\SystemPrompt;
-use NeuronAI\HttpClient\GuzzleHttpClient;
+use App\Services\AiUsage\NeuronOpenAiHttpClientFactory;
 use NeuronAI\Providers\AIProviderInterface;
 use NeuronAI\Providers\OpenAI\OpenAI;
 
@@ -16,12 +16,11 @@ final class PulseAgent extends Agent
     {
         $key = config('openai.api_key');
         $model = config('openai.chat_model', 'gpt-4o-mini');
-        $timeout = (float) config('openai.request_timeout', 120);
 
         return new OpenAI(
             key: is_string($key) ? $key : '',
             model: is_string($model) ? $model : 'gpt-4o-mini',
-            httpClient: new GuzzleHttpClient([], $timeout, 10.0),
+            httpClient: NeuronOpenAiHttpClientFactory::make(),
         );
     }
 

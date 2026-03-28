@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('borrow_payments')) {
+            return;
+        }
+
         Schema::create('borrow_payments', function (Blueprint $table) {
             $table->id();
             // Borrow Association

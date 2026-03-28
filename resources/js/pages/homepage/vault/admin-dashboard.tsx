@@ -1,19 +1,21 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import { useGreeting } from '@/hooks/use-greeting';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
-    Users,
-    Layers,
-    CreditCard,
-    MessageSquare,
-    Settings,
+    ArrowUpRight,
     Bell,
+    CreditCard,
     HelpCircle,
     KeyRound,
+    Layers,
+    MessageSquare,
+    Settings,
+    Sparkles,
+    Users,
 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -46,10 +48,10 @@ export default function VaultAdminDashboard({ quickStats, recentActivity }: Prop
     const isSuperAdmin = (usePage().props as { auth?: { is_superadmin?: boolean } }).auth?.is_superadmin === true;
 
     const quickStatsData = [
-        { title: 'Members', value: quickStats.total_users.toLocaleString(), icon: Users, color: 'text-amber-500' },
-        { title: 'Active subscriptions', value: quickStats.active_loans.toLocaleString(), icon: Layers, color: 'text-amber-600' },
-        { title: 'Pending', value: quickStats.pending_applications.toLocaleString(), icon: CreditCard, color: 'text-slate-600' },
-        { title: 'Support tickets', value: quickStats.support_tickets.toLocaleString(), icon: MessageSquare, color: 'text-rose-500' },
+        { title: 'Members', value: quickStats.total_users.toLocaleString(), icon: Users },
+        { title: 'Active subscriptions', value: quickStats.active_loans.toLocaleString(), icon: Layers },
+        { title: 'Pending', value: quickStats.pending_applications.toLocaleString(), icon: CreditCard },
+        { title: 'Support tickets', value: quickStats.support_tickets.toLocaleString(), icon: MessageSquare },
     ];
 
     const vaultSections = [
@@ -101,90 +103,155 @@ export default function VaultAdminDashboard({ quickStats, recentActivity }: Prop
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard - Admin (Vault)" />
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-2xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
-                        <p className="text-muted-foreground flex items-center gap-1.5">
-                            <KeyRound className="h-4 w-4 text-amber-500" />
-                            Vault admin – members, tiers, billing & support
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                            <Bell className="mr-2 h-4 w-4" />
-                            Notifications
-                        </Button>
-                        <Button variant="outline" size="sm">
-                            <HelpCircle className="mr-2 h-4 w-4" />
-                            Help
-                        </Button>
-                    </div>
-                </div>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {quickStatsData.map((stat, index) => (
-                        <Card key={index} className="cursor-pointer">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stat.value}</div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+            <div className="relative min-h-full overflow-hidden">
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_120%_80%_at_50%_-30%,rgba(245,158,11,0.14),transparent_50%)]"
+                    aria-hidden
+                />
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(165deg,hsl(var(--background))_0%,hsl(38_40%_97%)_45%,hsl(var(--background))_100%)] dark:bg-[linear-gradient(165deg,hsl(var(--background))_0%,hsl(30_25%_8%)_50%,hsl(var(--background))_100%)]"
+                    aria-hidden
+                />
 
-                <div className="grid gap-6 md:grid-cols-2">
-                    {vaultSections.map((section, index) => (
-                        <Card key={index}>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <section.icon className="h-5 w-5" />
-                                    <CardTitle>{section.title}</CardTitle>
+                <div className="mx-auto max-w-7xl space-y-10 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                    <header className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-b from-amber-50/90 to-card shadow-xl shadow-amber-900/5 dark:border-amber-900/40 dark:from-amber-950/40 dark:to-card">
+                        <div className="absolute right-0 top-0 h-40 w-40 translate-x-1/4 -translate-y-1/4 rounded-full bg-amber-400/20 blur-3xl dark:bg-amber-500/10" aria-hidden />
+                        <div className="relative flex flex-col gap-6 border-b border-amber-200/50 px-6 py-7 dark:border-amber-900/30 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                            <div className="flex items-start gap-4">
+                                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-amber-300/60 bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-600/25">
+                                    <KeyRound className="size-7" strokeWidth={1.5} />
                                 </div>
-                                <CardDescription>{section.description}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid gap-2">
-                                    {section.items.map((item, itemIndex) => (
-                                        <Button
-                                            key={itemIndex}
-                                            variant="ghost"
-                                            className="w-full justify-start cursor-pointer"
-                                            onClick={() => (window.location.href = item.href)}
-                                        >
-                                            {item.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent activity</CardTitle>
-                        <CardDescription>Latest activity across members and subscriptions</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {recentActivity.map((activity, index) => (
-                                <div key={index} className="flex items-center gap-4 cursor-pointer">
-                                    <div
-                                        className={`h-2 w-2 rounded-full ${activity.type === 'loan_application' ? 'bg-amber-500' : 'bg-slate-500'}`}
-                                    />
-                                    <div>
-                                        <p className="text-sm font-medium">{activity.title}</p>
-                                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                                <div>
+                                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-amber-800/80 dark:text-amber-400/90">
+                                        <Sparkles className="size-3.5" />
+                                        Vault
                                     </div>
+                                    <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+                                        {getGreeting()}, {user.first_name as string} {user.last_name as string}
+                                    </h1>
+                                    <p className="mt-1.5 max-w-xl text-sm text-muted-foreground">
+                                        Members, tiers, billing & support — your premium workspace.
+                                    </p>
                                 </div>
-                            ))}
+                            </div>
+                            <div className="flex flex-wrap gap-2 sm:justify-end">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-amber-300/80 bg-background/80 dark:border-amber-800"
+                                >
+                                    <Bell className="mr-2 size-4" />
+                                    Notifications
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-amber-300/80 bg-background/80 dark:border-amber-800"
+                                >
+                                    <HelpCircle className="mr-2 size-4" />
+                                    Help
+                                </Button>
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </header>
+
+                    <section aria-label="Key metrics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {quickStatsData.map((stat) => {
+                            const Icon = stat.icon;
+                            return (
+                                <div
+                                    key={stat.title}
+                                    className="relative overflow-hidden rounded-2xl border border-amber-200/50 bg-card p-5 shadow-md dark:border-amber-900/35"
+                                >
+                                    <div className="absolute -right-6 -top-6 size-24 rounded-full bg-amber-400/10 blur-2xl dark:bg-amber-500/5" aria-hidden />
+                                    <div className="relative flex items-center justify-between gap-3">
+                                        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{stat.title}</span>
+                                        <div className="rounded-xl border border-amber-200/60 bg-amber-500/10 p-2 text-amber-700 dark:border-amber-800 dark:text-amber-400">
+                                            <Icon className="size-5" strokeWidth={1.75} />
+                                        </div>
+                                    </div>
+                                    <p className="relative mt-4 text-3xl font-semibold tabular-nums tracking-tight text-amber-950 dark:text-amber-50">
+                                        {stat.value}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </section>
+
+                    <section aria-label="Vault sections" className="grid gap-5 md:grid-cols-2">
+                        {vaultSections.map((section) => {
+                            const Icon = section.icon;
+                            return (
+                                <div
+                                    key={section.title}
+                                    className="group rounded-2xl border border-amber-200/40 bg-card/95 shadow-sm ring-1 ring-amber-500/5 transition hover:ring-amber-500/20 dark:border-amber-900/35"
+                                >
+                                    <div className="flex items-start gap-3 border-b border-amber-200/40 px-5 py-4 dark:border-amber-900/30">
+                                        <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                                            <Icon className="size-5" strokeWidth={1.75} />
+                                        </span>
+                                        <div>
+                                            <h2 className="font-semibold leading-tight">{section.title}</h2>
+                                            <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
+                                        </div>
+                                    </div>
+                                    <ul className="divide-y divide-amber-200/30 dark:divide-amber-900/25">
+                                        {section.items.map((item) => (
+                                            <li key={item.href + item.name}>
+                                                <Link
+                                                    href={item.href}
+                                                    className="flex items-center justify-between gap-2 px-5 py-3 text-sm font-medium transition hover:bg-amber-500/[0.06]"
+                                                >
+                                                    {item.name}
+                                                    <ArrowUpRight className="size-4 text-amber-600/50 opacity-0 transition group-hover:opacity-100 dark:text-amber-400/50" />
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            );
+                        })}
+                    </section>
+
+                    <section aria-label="Recent activity" className="rounded-2xl border border-amber-200/45 bg-card shadow-sm dark:border-amber-900/35">
+                        <div className="border-b border-amber-200/40 px-5 py-4 dark:border-amber-900/30 sm:px-6">
+                            <h2 className="text-lg font-semibold">Recent activity</h2>
+                            <p className="text-sm text-muted-foreground">Latest activity across members and subscriptions</p>
+                        </div>
+                        <div className="p-4 sm:p-6">
+                            {recentActivity.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-muted-foreground">No recent activity.</p>
+                            ) : (
+                                <ul className="space-y-3">
+                                    {recentActivity.map((activity, index) => (
+                                        <li
+                                            key={`${activity.title}-${index}`}
+                                            className="flex gap-3 rounded-xl border border-transparent px-3 py-2.5 transition hover:border-amber-200/60 hover:bg-amber-500/[0.04] dark:hover:border-amber-900/40"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'mt-2 size-2 shrink-0 rounded-full ring-2 ring-background',
+                                                    activity.type === 'loan_application' ? 'bg-amber-500' : 'bg-slate-400',
+                                                )}
+                                            />
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium">{activity.title}</p>
+                                                {activity.description ? (
+                                                    <p className="text-xs text-muted-foreground">{activity.description}</p>
+                                                ) : null}
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {activity.time}
+                                                    {activity.user ? ` · ${activity.user}` : ''}
+                                                </p>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </section>
+                </div>
             </div>
         </AppLayout>
     );

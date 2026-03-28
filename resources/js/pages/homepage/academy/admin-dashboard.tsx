@@ -1,18 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
 import { useGreeting } from '@/hooks/use-greeting';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
-    Users,
-    BookOpen,
-    MessageSquare,
+    ArrowUpRight,
     Award,
-    Settings,
     Bell,
+    BookOpen,
+    GraduationCap,
     HelpCircle,
+    MessageSquare,
+    Settings,
+    Users,
 } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -45,10 +47,10 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
     const isSuperAdmin = (usePage().props as { auth?: { is_superadmin?: boolean } }).auth?.is_superadmin === true;
 
     const quickStatsData = [
-        { title: 'Learners', value: quickStats.total_users.toLocaleString(), icon: Users, color: 'text-teal-600' },
-        { title: 'Active enrollments', value: quickStats.active_loans.toLocaleString(), icon: BookOpen, color: 'text-teal-500' },
-        { title: 'Pending', value: quickStats.pending_applications.toLocaleString(), icon: Award, color: 'text-slate-600' },
-        { title: 'Support tickets', value: quickStats.support_tickets.toLocaleString(), icon: MessageSquare, color: 'text-rose-500' },
+        { title: 'Learners', value: quickStats.total_users.toLocaleString(), icon: Users },
+        { title: 'Active enrollments', value: quickStats.active_loans.toLocaleString(), icon: BookOpen },
+        { title: 'Pending', value: quickStats.pending_applications.toLocaleString(), icon: Award },
+        { title: 'Support tickets', value: quickStats.support_tickets.toLocaleString(), icon: MessageSquare },
     ];
 
     const academySections = [
@@ -56,6 +58,7 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
             title: 'Learners & access',
             icon: Users,
             description: 'Manage learners and roles',
+            ring: 'ring-teal-500/25',
             items: [
                 { name: 'All Users', href: '/admin/users' },
                 { name: 'User Roles', href: '/admin/roles' },
@@ -68,6 +71,7 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
             title: 'Courses & content',
             icon: BookOpen,
             description: 'Courses, packages, and curricula',
+            ring: 'ring-emerald-500/25',
             items: [
                 { name: 'Loan Packages', href: '/admin/loan-packages' },
                 { name: 'Currencies', href: '/admin/currencies' },
@@ -77,6 +81,7 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
             title: 'Enrollments & support',
             icon: Award,
             description: 'Enrollments and learner support',
+            ring: 'ring-amber-500/25',
             items: [
                 { name: 'Loan Applications', href: '/admin/loans' },
                 { name: 'Support Tickets', href: '/admin/tickets' },
@@ -86,6 +91,7 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
             title: 'Settings',
             icon: Settings,
             description: 'Academy and platform settings',
+            ring: 'ring-slate-400/30',
             items: [
                 { name: 'System Settings', href: '/admin/settings' },
                 { name: 'Loan Settings', href: '/admin/settings/loan' },
@@ -100,90 +106,140 @@ export default function AcademyAdminDashboard({ quickStats, recentActivity }: Pr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard - Admin (Academy)" />
-            <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-2xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
-                        <p className="text-muted-foreground flex items-center gap-1.5">
-                            <BookOpen className="h-4 w-4 text-teal-600" />
-                            Academy admin – learners, courses & support
+
+            <div className="relative min-h-full">
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(180deg,hsl(168_42%_96%)_0%,hsl(var(--background))_35%,hsl(45_40%_98%)_100%)] dark:bg-[linear-gradient(180deg,hsl(168_25%_12%)_0%,hsl(var(--background))_40%,hsl(30_20%_10%)_100%)]"
+                    aria-hidden
+                />
+
+                <div className="mx-auto max-w-7xl space-y-10 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+                    <header className="mx-auto max-w-3xl text-center">
+                        <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-3xl bg-teal-600 text-white shadow-lg shadow-teal-600/30">
+                            <GraduationCap className="size-9" strokeWidth={1.5} />
+                        </div>
+                        <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700 dark:text-teal-400">Academy admin</p>
+                        <h1 className="mt-3 text-balance font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                            {getGreeting()}, {user.first_name as string}{' '}
+                            <span className="text-muted-foreground">{user.last_name as string}</span>
+                        </h1>
+                        <p className="mt-3 flex items-center justify-center gap-2 text-muted-foreground">
+                            <BookOpen className="size-4 text-teal-600" />
+                            Learners, courses & support
                         </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
-                            <Bell className="mr-2 h-4 w-4" />
-                            Notifications
-                        </Button>
-                        <Button variant="outline" size="sm">
-                            <HelpCircle className="mr-2 h-4 w-4" />
-                            Help
-                        </Button>
-                    </div>
-                </div>
+                        <div className="mt-6 flex justify-center gap-2">
+                            <Button variant="outline" size="sm" className="rounded-full border-teal-200 bg-background/80 dark:border-teal-900">
+                                <Bell className="mr-2 size-4" />
+                                Notifications
+                            </Button>
+                            <Button variant="outline" size="sm" className="rounded-full border-teal-200 bg-background/80 dark:border-teal-900">
+                                <HelpCircle className="mr-2 size-4" />
+                                Help
+                            </Button>
+                        </div>
+                    </header>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {quickStatsData.map((stat, index) => (
-                        <Card key={index} className="cursor-pointer">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                                <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stat.value}</div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <div className="grid gap-6 md:grid-cols-2">
-                    {academySections.map((section, index) => (
-                        <Card key={index}>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <section.icon className="h-5 w-5" />
-                                    <CardTitle>{section.title}</CardTitle>
+                    <section aria-label="Key metrics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {quickStatsData.map((stat) => {
+                            const Icon = stat.icon;
+                            return (
+                                <div
+                                    key={stat.title}
+                                    className="rounded-3xl border border-teal-200/60 bg-card/90 p-6 shadow-sm ring-2 ring-teal-500/5 dark:border-teal-900/40"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-muted-foreground">{stat.title}</span>
+                                        <div className="rounded-2xl bg-teal-500/10 p-2 text-teal-700 dark:text-teal-400">
+                                            <Icon className="size-5" />
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 font-serif text-4xl font-semibold tabular-nums text-teal-900 dark:text-teal-100">
+                                        {stat.value}
+                                    </p>
                                 </div>
-                                <CardDescription>{section.description}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid gap-2">
-                                    {section.items.map((item, itemIndex) => (
-                                        <Button
-                                            key={itemIndex}
-                                            variant="ghost"
-                                            className="w-full justify-start cursor-pointer"
-                                            onClick={() => (window.location.href = item.href)}
-                                        >
-                                            {item.name}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                            );
+                        })}
+                    </section>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent activity</CardTitle>
-                        <CardDescription>Latest activity across learners and courses</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {recentActivity.map((activity, index) => (
-                                <div key={index} className="flex items-center gap-4 cursor-pointer">
-                                    <div
-                                        className={`h-2 w-2 rounded-full ${activity.type === 'loan_application' ? 'bg-teal-500' : 'bg-slate-500'}`}
-                                    />
-                                    <div>
-                                        <p className="text-sm font-medium">{activity.title}</p>
-                                        <p className="text-xs text-muted-foreground">{activity.time}</p>
+                    <section aria-label="Academy sections" className="grid gap-6 md:grid-cols-2">
+                        {academySections.map((section) => {
+                            const Icon = section.icon;
+                            return (
+                                <div
+                                    key={section.title}
+                                    className={cn(
+                                        'rounded-3xl border bg-card/95 p-1 shadow-md',
+                                        'ring-2',
+                                        section.ring,
+                                    )}
+                                >
+                                    <div className="rounded-[1.35rem] bg-gradient-to-br from-teal-50/80 to-transparent p-5 dark:from-teal-950/30">
+                                        <div className="flex items-start gap-3">
+                                            <div className="rounded-2xl bg-teal-600 p-2.5 text-white shadow">
+                                                <Icon className="size-5" />
+                                            </div>
+                                            <div>
+                                                <h2 className="font-serif text-xl font-semibold">{section.title}</h2>
+                                                <p className="mt-1 text-sm text-muted-foreground">{section.description}</p>
+                                            </div>
+                                        </div>
+                                        <ul className="mt-5 space-y-1">
+                                            {section.items.map((item) => (
+                                                <li key={item.href + item.name}>
+                                                    <Link
+                                                        href={item.href}
+                                                        className="group flex items-center justify-between rounded-2xl px-3 py-2 text-sm font-medium transition hover:bg-teal-600/10"
+                                                    >
+                                                        {item.name}
+                                                        <ArrowUpRight className="size-4 text-teal-600/60 opacity-0 transition group-hover:opacity-100" />
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                        })}
+                    </section>
+
+                    <section aria-label="Recent activity" className="overflow-hidden rounded-3xl border border-teal-200/50 bg-card shadow-sm dark:border-teal-900/40">
+                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white">
+                            <h2 className="font-serif text-lg font-semibold">Recent activity</h2>
+                            <p className="text-sm text-teal-100">Latest activity across learners and courses</p>
                         </div>
-                    </CardContent>
-                </Card>
+                        <div className="p-5 sm:p-6">
+                            {recentActivity.length === 0 ? (
+                                <p className="py-8 text-center text-sm text-muted-foreground">No recent activity.</p>
+                            ) : (
+                                <ul className="space-y-3">
+                                    {recentActivity.map((activity, index) => (
+                                        <li
+                                            key={`${activity.title}-${index}`}
+                                            className="flex gap-3 rounded-2xl border border-transparent bg-teal-50/30 px-4 py-3 dark:bg-teal-950/20"
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'mt-1.5 size-2 shrink-0 rounded-full',
+                                                    activity.type === 'loan_application' ? 'bg-teal-500' : 'bg-slate-400',
+                                                )}
+                                            />
+                                            <div>
+                                                <p className="text-sm font-medium">{activity.title}</p>
+                                                {activity.description ? (
+                                                    <p className="text-xs text-muted-foreground">{activity.description}</p>
+                                                ) : null}
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {activity.time}
+                                                    {activity.user ? ` · ${activity.user}` : ''}
+                                                </p>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </section>
+                </div>
             </div>
         </AppLayout>
     );

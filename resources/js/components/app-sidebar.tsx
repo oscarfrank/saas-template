@@ -23,6 +23,7 @@ interface Tenant {
     name: string;
     slug: string;
     logo?: string | null;
+    default_landing_path?: string;
 }
 
 interface PageProps extends InertiaPageProps {
@@ -84,7 +85,8 @@ export const AppSidebar = memo(function AppSidebar() {
     }), [tenants, user, hasRole]);
 
     const handleTeamSwitch = (team: { slug: string }) => {
-        router.visit(`/${team.slug}/dashboard`, {
+        const path = tenants.find((t) => t.slug === team.slug)?.default_landing_path ?? 'dashboard/workspace';
+        router.visit(`/${team.slug}/${path}`, {
             preserveState: false,
             preserveScroll: false,
             only: ['tenant', 'preferences'],
@@ -180,7 +182,11 @@ export const AppSidebar = memo(function AppSidebar() {
                                 className={cn(
                                     state === "collapsed" ? "size-8 shrink-0 justify-center p-0" : "w-full justify-start gap-2"
                                 )}
-                                onClick={() => router.visit(`/${effectiveTenant.slug}/dashboard`)}
+                                onClick={() =>
+                                    router.visit(
+                                        `/${effectiveTenant.slug}/${effectiveTenant.default_landing_path ?? 'dashboard/workspace'}`,
+                                    )
+                                }
                             >
                                 <LayoutGrid className="size-4" />
                                 {state === "expanded" && <span>Dashboard</span>}

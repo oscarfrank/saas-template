@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
 
 /** Storage path is valid for public URL when it doesn't use the old buggy "public/..." format. */
 function publicStorageUrl(path: string | null): string | null {
@@ -53,6 +54,8 @@ interface SiteSettings {
     maintenance_mode: boolean;
     homepage_theme: string;
     homepage_redirect_url: string | null;
+    /** Which paths org owners may pick as default landing; null = all (from config). */
+    allowed_org_default_landing_paths: string[] | null;
 }
 
 /** Short "best for" description for each homepage theme. */
@@ -66,17 +69,52 @@ const THEME_SUITED_FOR: Record<string, string> = {
     redirect: 'Redirect root (/) and public pages to any URL; app and other routes work as normal',
 };
 
+interface OrgLandingDef {
+    path: string;
+    label: string;
+}
+
 interface Props {
     settings: SiteSettings;
     homepageThemes: Record<string, string>;
+    orgDefaultLandingDefinitions: OrgLandingDef[];
 }
 
-export default function Settings({ settings, homepageThemes }: Props) {
+export default function Settings({ settings, homepageThemes, orgDefaultLandingDefinitions }: Props) {
+    const allLandingPaths = useMemo(
+        () => orgDefaultLandingDefinitions.map((d) => d.path),
+        [orgDefaultLandingDefinitions],
+    );
+
     const { data, setData, put, processing, errors } = useForm({
         ...settings,
         site_logo: null as File | null,
         site_favicon: null as File | null,
+        allowed_org_default_landing_paths:
+            settings.allowed_org_default_landing_paths != null && settings.allowed_org_default_landing_paths.length > 0
+                ? settings.allowed_org_default_landing_paths
+                : allLandingPaths,
     });
+
+    const toggleOrgLandingPath = useCallback(
+        (path: string, checked: boolean) => {
+            const cur = [...(data.allowed_org_default_landing_paths ?? allLandingPaths)];
+            if (checked) {
+                if (!cur.includes(path)) {
+                    cur.push(path);
+                }
+                setData('allowed_org_default_landing_paths', cur);
+            } else {
+                const next = cur.filter((p) => p !== path);
+                if (next.length === 0) {
+                    toast.error('Keep at least one landing page enabled for organizations.');
+                    return;
+                }
+                setData('allowed_org_default_landing_paths', next);
+            }
+        },
+        [allLandingPaths, data.allowed_org_default_landing_paths, setData],
+    );
 
     const logoPreviewUrl = useMemo(() => {
         if (data.site_logo instanceof File) return URL.createObjectURL(data.site_logo);
@@ -525,6 +563,44 @@ export default function Settings({ settings, homepageThemes }: Props) {
                                             <p className="text-muted-foreground text-sm mt-0.5">
                                                 When on, only admins can log in; everyone else sees the maintenance page and cannot register.
                                             </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-border/80 bg-muted/20 p-4 space-y-4">
+                                        <div>
+                                            <Label className="text-base">Organization default landing pages</Label>
+                                            <p className="text-muted-foreground text-sm mt-1">
+                                                Choose which dashboards organization owners may offer as the default landing page
+                                                (Settings → Organization → General). Paths users type manually are not affected;
+                                                this only limits the dropdown.
+                                            </p>
+                                            {errors.allowed_org_default_landing_paths && (
+                                                <p className="text-destructive text-sm mt-2">
+                                                    {String(errors.allowed_org_default_landing_paths)}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {orgDefaultLandingDefinitions.map((def) => (
+                                                <div key={def.path} className="flex items-start gap-3 rounded-md border border-transparent bg-background/60 p-2">
+                                                    <Checkbox
+                                                        id={`org-landing-${def.path.replace(/\//g, '-')}`}
+                                                        checked={(data.allowed_org_default_landing_paths ?? allLandingPaths).includes(def.path)}
+                                                        onCheckedChange={(c) => toggleOrgLandingPath(def.path, c === true)}
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <Label
+                                                            htmlFor={`org-landing-${def.path.replace(/\//g, '-')}`}
+                                                            className="cursor-pointer font-medium leading-tight"
+                                                        >
+                                                            {def.label}
+                                                        </Label>
+                                                        <p className="text-muted-foreground font-mono text-[11px] mt-0.5 truncate" title={def.path}>
+                                                            {def.path}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 </CardContent>

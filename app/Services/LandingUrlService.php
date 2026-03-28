@@ -13,9 +13,9 @@ class LandingUrlService
 {
     /**
      * Return the full URL path (with leading slash) the user should be sent to,
-     * e.g. "/acme/dashboard/workspace" or "/acme/dashboard".
+     * e.g. "/acme/dashboard/workspace" or "/acme/dashboard/hub".
      *
-     * The tenant must have its data column loaded for getDefaultLandingPath() to work;
+     * The tenant must have its data column loaded for getEffectiveDefaultLandingPath() to work;
      * if it was loaded via User->tenants() (which selects only id, name, slug), we refetch.
      */
     public static function forUser(User $user, Tenant $tenant): string
@@ -32,7 +32,7 @@ class LandingUrlService
                 // Only use last path if user belongs to that tenant (first segment is tenant slug)
                 $belongsToTenant = $user->tenants()->where('tenants.slug', $firstSegment)->exists();
                 if ($belongsToTenant) {
-                    return '/' . $lastPath;
+                    return '/'.$lastPath;
                 }
             }
         }
@@ -42,7 +42,8 @@ class LandingUrlService
         $tenantWithData = $tenant->getAttribute('data') !== null
             ? $tenant
             : Tenant::find($tenant->id);
-        $path = $tenantWithData->getDefaultLandingPath();
-        return '/' . trim($tenant->slug . '/' . $path, '/');
+        $path = $tenantWithData->getEffectiveDefaultLandingPath();
+
+        return '/'.trim($tenant->slug.'/'.$path, '/');
     }
 }

@@ -30,14 +30,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const DEFAULT_LANDING_OPTIONS = [
-    { value: 'dashboard', label: 'Dashboard (hub)' },
-    { value: 'dashboard/workspace', label: 'Workspace' },
-    { value: 'dashboard/youtuber', label: 'YouTuber' },
-    { value: 'dashboard/borrower', label: 'Borrower' },
-    { value: 'dashboard/lender', label: 'Lender' },
-] as const;
-
 type OrganizationForm = {
     name: string;
     slug: string;
@@ -63,6 +55,8 @@ interface Props {
         updated_at?: string;
     } | null;
     default_landing_path?: string;
+    /** From site settings — only options super admins allow for this installation. */
+    org_default_landing_options: { value: string; label: string }[];
     can_edit_organization?: boolean;
     industries: string[];
     organizationSizes: string[];
@@ -70,7 +64,14 @@ interface Props {
 
 type TenantForForm = NonNullable<Props['tenant']>;
 
-export default function OrganizationGeneral({ tenant: tenantProp, default_landing_path = 'dashboard', can_edit_organization = false, industries, organizationSizes }: Props) {
+export default function OrganizationGeneral({
+    tenant: tenantProp,
+    default_landing_path = 'dashboard/workspace',
+    org_default_landing_options = [],
+    can_edit_organization = false,
+    industries,
+    organizationSizes,
+}: Props) {
     const { auth, tenant: sharedTenant } = usePage<SharedData>().props;
     const tenant: TenantForForm = (tenantProp ?? (sharedTenant ? {
         id: sharedTenant.id,
@@ -258,18 +259,25 @@ export default function OrganizationGeneral({ tenant: tenantProp, default_landin
                                 {can_edit_organization && (
                                     <div className="space-y-2">
                                         <Label htmlFor="default_landing_path">Default landing page</Label>
-                                        <select
-                                            id="default_landing_path"
-                                            value={data.default_landing_path}
-                                            onChange={(e) => setData('default_landing_path', e.target.value)}
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2"
-                                        >
-                                            {DEFAULT_LANDING_OPTIONS.map((opt) => (
-                                                <option key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        {org_default_landing_options.length === 0 ? (
+                                            <p className="text-sm text-destructive">
+                                                No options are enabled for this site. A super admin can allow them under Admin →
+                                                Settings → Advanced.
+                                            </p>
+                                        ) : (
+                                            <select
+                                                id="default_landing_path"
+                                                value={data.default_landing_path}
+                                                onChange={(e) => setData('default_landing_path', e.target.value)}
+                                                className="w-full rounded-md border border-input bg-background px-3 py-2"
+                                            >
+                                                {org_default_landing_options.map((opt) => (
+                                                    <option key={opt.value} value={opt.value}>
+                                                        {opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        )}
                                         <p className="text-sm text-muted-foreground">
                                             Where members land when they log in (they can override this in their own preferences).
                                         </p>

@@ -2,14 +2,13 @@
 
 namespace App\Http\Middleware;
 
-use Modules\Settings\Models\SiteSettings;
+use App\Models\Tenant;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
-use Inertia\Middleware;
-use Tighten\Ziggy\Ziggy;
-use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use Inertia\Middleware;
+use Modules\Settings\Models\SiteSettings;
+use Tighten\Ziggy\Ziggy;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -45,6 +44,7 @@ class HandleInertiaRequests extends Middleware
         if ($request->is('install') || $request->is('install/*')) {
             $ziggy = new Ziggy;
             $ziggyData = $ziggy->toArray();
+
             return [
                 ...parent::share($request),
                 'name' => config('app.name'),
@@ -91,7 +91,7 @@ class HandleInertiaRequests extends Middleware
             }
 
             // If no current tenant is set, use the first tenant from the list
-            if (!$currentTenant && !empty($tenants)) {
+            if (! $currentTenant && ! empty($tenants)) {
                 $currentTenant = $tenants[0];
             }
 
@@ -106,12 +106,15 @@ class HandleInertiaRequests extends Middleware
                 $t['logo'] = $model?->getAttribute('logo');
                 $row = $tenantDataRaw->get($t['id']);
                 $t['data'] = $row && $row->data !== null ? (is_string($row->data) ? json_decode($row->data, true) ?? [] : (array) $row->data) : [];
+                $t['default_landing_path'] = $model ? $model->getEffectiveDefaultLandingPath() : config('homepage.fallback_landing_path', 'dashboard/workspace');
             }
             unset($t);
             if ($currentTenant) {
-                $currentTenant['logo'] = $tenantModels->get($currentTenant['id'])?->getAttribute('logo');
+                $currentModel = $tenantModels->get($currentTenant['id']);
+                $currentTenant['logo'] = $currentModel?->getAttribute('logo');
                 $row = $tenantDataRaw->get($currentTenant['id']);
                 $currentTenant['data'] = $row && $row->data !== null ? (is_string($row->data) ? json_decode($row->data, true) ?? [] : (array) $row->data) : [];
+                $currentTenant['default_landing_path'] = $currentModel ? $currentModel->getEffectiveDefaultLandingPath() : config('homepage.fallback_landing_path', 'dashboard/workspace');
             }
 
             // If we're on the homepage and have a tenant, redirect to org default or last visited (per user preference)
@@ -130,7 +133,7 @@ class HandleInertiaRequests extends Middleware
             'tenants_count' => count($tenants),
             'tenants' => $tenants,
             'current_tenant' => $currentTenant,
-            'route_tenant' => $request->route('tenant')
+            'route_tenant' => $request->route('tenant'),
         ]);
 
         // Create Ziggy configuration
@@ -164,6 +167,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'siteSettings' => function () {
                 $settings = SiteSettings::getSettings();
+
                 return $settings && $settings->exists ? $settings->toArray() : null;
             },
             'tenant' => $currentTenant,

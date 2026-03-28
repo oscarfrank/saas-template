@@ -1,90 +1,200 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useAuth } from '@/hooks/use-auth';
-import { useRole } from '@/hooks/use-role';
 import { useGreeting } from '@/hooks/use-greeting';
-import { Link } from '@inertiajs/react';
-
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, ArrowUpRight, Gem, LayoutGrid, Sparkles, Wallet, Youtube } from 'lucide-react';
 
-const breadcrumbs: BreadcrumbItem[] = [
+type HubDestination = {
+    id: string;
+    title: string;
+    description: string;
+    route: 'workspace-dashboard' | 'youtuber-dashboard' | 'borrower-dashboard' | 'lender-dashboard';
+    icon: typeof LayoutGrid;
+    /** Tailwind gradient + ring accents */
+    accent: {
+        iconBg: string;
+        iconFg: string;
+        gradient: string;
+        borderHover: string;
+        glow: string;
+    };
+};
+
+const DESTINATIONS: HubDestination[] = [
     {
-        title: 'Dashboard',
-        href: '/dashboard',
+        id: 'workspace',
+        title: 'Workspace',
+        description: 'Scripts, tasks, and YouTube workflows in one calm surface.',
+        route: 'workspace-dashboard',
+        icon: LayoutGrid,
+        accent: {
+            iconBg: 'bg-violet-500/15 dark:bg-violet-400/10',
+            iconFg: 'text-violet-600 dark:text-violet-300',
+            gradient: 'from-violet-500/[0.07] via-transparent to-fuchsia-500/[0.05]',
+            borderHover: 'hover:border-violet-500/35 dark:hover:border-violet-400/30',
+            glow: 'group-hover:shadow-violet-500/15 dark:group-hover:shadow-violet-400/10',
+        },
+    },
+    {
+        id: 'youtuber',
+        title: 'YouTuber',
+        description: 'Channel pulse, ideas, and creative tools tailored for creators.',
+        route: 'youtuber-dashboard',
+        icon: Youtube,
+        accent: {
+            iconBg: 'bg-rose-500/15 dark:bg-rose-400/10',
+            iconFg: 'text-rose-600 dark:text-rose-300',
+            gradient: 'from-rose-500/[0.07] via-transparent to-orange-500/[0.05]',
+            borderHover: 'hover:border-rose-500/35 dark:hover:border-rose-400/30',
+            glow: 'group-hover:shadow-rose-500/15 dark:group-hover:shadow-rose-400/10',
+        },
+    },
+    {
+        id: 'borrower',
+        title: 'Borrower',
+        description: 'Track funding, applications, and what you owe — in one place.',
+        route: 'borrower-dashboard',
+        icon: Wallet,
+        accent: {
+            iconBg: 'bg-sky-500/15 dark:bg-sky-400/10',
+            iconFg: 'text-sky-600 dark:text-sky-300',
+            gradient: 'from-sky-500/[0.07] via-transparent to-cyan-500/[0.05]',
+            borderHover: 'hover:border-sky-500/35 dark:hover:border-sky-400/30',
+            glow: 'group-hover:shadow-sky-500/15 dark:group-hover:shadow-sky-400/10',
+        },
+    },
+    {
+        id: 'lender',
+        title: 'Lender',
+        description: 'Portfolio view, returns, and opportunities worth your attention.',
+        route: 'lender-dashboard',
+        icon: Gem,
+        accent: {
+            iconBg: 'bg-emerald-500/15 dark:bg-emerald-400/10',
+            iconFg: 'text-emerald-600 dark:text-emerald-300',
+            gradient: 'from-emerald-500/[0.07] via-transparent to-teal-500/[0.05]',
+            borderHover: 'hover:border-emerald-500/35 dark:hover:border-emerald-400/30',
+            glow: 'group-hover:shadow-emerald-500/15 dark:group-hover:shadow-emerald-400/10',
+        },
     },
 ];
 
 export default function Dashboard() {
+    const { tenant } = usePage<{ tenant: { slug: string; default_landing_path?: string } | null }>().props;
+    const primaryPath = tenant?.default_landing_path ?? 'dashboard/workspace';
+    const breadcrumbs: BreadcrumbItem[] = tenant
+        ? [{ title: 'Dashboard', href: `/${tenant.slug}/${primaryPath}` }]
+        : [{ title: 'Dashboard', href: '/dashboard' }];
+
     const tenantRouter = useTenantRouter();
     const { user } = useAuth();
-    const { hasRole } = useRole();
     const { getGreeting } = useGreeting();
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-xl font-semibold">{getGreeting()}, {(user.first_name as string)} {(user.last_name as string)}</h3>
-                </div>
+            <Head title="Dashboard hub" />
 
-                <p className="text-muted-foreground text-sm mb-6 max-w-2xl">
-                    Choose a dashboard to get started. You can switch anytime from this page or the sidebar.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full">
-                    {/* Workspace (Notion-like) */}
-                    <Link
-                        href={tenantRouter.route('workspace-dashboard')}
-                        className="group relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-violet-500 hover:border-violet-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
-                    >
-                        <div className="text-4xl mb-3">📋</div>
-                        <h2 className="text-xl font-bold mb-2 text-violet-600 dark:text-violet-400">Workspace</h2>
-                        <p className="text-center text-gray-600 dark:text-gray-300 text-sm">
-                            Upcoming events, tasks, and YouTube in one place
-                        </p>
-                        <div className="absolute inset-0 rounded-xl bg-violet-500/0 group-hover:bg-violet-500/5 transition-all duration-200" />
-                    </Link>
+            <div className="relative flex min-h-[calc(100vh-8rem)] flex-1 flex-col overflow-hidden rounded-2xl">
+                {/* Ambient background */}
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]"
+                    aria-hidden
+                />
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,transparent,hsl(var(--background))_70%)]"
+                    aria-hidden
+                />
+                <div
+                    className="pointer-events-none absolute inset-0 -z-10 opacity-[0.35] dark:opacity-[0.2] [background-image:linear-gradient(hsl(var(--border)/0.5)_1px,transparent_1px),linear-gradient(90deg,hsl(var(--border)/0.5)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+                    aria-hidden
+                />
 
-                    {/* YouTuber Dashboard */}
-                    <Link
-                        href={tenantRouter.route('youtuber-dashboard')}
-                        className="group relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-red-500 hover:border-red-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
-                    >
-                        <div className="text-4xl mb-3">▶️</div>
-                        <h2 className="text-xl font-bold mb-2 text-red-600 dark:text-red-400">YouTuber</h2>
-                        <p className="text-center text-gray-600 dark:text-gray-300 text-sm">
-                            Channel stats, creative tools, and content ideas
+                <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-12 pt-2 sm:px-6 lg:px-8">
+                    {/* Hero */}
+                    <header className="mb-10 mt-4 text-center sm:mb-12 sm:text-left">
+                        <div className="mb-3 inline-flex items-center gap-2">
+                            <Badge
+                                variant="secondary"
+                                className="rounded-full border border-border/80 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm"
+                            >
+                                <Sparkles className="mr-1.5 size-3.5 opacity-80" />
+                                Dashboard hub
+                            </Badge>
+                        </div>
+                        <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                            {getGreeting()}, {user.first_name as string}{' '}
+                            <span className="font-normal text-muted-foreground">{user.last_name as string}</span>
+                        </h1>
+                        <p className="mx-auto mt-3 max-w-2xl text-pretty text-base text-muted-foreground sm:mx-0">
+                            Pick an experience. Your sidebar <span className="text-foreground/90">Dashboard</span> opens
+                            your organization&apos;s primary home — this page is for switching contexts.
                         </p>
-                        <div className="absolute inset-0 rounded-xl bg-red-500/0 group-hover:bg-red-500/5 transition-all duration-200" />
-                    </Link>
+                    </header>
 
-                    {/* Borrower Dashboard */}
-                    <Link
-                        href={tenantRouter.route('borrower-dashboard')}
-                        className="group relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-blue-500 hover:border-blue-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
-                    >
-                        <div className="text-4xl mb-3">💰</div>
-                        <h2 className="text-xl font-bold mb-2 text-blue-600 dark:text-blue-400">Borrower</h2>
-                        <p className="text-center text-gray-600 dark:text-gray-300 text-sm">
-                            Funding for your projects and ventures
-                        </p>
-                        <div className="absolute inset-0 rounded-xl bg-blue-500/0 group-hover:bg-blue-500/5 transition-all duration-200" />
-                    </Link>
+                    {/* Cards */}
+                    <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-2 xl:grid-cols-4">
+                        {DESTINATIONS.map((dest) => {
+                            const Icon = dest.icon;
+                            return (
+                                <Link
+                                    key={dest.id}
+                                    href={tenantRouter.route(dest.route)}
+                                    className={cn(
+                                        'group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/40 p-6 shadow-sm backdrop-blur-md transition-all duration-300',
+                                        'hover:-translate-y-0.5 hover:bg-card/60 hover:shadow-lg',
+                                        dest.accent.borderHover,
+                                        dest.accent.glow,
+                                    )}
+                                >
+                                    <div
+                                        className={cn(
+                                            'pointer-events-none absolute inset-0 bg-gradient-to-br opacity-100 transition-opacity duration-300 group-hover:opacity-100',
+                                            dest.accent.gradient,
+                                        )}
+                                    />
+                                    <div className="relative flex flex-1 flex-col">
+                                        <div className="mb-5 flex items-start justify-between gap-3">
+                                            <div
+                                                className={cn(
+                                                    'flex size-12 items-center justify-center rounded-2xl ring-1 ring-inset ring-black/[0.04] dark:ring-white/[0.06]',
+                                                    dest.accent.iconBg,
+                                                )}
+                                            >
+                                                <Icon className={cn('size-6', dest.accent.iconFg)} strokeWidth={1.75} />
+                                            </div>
+                                            <span
+                                                className={cn(
+                                                    'flex size-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground opacity-0 shadow-sm transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100',
+                                                )}
+                                            >
+                                                <ArrowUpRight className="size-4" />
+                                            </span>
+                                        </div>
+                                        <h2 className="text-lg font-semibold tracking-tight text-foreground">{dest.title}</h2>
+                                        <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+                                            {dest.description}
+                                        </p>
+                                        <div className="mt-6 flex items-center gap-2 text-xs font-medium text-muted-foreground/80 transition-colors group-hover:text-foreground/80">
+                                            <ArrowRight className="size-3.5 opacity-70 transition-transform duration-300 group-hover:translate-x-0.5" aria-hidden />
+                                            <span>Open {dest.title}</span>
+                                        </div>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
 
-                    {/* Lender Dashboard */}
-                    <Link
-                        href={tenantRouter.route('lender-dashboard')}
-                        className="group relative flex flex-col items-center justify-center p-6 rounded-xl border-2 border-green-500 hover:border-green-600 transition-all duration-200 hover:shadow-lg bg-white dark:bg-gray-800"
-                    >
-                        <div className="text-4xl mb-3">💎</div>
-                        <h2 className="text-xl font-bold mb-2 text-green-600 dark:text-green-400">Lender</h2>
-                        <p className="text-center text-gray-600 dark:text-gray-300 text-sm">
-                            Grow your portfolio and earn returns
-                        </p>
-                        <div className="absolute inset-0 rounded-xl bg-green-500/0 group-hover:bg-green-500/5 transition-all duration-200" />
-                    </Link>
+                    {/* Footnote */}
+                    <p className="mx-auto mt-10 max-w-xl text-center text-xs leading-relaxed text-muted-foreground/90">
+                        Direct link:{' '}
+                        <code className="rounded-md bg-muted/80 px-1.5 py-0.5 font-mono text-[0.7rem] text-foreground/80">
+                            /{tenant?.slug ?? '…'}/dashboard/hub
+                        </code>
+                    </p>
                 </div>
             </div>
         </AppLayout>

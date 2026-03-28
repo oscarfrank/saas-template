@@ -36,14 +36,51 @@ class SiteSettings extends Model
         'maintenance_mode',
         'homepage_theme',
         'homepage_redirect_url',
+        'allowed_org_default_landing_paths',
     ];
 
     protected $casts = [
         'maintenance_mode' => 'boolean',
+        'allowed_org_default_landing_paths' => 'array',
     ];
 
     public static function getSettings()
     {
-        return self::first() ?? new self();
+        return self::first() ?? new self;
+    }
+
+    /**
+     * Paths org owners may set as default landing (Settings → Organization).
+     * Null or empty stored value means all paths from config are allowed.
+     *
+     * @return list<string>
+     */
+    public function getAllowedOrgDefaultLandingPaths(): array
+    {
+        $all = array_keys(config('homepage.org_default_landing_paths', []));
+        $stored = $this->allowed_org_default_landing_paths;
+        if (! is_array($stored) || $stored === []) {
+            return $all;
+        }
+        $intersect = array_values(array_intersect($all, $stored));
+
+        return $intersect !== [] ? $intersect : $all;
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    public static function orgDefaultLandingOptionsForSelect(): array
+    {
+        $labels = config('homepage.org_default_landing_paths', []);
+        $allowed = self::getSettings()->getAllowedOrgDefaultLandingPaths();
+        $out = [];
+        foreach ($allowed as $path) {
+            if (isset($labels[$path])) {
+                $out[] = ['value' => $path, 'label' => $labels[$path]];
+            }
+        }
+
+        return $out;
     }
 }

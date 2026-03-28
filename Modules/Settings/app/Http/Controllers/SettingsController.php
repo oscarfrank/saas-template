@@ -3,16 +3,17 @@
 namespace Modules\Settings\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
 use App\Models\Tenant;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
-
-use Modules\User\Models\UserPreference;
-use Modules\Settings\Models\OrganizationInvite;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 use Modules\Settings\Mail\OrganizationInvite as OrganizationInviteMail;
+use Modules\Settings\Models\OrganizationInvite;
+use Modules\Settings\Models\SiteSettings;
+use Modules\User\Models\UserPreference;
 
 class SettingsController extends Controller
 {
@@ -69,7 +70,7 @@ class SettingsController extends Controller
     public function preferences()
     {
         $preferences = UserPreference::getForUser(auth()->id());
-        
+
         return Inertia::render('settings/preferences', [
             'preferences' => $preferences->preferences,
         ]);
@@ -112,7 +113,7 @@ class SettingsController extends Controller
     public function organizationGeneral()
     {
         $user = auth()->user();
-        
+
         // Get all tenants the user belongs to
         $allTenants = $user->tenants;
 
@@ -120,7 +121,7 @@ class SettingsController extends Controller
             $userRoles = $user->getRoleNames();
             $userPermissions = $user->getAllPermissions()->pluck('name');
         } catch (\Exception $e) {
-            \Log::error('Error getting user roles and permissions: ' . $e->getMessage());
+            \Log::error('Error getting user roles and permissions: '.$e->getMessage());
             $userRoles = [];
             $userPermissions = [];
         }
@@ -145,11 +146,11 @@ class SettingsController extends Controller
         return Inertia::render('settings/organization/general', [
             'user' => [
                 'id' => $user->id,
-                'name' => $user->first_name . ' ' . $user->last_name,
+                'name' => $user->first_name.' '.$user->last_name,
                 'email' => $user->email,
             ],
             'tenant' => $tenantForPage,
-            'all_tenants' => $allTenants->map(function($tenant) {
+            'all_tenants' => $allTenants->map(function ($tenant) {
                 return [
                     'id' => $tenant->id,
                     'name' => $tenant->name,
@@ -159,7 +160,21 @@ class SettingsController extends Controller
             }),
             'user_roles' => $userRoles,
             'user_permissions' => $userPermissions,
-            'default_landing_path' => $currentTenant ? $currentTenant->getDefaultLandingPath() : 'dashboard',
+            'default_landing_path' => (function () use ($currentTenant) {
+                $allowed = SiteSettings::getSettings()->getAllowedOrgDefaultLandingPaths();
+                $path = $currentTenant
+                    ? $currentTenant->getDefaultLandingPath()
+                    : (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
+                if (in_array($path, ['dashboard', 'dashboard/hub'], true)) {
+                    $path = (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
+                }
+                if (! in_array($path, $allowed, true)) {
+                    $path = $allowed[0] ?? (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
+                }
+
+                return $path;
+            })(),
+            'org_default_landing_options' => SiteSettings::orgDefaultLandingOptionsForSelect(),
             'can_edit_organization' => $canEditOrganization,
             'industries' => [
                 'Technology',
@@ -199,7 +214,7 @@ class SettingsController extends Controller
         $members = $tenant->users()->with('roles')->get()->map(function ($user) {
             return [
                 'id' => $user->id,
-                'name' => $user->first_name . ' ' . $user->last_name,
+                'name' => $user->first_name.' '.$user->last_name,
                 'email' => $user->email,
                 'role' => $user->pivot->role,
                 'avatar' => $user->avatar ?? '👤',
@@ -216,7 +231,7 @@ class SettingsController extends Controller
                     'id' => $invite->id,
                     'email' => $invite->email,
                     'role' => $invite->role,
-                    'invitedBy' => $invite->invitedBy->first_name . ' ' . $invite->invitedBy->last_name,
+                    'invitedBy' => $invite->invitedBy->first_name.' '.$invite->invitedBy->last_name,
                     'invitedAt' => $invite->created_at->diffForHumans(),
                     'status' => $invite->status,
                 ];
@@ -225,7 +240,7 @@ class SettingsController extends Controller
         \Log::info('OrganizationPeople data retrieved', [
             'tenant_id' => $tenant->id,
             'members_count' => $members->count(),
-            'invites_count' => $invites->count()
+            'invites_count' => $invites->count(),
         ]);
 
         return Inertia::render('settings/organization/people', [
@@ -242,8 +257,8 @@ class SettingsController extends Controller
     {
 
         $tenant = tenant();
-        
-        if (!$tenant) {
+
+        if (! $tenant) {
             return redirect()->route('profile.edit')
                 ->with('error', 'You must be part of an organization to send invites.');
         }
@@ -266,7 +281,6 @@ class SettingsController extends Controller
             return back()->with('error', 'An invite has already been sent to this email.');
         }
 
-
         $invite = OrganizationInvite::create([
             'tenant_id' => $tenant->id,
             'email' => $validated['email'],
@@ -277,9 +291,8 @@ class SettingsController extends Controller
             'expires_at' => now()->addDays(7),
         ]);
 
-        
         // Log the invite URL for debugging
-        \Log::info('Organization invite URL: ' . $invite->getInviteUrl());
+        \Log::info('Organization invite URL: '.$invite->getInviteUrl());
 
         // Send the invite email
         // Mail::to($validated['email'])->send(new OrganizationInviteMail($invite));
@@ -294,10 +307,10 @@ class SettingsController extends Controller
     {
         $tenant = tenant();
 
-        if($invite->tenant_id != $tenant->id){
+        if ($invite->tenant_id != $tenant->id) {
             return back()->with('error', 'You do not have permission to cancel this invite.');
         }
-        
+
         $invite->delete();
 
         return back()->with('success', 'Invite cancelled successfully.');
@@ -309,15 +322,15 @@ class SettingsController extends Controller
     public function resendInvite(Request $request, OrganizationInvite $invite)
     {
         $tenant = auth()->user()->tenant;
-        
-        if (!$tenant || $invite->tenant_id !== $tenant->id) {
+
+        if (! $tenant || $invite->tenant_id !== $tenant->id) {
             return back()->with('error', 'You do not have permission to resend this invite.');
         }
 
         $token = $invite->generateToken();
-        
+
         // Log the invite URL for debugging
-        \Log::info('Organization invite URL (resend): ' . $invite->getInviteUrl());
+        \Log::info('Organization invite URL (resend): '.$invite->getInviteUrl());
 
         // Send the invite email
         Mail::to($invite->email)->send(new OrganizationInviteMail($invite));
@@ -425,8 +438,8 @@ class SettingsController extends Controller
     public function updateOrganization(Request $request)
     {
         $tenant = tenant();
-        
-        if (!$tenant) {
+
+        if (! $tenant) {
             return redirect()->route('profile.edit')
                 ->with('error', 'You must be part of an organization to update these settings.');
         }
@@ -434,18 +447,20 @@ class SettingsController extends Controller
         $user = auth()->user();
         $pivot = $user->tenants()->where('tenants.id', $tenant->id)->first()?->pivot;
         $isOwner = $tenant->created_by === (int) $user->id || $pivot?->role === 'owner';
-        if (!$isOwner) {
+        if (! $isOwner) {
             return back()->with('error', 'You do not have permission to update organization settings.');
         }
 
+        $allowedLanding = SiteSettings::getSettings()->getAllowedOrgDefaultLandingPaths();
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:tenants,slug,' . $tenant->id,
+            'slug' => 'required|string|max:255|unique:tenants,slug,'.$tenant->id,
             'description' => 'nullable|string',
             'website' => 'nullable|url|max:255',
             'industry' => 'required|string|max:255',
             'size' => 'required|string|max:255',
-            'default_landing_path' => 'nullable|string|in:dashboard,dashboard/workspace,dashboard/youtuber,dashboard/borrower,dashboard/lender',
+            'default_landing_path' => ['required', 'string', Rule::in($allowedLanding)],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
@@ -454,7 +469,7 @@ class SettingsController extends Controller
             $validated['slug'] = Str::slug($validated['name']);
         }
 
-        $landingPath = $validated['default_landing_path'] ?? 'dashboard';
+        $landingPath = $validated['default_landing_path'] ?? (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
         $description = $validated['description'] ?? null;
         $website = $validated['website'] ?? null;
         $industry = $validated['industry'] ?? null;
@@ -475,7 +490,7 @@ class SettingsController extends Controller
         // Store organization logo on central public disk so it is served at /storage/... (not tenant-prefixed)
         if ($request->hasFile('logo')) {
             $oldPath = $tenant->getAttribute('logo');
-            if ($oldPath && is_string($oldPath) && !str_starts_with($oldPath, 'public/')) {
+            if ($oldPath && is_string($oldPath) && ! str_starts_with($oldPath, 'public/')) {
                 Storage::disk('public_central')->delete($oldPath);
             }
             $path = $request->file('logo')->store('organization-logos/'.$tenant->id, 'public_central');
@@ -528,20 +543,22 @@ class SettingsController extends Controller
             ->where('status', 'pending')
             ->first();
 
-        if (!$invite) {
+        if (! $invite) {
             return redirect()->route('login')
                 ->with('error', 'Invalid or expired invitation.');
         }
 
         if ($invite->isExpired()) {
             $invite->update(['status' => 'expired']);
+
             return redirect()->route('login')
                 ->with('error', 'This invitation has expired.');
         }
 
         // If user is not logged in, store the invite token in session and redirect to login
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             session(['organization_invite_token' => $token]);
+
             return redirect()->route('login');
         }
 
@@ -549,13 +566,14 @@ class SettingsController extends Controller
         if ($invite->tenant->users()->where('email', auth()->user()->email)->exists()) {
             // $invite->update(['status' => 'accepted']);
             $invite->delete();
+
             return redirect()->route('dashboard')
                 ->with('error', 'You are already a member of this organization.');
         }
 
         // Add user to the organization
         $invite->tenant->users()->attach(auth()->id(), [
-            'role' => $invite->role
+            'role' => $invite->role,
         ]);
 
         // Mark invite as accepted
@@ -563,9 +581,8 @@ class SettingsController extends Controller
         $invite->delete();
 
         return redirect()->route('dashboard')
-            ->with('success', 'You have successfully joined ' . $invite->tenant->name);
+            ->with('success', 'You have successfully joined '.$invite->tenant->name);
     }
-
 
     public function updateMemberRole(Request $request, $memberId)
     {
@@ -574,7 +591,7 @@ class SettingsController extends Controller
         ]);
 
         $tenant = tenant();
-        if (!$tenant) {
+        if (! $tenant) {
             return back()->withErrors(['role' => 'No organization found']);
         }
 
@@ -591,7 +608,7 @@ class SettingsController extends Controller
         }
 
         $member->pivot->update([
-            'role' => $request->role
+            'role' => $request->role,
         ]);
 
         return back();
@@ -600,7 +617,7 @@ class SettingsController extends Controller
     public function removeMember(Request $request, $memberId)
     {
         $tenant = tenant();
-        if (!$tenant) {
+        if (! $tenant) {
             return back()->withErrors(['member' => 'No organization found']);
         }
 

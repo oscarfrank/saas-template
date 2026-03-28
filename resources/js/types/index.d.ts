@@ -155,6 +155,8 @@ export interface SiteSettings {
     maintenance_mode: boolean;
     homepage_theme: string;
     homepage_redirect_url: string | null;
+    /** Super-admin: which paths orgs may set as default landing; null = all from config */
+    allowed_org_default_landing_paths?: string[] | null;
     created_at: string;
     updated_at: string;
 }
@@ -163,6 +165,8 @@ export interface Tenant {
     id: string;
     name: string;
     slug: string;
+    /** Resolved primary dashboard path after {slug}/ (e.g. dashboard/workspace). */
+    default_landing_path?: string;
     /** Organization logo path (in tenant data), served at /storage/{logo} */
     logo?: string | null;
     data?: Record<string, any>;

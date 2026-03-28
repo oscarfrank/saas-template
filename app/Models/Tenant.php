@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Support\Facades\Artisan;
+use Modules\Settings\Models\SiteSettings;
 use Modules\User\Models\User;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
@@ -78,6 +79,24 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function getDefaultLandingPath(): string
     {
         return (string) ($this->getAttribute('default_landing_path') ?? 'dashboard');
+    }
+
+    /**
+     * Path segment(s) after {tenant}/ for primary dashboard (not the hub).
+     * Legacy stored values "dashboard" or "dashboard/hub" resolve to homepage.fallback_landing_path.
+     */
+    public function getEffectiveDefaultLandingPath(): string
+    {
+        $path = $this->getDefaultLandingPath();
+        if (in_array($path, ['dashboard', 'dashboard/hub'], true)) {
+            $path = (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
+        }
+        $allowed = SiteSettings::getSettings()->getAllowedOrgDefaultLandingPaths();
+        if (! in_array($path, $allowed, true)) {
+            return $allowed[0] ?? (string) config('homepage.fallback_landing_path', 'dashboard/workspace');
+        }
+
+        return $path;
     }
 
     /**

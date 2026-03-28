@@ -1,20 +1,12 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
-
-use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
-
-// Local Modular Dependencies
-use Modules\Dashboard\Http\Controllers\DashboardController;
-use Modules\Loan\Http\Controllers\LoanDashboardController;
 use App\Http\Controllers\Admin\AiUsageAdminController;
 use App\Http\Controllers\Admin\ExportImportController;
-
-use App\Traits\LevelBasedAuthorization;
-use App\Helpers\AccessLevel;
-
+// Local Modular Dependencies
+use Illuminate\Support\Facades\Route;
+use Modules\Dashboard\Http\Controllers\DashboardController;
+use Modules\Loan\Http\Controllers\LoanDashboardController;
+use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -28,17 +20,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if ($lastTenantId) {
             $tenant = \App\Models\Tenant::where('id', $lastTenantId)->first();
         }
-        if (!$tenant) {
+        if (! $tenant) {
             $tenant = $user->tenants()->first();
         }
-        if (!$tenant) {
+        if (! $tenant) {
             return redirect()->route('tenants.create');
         }
 
         $url = \App\Services\LandingUrlService::forUser($user, $tenant);
+
         return redirect()->to($url);
     });
-    
+
     // ======================================================================
     // ========================== ADMIN ROUTES ==============================
     // ======================================================================
@@ -57,12 +50,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('import', [ExportImportController::class, 'import'])->name('admin.import');
     });
 
-
-
 });
-
-
-
 
 // Tenant Routes - These should be tenant-aware
 Route::middleware([
@@ -73,12 +61,12 @@ Route::middleware([
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
 
+    // Dashboard routes (hub must be registered before single-segment `dashboard` is not an issue; explicit paths first)
+    Route::get('dashboard/hub', [DashboardController::class, 'hub'])->name('dashboard-hub');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-            // Dashboard routes
-            Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-            Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
-            Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');
-            Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
-            Route::get('dashboard/workspace', [DashboardController::class, 'workspaceDashboard'])->name('workspace-dashboard');
+    Route::get('dashboard/lender', [DashboardController::class, 'lenderDashboard'])->name('lender-dashboard');
+    Route::get('dashboard/borrower', [LoanDashboardController::class, 'index'])->name('borrower-dashboard');
+    Route::get('dashboard/youtuber', [DashboardController::class, 'youtuberDashboard'])->name('youtuber-dashboard');
+    Route::get('dashboard/workspace', [DashboardController::class, 'workspaceDashboard'])->name('workspace-dashboard');
 });

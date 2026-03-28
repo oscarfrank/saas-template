@@ -2,17 +2,28 @@
 
 namespace Modules\Dashboard\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Http\Controllers\Controller;
 
 class DashboardController extends Controller
 {
     /**
-     * Display the dashboard hub (choice of Workspace, YouTuber, Borrower, Lender).
-     * Do not redirect by role here so that org default and user "last visited" landing preferences are respected.
+     * Primary "dashboard" URL: always send users to the org's functional dashboard
+     * (effective default landing path), not the hub picker.
      */
     public function index(Request $request)
+    {
+        $t = tenant();
+        $path = $t->getEffectiveDefaultLandingPath();
+
+        return redirect()->to('/'.$t->getAttribute('slug').'/'.$path);
+    }
+
+    /**
+     * Optional hub where users pick Workspace / YouTuber / Borrower / Lender (not linked from sidebar).
+     */
+    public function hub(Request $request)
     {
         return Inertia::render('dashboard/user/dashboard');
     }

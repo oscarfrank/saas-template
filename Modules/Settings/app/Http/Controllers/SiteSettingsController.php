@@ -3,26 +3,33 @@
 namespace Modules\Settings\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\Settings\Models\SiteSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Settings\Models\SiteSettings;
 
 class SiteSettingsController extends Controller
 {
     public function index()
     {
         $settings = SiteSettings::getSettings();
+
         return Inertia::render('admin/settings/index', [
             'settings' => $settings,
             'homepageThemes' => config('homepage.themes', ['lending' => 'Lending']),
+            'orgDefaultLandingDefinitions' => collect(config('homepage.org_default_landing_paths', []))
+                ->map(fn (string $label, string $path) => ['path' => $path, 'label' => $label])
+                ->values()
+                ->all(),
         ]);
     }
 
     public function update(Request $request)
     {
         $themeKeys = array_keys(config('homepage.themes', ['lending' => 'Lending']));
+
+        $canonicalLandingPaths = array_keys(config('homepage.org_default_landing_paths', []));
 
         $validated = $request->validate([
             'site_name' => 'required|string|max:255',
@@ -53,6 +60,8 @@ class SiteSettingsController extends Controller
                 'required_if:homepage_theme,redirect',
                 'url',
             ],
+            'allowed_org_default_landing_paths' => ['required', 'array', 'min:1'],
+            'allowed_org_default_landing_paths.*' => ['string', Rule::in($canonicalLandingPaths)],
         ]);
 
         $settings = SiteSettings::getSettings();

@@ -6,8 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
-use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 use Modules\User\Models\User;
+use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 class Staff extends Model
 {
@@ -17,6 +17,8 @@ class Staff extends Model
 
     protected $fillable = [
         'tenant_id',
+        'kind',
+        'reports_to_staff_id',
         'user_id',
         'uuid',
         'employee_id',
@@ -62,12 +64,45 @@ class Staff extends Model
         $deductions = is_array($this->deductions) ? $this->deductions : [];
         $allowanceTotal = array_sum(array_column($allowances, 'amount'));
         $deductionTotal = array_sum(array_column($deductions, 'amount'));
+
         return round($base + $allowanceTotal - $deductionTotal, 2);
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function reportsTo(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reports_to_staff_id');
+    }
+
+    public function directReports(): HasMany
+    {
+        return $this->hasMany(self::class, 'reports_to_staff_id');
+    }
+
+    /**
+     * Whether assigning {@see $newManagerId} as manager would create a cycle in the reporting chain.
+     */
+    public static function wouldCreateReportingCycle(int $staffId, ?int $newManagerId): bool
+    {
+        if ($newManagerId === null || $newManagerId === $staffId) {
+            return false;
+        }
+
+        $current = $newManagerId;
+        $guard = 0;
+        while ($current !== null && $guard < 200) {
+            if ($current === $staffId) {
+                return true;
+            }
+            $current = self::query()->whereKey($current)->value('reports_to_staff_id');
+            $guard++;
+        }
+
+        return false;
     }
 
     public function assignedTasks(): HasMany
@@ -118,6 +153,16 @@ class Staff extends Model
     public function scopeActive($query)
     {
         return $query->whereNull('ended_at');
+    }
+
+    public function scopeHumans($query)
+    {
+        return $query->where('kind', 'human');
+    }
+
+    public function scopeAgents($query)
+    {
+        return $query->where('kind', 'agent');
     }
 
     public function getRouteKeyName(): string

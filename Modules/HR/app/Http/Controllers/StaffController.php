@@ -10,6 +10,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\HR\Models\PaymentRunItem;
@@ -17,8 +18,8 @@ use Modules\HR\Models\Payslip;
 use Modules\HR\Models\Staff;
 use Modules\HR\Models\StaffDocument;
 use Modules\HR\Models\StaffEvent;
-use Modules\HR\Models\StaffPositionHistory;
 use Modules\HR\Models\Task;
+use Modules\HR\Support\StaffReportingOptions;
 use Modules\User\Models\User;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -45,9 +46,9 @@ class StaffController extends Controller
         if ($request->filled('search')) {
             $search = trim($request->search);
             $userQuery->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', '%' . $search . '%')
-                    ->orWhere('last_name', 'like', '%' . $search . '%')
-                    ->orWhere('email', 'like', '%' . $search . '%');
+                $q->where('first_name', 'like', '%'.$search.'%')
+                    ->orWhere('last_name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%');
             });
         }
 
@@ -89,15 +90,15 @@ class StaffController extends Controller
             ->whereNotIn('id', $existingStaffUserIds)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'email'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => trim($u->first_name . ' ' . $u->last_name) ?: $u->email, 'email' => $u->email]);
+            ->map(fn ($u) => ['id' => $u->id, 'name' => trim($u->first_name.' '.$u->last_name) ?: $u->email, 'email' => $u->email]);
 
         $preSelectUser = null;
         if ($request->filled('user_id')) {
             $userId = (int) $request->user_id;
             if (in_array($userId, $tenantUserIds->all(), true)) {
                 $u = User::find($userId);
-                if ($u && !$existingStaffUserIds->contains($userId)) {
-                    $preSelectUser = ['id' => $u->id, 'name' => trim($u->first_name . ' ' . $u->last_name) ?: $u->email, 'email' => $u->email];
+                if ($u && ! $existingStaffUserIds->contains($userId)) {
+                    $preSelectUser = ['id' => $u->id, 'name' => trim($u->first_name.' '.$u->last_name) ?: $u->email, 'email' => $u->email];
                 }
             }
         }
@@ -105,6 +106,7 @@ class StaffController extends Controller
         return Inertia::render('hr/staff/create', [
             'users' => $users,
             'preSelectUser' => $preSelectUser,
+            'reportingOptions' => StaffReportingOptions::forTenant((string) $tenantId),
         ]);
     }
 
@@ -123,7 +125,7 @@ class StaffController extends Controller
         $passportPath = null;
         if ($request->hasFile('passport_photo')) {
             $passportPath = $request->file('passport_photo')->store(
-                'hr/staff-passports/' . $tenantId,
+                'hr/staff-passports/'.$tenantId,
                 'local'
             );
         }
@@ -131,6 +133,7 @@ class StaffController extends Controller
         Staff::create([
             'tenant_id' => $tenantId,
             'user_id' => $validated['user_id'],
+            'reports_to_staff_id' => $validated['reports_to_staff_id'] ?? null,
             'employee_id' => $validated['employee_id'] ?? null,
             'department' => $validated['department'] ?? null,
             'job_title' => $validated['job_title'] ?? null,
@@ -343,7 +346,11 @@ class StaffController extends Controller
             abort(404);
         }
         $staff->load(['user:id,first_name,last_name,email', 'documents']);
-        return Inertia::render('hr/staff/edit', ['staff' => $staff]);
+
+        return Inertia::render('hr/staff/edit', [
+            'staff' => $staff,
+            'reportingOptions' => StaffReportingOptions::forTenant((string) tenant('id'), $staff->id),
+        ]);
     }
 
     public function update(Request $request, Staff $staff): RedirectResponse
@@ -386,8 +393,19 @@ class StaffController extends Controller
             'salary', 'salary_currency', 'pay_frequency',
         ]);
 
+        if (isset($validated['reports_to_staff_id'])) {
+            if ($validated['reports_to_staff_id'] === $staff->id) {
+                return back()->withErrors(['reports_to_staff_id' => 'Cannot report to yourself.']);
+            }
+            if ($validated['reports_to_staff_id'] !== null
+                && Staff::wouldCreateReportingCycle($staff->id, (int) $validated['reports_to_staff_id'])) {
+                return back()->withErrors(['reports_to_staff_id' => 'That reporting line would create a cycle.']);
+            }
+        }
+
         $staff->update([
             'employee_id' => $validated['employee_id'] ?? null,
+            'reports_to_staff_id' => array_key_exists('reports_to_staff_id', $validated) ? $validated['reports_to_staff_id'] : $staff->reports_to_staff_id,
             'department' => $validated['department'] ?? null,
             'job_title' => $validated['job_title'] ?? null,
             'salary' => $validated['salary'] ?? null,
@@ -422,7 +440,7 @@ class StaffController extends Controller
             'description' => 'nullable|string|max:500',
         ]);
         $file = $request->file('file');
-        $path = $file->store('hr/staff-documents/' . tenant('id') . '/' . $staff->id, 'local');
+        $path = $file->store('hr/staff-documents/'.tenant('id').'/'.$staff->id, 'local');
         $staff->documents()->create([
             'name' => $file->getClientOriginalName(),
             'type' => $validated['type'],
@@ -432,6 +450,7 @@ class StaffController extends Controller
             'description' => $validated['description'] ?? null,
             'uploaded_by' => auth()->id(),
         ]);
+
         return back()->with('success', 'Document uploaded.');
     }
 
@@ -444,6 +463,7 @@ class StaffController extends Controller
             Storage::disk('local')->delete($document->file_path);
         }
         $document->delete();
+
         return back()->with('success', 'Document deleted.');
     }
 
@@ -452,6 +472,7 @@ class StaffController extends Controller
         if ($staff->tenant_id !== tenant('id') || $document->staff_id !== $staff->id) {
             abort(404);
         }
+
         return Storage::disk('local')->download($document->file_path, $document->name);
     }
 
@@ -472,7 +493,7 @@ class StaffController extends Controller
         }
 
         $path = $request->file('passport_photo')->store(
-            'hr/staff-passports/' . tenant('id'),
+            'hr/staff-passports/'.tenant('id'),
             'local'
         );
 
@@ -489,6 +510,7 @@ class StaffController extends Controller
         if (! Storage::disk('local')->exists($staff->passport_photo_path)) {
             abort(404);
         }
+
         return Storage::disk('local')->response($staff->passport_photo_path);
     }
 
@@ -506,6 +528,10 @@ class StaffController extends Controller
                 $input[$key] = null;
             }
         }
+        if (isset($input['reports_to_staff_id']) && $input['reports_to_staff_id'] === '') {
+            $input['reports_to_staff_id'] = null;
+        }
+
         return $input;
     }
 
@@ -533,6 +559,11 @@ class StaffController extends Controller
             'bank_account_name' => 'nullable|string|max:128',
             'started_at' => 'nullable|date',
             'ended_at' => 'nullable|date|after_or_equal:started_at',
+            'reports_to_staff_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('hr_staff', 'id')->where('tenant_id', (string) tenant('id')),
+            ],
         ];
     }
 
@@ -613,6 +644,7 @@ class StaffController extends Controller
             'description' => $validated['description'] ?? null,
             'changed_by_user_id' => auth()->id(),
         ]);
+
         return back()->with('success', 'Event added.');
     }
 
@@ -637,6 +669,7 @@ class StaffController extends Controller
             }
         }
         $event->delete();
+
         return back()->with('success', 'Event deleted.');
     }
 
@@ -646,6 +679,7 @@ class StaffController extends Controller
             abort(404);
         }
         $staff->delete();
+
         return redirect()->route('hr.staff.index', ['tenant' => tenant('slug')])
             ->with('success', 'Staff member removed.');
     }

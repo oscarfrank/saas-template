@@ -12,4 +12,6 @@ Schedule::command('script:prune-trashed')->daily()->at('02:00');
 
 Schedule::command('cortex:pulse-scheduled-digests')->everyMinute();
 
+Schedule::command('worker-agents:dispatch-due')->everyMinute();
+
 Schedule::command('backup:run-scheduled')->everyMinute();

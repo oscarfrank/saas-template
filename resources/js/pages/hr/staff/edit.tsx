@@ -51,6 +51,7 @@ interface Staff {
     id: number;
     uuid: string;
     user?: User;
+    reports_to_staff_id: number | null;
     employee_id: string | null;
     department: string | null;
     job_title: string | null;
@@ -71,8 +72,15 @@ interface Staff {
     documents?: StaffDocument[];
 }
 
+interface ReportingOption {
+    id: number;
+    label: string;
+    kind: string;
+}
+
 interface Props {
     staff: Staff;
+    reportingOptions: ReportingOption[];
 }
 
 function toFormAllowance(a: AllowanceDeduction): { name: string; amount: string } {
@@ -89,7 +97,7 @@ function toDateInputValue(value: string | null | undefined): string {
     return d.toISOString().slice(0, 10);
 }
 
-function StaffEditForm({ staff }: Props) {
+function StaffEditForm({ staff, reportingOptions }: Props) {
     const tenantRouter = useTenantRouter();
     const name = staff.user
         ? `${staff.user.first_name || ''} ${staff.user.last_name || ''}`.trim() || staff.user.email
@@ -98,6 +106,7 @@ function StaffEditForm({ staff }: Props) {
     const { data, setData, processing, errors } = useForm({
         employee_id: staff.employee_id ?? '',
         department: staff.department ?? '',
+        reports_to_staff_id: staff.reports_to_staff_id != null ? String(staff.reports_to_staff_id) : '',
         job_title: staff.job_title ?? '',
         salary: staff.salary ?? '',
         salary_currency: staff.salary_currency || 'USD',
@@ -132,6 +141,7 @@ function StaffEditForm({ staff }: Props) {
         const payload: Record<string, unknown> = {
             _method: 'PUT',
             ...data,
+            reports_to_staff_id: data.reports_to_staff_id === '' ? null : Number(data.reports_to_staff_id),
             allowances: filteredAllowances,
             deductions: filteredDeductions,
             salary: data.salary === '' ? null : data.salary,
@@ -268,6 +278,26 @@ function StaffEditForm({ staff }: Props) {
                                                 onChange={(e) => setData('job_title', e.target.value)}
                                                 className="bg-background"
                                             />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="reports_to_staff_id">Reports to (optional)</Label>
+                                            <Select
+                                                value={data.reports_to_staff_id === '' ? 'none' : String(data.reports_to_staff_id)}
+                                                onValueChange={(v) => setData('reports_to_staff_id', v === 'none' ? '' : v)}
+                                            >
+                                                <SelectTrigger id="reports_to_staff_id" className="bg-background">
+                                                    <SelectValue placeholder="Nobody — top of chain" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">Nobody (top of chain)</SelectItem>
+                                                    {reportingOptions.map((r) => (
+                                                        <SelectItem key={r.id} value={String(r.id)}>
+                                                            {r.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-muted-foreground text-xs">Flexible org chart: e.g. reports to manager, manager to CEO.</p>
                                         </div>
                                         <div className="grid gap-4 sm:grid-cols-2">
                                             <div className="space-y-2">

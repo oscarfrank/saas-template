@@ -1,0 +1,11 @@
+{
+    "name": "WorkerAgents",
+    "alias": "workeragents",
+    "description": "Tenant worker agents: HR seats, capabilities, schedules, and automation (distinct from Cortex product agents)",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\WorkerAgents\\Providers\\WorkerAgentsServiceProvider"
+    ],
+    "files": []
+}

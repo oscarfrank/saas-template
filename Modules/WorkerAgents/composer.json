@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/workeragents",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\WorkerAgents\\": "app/",
+            "Modules\\WorkerAgents\\Database\\Factories\\": "database/factories/",
+            "Modules\\WorkerAgents\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\WorkerAgents\\Tests\\": "tests/"
+        }
+    }
+}

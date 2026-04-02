@@ -30,6 +30,7 @@ interface AllowanceDeduction {
 interface StaffFormData {
     user_id: number | '';
     employee_id: string;
+    reports_to_staff_id: string;
     department: string;
     job_title: string;
     salary: string;
@@ -48,8 +49,15 @@ interface StaffFormData {
     ended_at: string;
 }
 
+interface ReportingOption {
+    id: number;
+    label: string;
+    kind: string;
+}
+
 interface Props {
     users: UserOption[];
+    reportingOptions: ReportingOption[];
     /** When coming from "Add HR details" on a specific member */
     preSelectUser?: UserOption | null;
 }
@@ -57,6 +65,7 @@ interface Props {
 const initialFormData: StaffFormData = {
     user_id: '',
     employee_id: '',
+    reports_to_staff_id: '',
     department: '',
     job_title: '',
     salary: '',
@@ -75,7 +84,7 @@ const initialFormData: StaffFormData = {
     ended_at: '',
 };
 
-export default function HRStaffCreate({ users, preSelectUser = null }: Props) {
+export default function HRStaffCreate({ users, reportingOptions, preSelectUser = null }: Props) {
     const tenantRouter = useTenantRouter();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: tenantRouter.route('hr.staff.index') },
@@ -95,6 +104,7 @@ export default function HRStaffCreate({ users, preSelectUser = null }: Props) {
         e.preventDefault();
         const payload: Record<string, unknown> = {
             ...data,
+            reports_to_staff_id: data.reports_to_staff_id === '' ? null : Number(data.reports_to_staff_id),
             allowances: allowances.filter((a) => a.name.trim() && a.amount !== '' && Number(a.amount) >= 0),
             deductions: deductions.filter((d) => d.name.trim() && d.amount !== '' && Number(d.amount) >= 0),
         };
@@ -196,6 +206,25 @@ export default function HRStaffCreate({ users, preSelectUser = null }: Props) {
                                                 onChange={(e) => setData('job_title', e.target.value)}
                                                 className="bg-background"
                                             />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="reports_to_staff_id">Reports to (optional)</Label>
+                                            <Select
+                                                value={data.reports_to_staff_id === '' ? 'none' : String(data.reports_to_staff_id)}
+                                                onValueChange={(v) => setData('reports_to_staff_id', v === 'none' ? '' : v)}
+                                            >
+                                                <SelectTrigger id="reports_to_staff_id" className="bg-background">
+                                                    <SelectValue placeholder="Nobody — top of chain" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">Nobody (top of chain)</SelectItem>
+                                                    {reportingOptions.map((r) => (
+                                                        <SelectItem key={r.id} value={String(r.id)}>
+                                                            {r.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                         <div className="grid gap-4 sm:grid-cols-2">
                                             <div className="space-y-2">

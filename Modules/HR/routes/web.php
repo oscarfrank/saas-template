@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\HR\Http\Controllers\EvaluationController;
+use Modules\HR\Http\Controllers\OrganizationGoalController;
 use Modules\HR\Http\Controllers\PaymentRunController;
 use Modules\HR\Http\Controllers\PayslipController;
 use Modules\HR\Http\Controllers\ProjectController;
@@ -16,6 +17,12 @@ Route::middleware([
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
+    // Organization goals (WorkerAgents & strategy alignment)
+    Route::get('hr/goals', [OrganizationGoalController::class, 'index'])->name('hr.goals.index');
+    Route::post('hr/goals', [OrganizationGoalController::class, 'store'])->name('hr.goals.store');
+    Route::put('hr/goals/{goal}', [OrganizationGoalController::class, 'update'])->name('hr.goals.update');
+    Route::delete('hr/goals/{goal}', [OrganizationGoalController::class, 'destroy'])->name('hr.goals.destroy');
+
     // Staff
     Route::get('hr', [StaffController::class, 'index'])->name('hr.staff.index');
     Route::get('hr/staff', [StaffController::class, 'index'])->name('hr.staff.index.alt');

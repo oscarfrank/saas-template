@@ -19,5 +19,6 @@
     "HR": true,
     "Assets": true,
     "Creator": true,
-    "Cortex": true
+    "Cortex": true,
+    "WorkerAgents": true
 }

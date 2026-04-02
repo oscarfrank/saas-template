@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Cortex\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Cortex\Support\CortexAgentKey;
 use Modules\Cortex\Support\CortexLlmModelCatalog;
 use Modules\Cortex\Support\CortexLlmProvider;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
+use Stancl\Tenancy\Database\TenantScope;
 
 class CortexAgentLlmSetting extends Model
 {
@@ -30,12 +32,24 @@ class CortexAgentLlmSetting extends Model
         ];
     }
 
+    /**
+     * Query by explicit tenant id without stacking Stancl's {@see TenantScope} on top.
+     *
+     * When tenancy is initialized, the global scope adds another tenant_id constraint; combining
+     * it with an explicit where can yield zero rows if the scope key ever diverges (e.g. queue workers).
+     */
+    public static function queryForTenant(string $tenantId): Builder
+    {
+        return static::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId);
+    }
+
     public static function resolvedProviderFor(string $tenantId, CortexAgentKey|string $agentKey): CortexLlmProvider
     {
         $key = $agentKey instanceof CortexAgentKey ? $agentKey->value : $agentKey;
 
-        $row = static::query()
-            ->where('tenant_id', $tenantId)
+        $row = static::queryForTenant($tenantId)
             ->where('agent_key', $key)
             ->first();
 
@@ -53,8 +67,7 @@ class CortexAgentLlmSetting extends Model
     ): array {
         $key = $agentKey instanceof CortexAgentKey ? $agentKey->value : $agentKey;
 
-        $row = static::query()
-            ->where('tenant_id', $tenantId)
+        $row = static::queryForTenant($tenantId)
             ->where('agent_key', $key)
             ->first();
 

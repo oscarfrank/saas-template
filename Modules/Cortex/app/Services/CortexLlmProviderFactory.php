@@ -51,8 +51,7 @@ final class CortexLlmProviderFactory
     ): AIProviderInterface {
         $key = $agentKey instanceof CortexAgentKey ? $agentKey->value : $agentKey;
 
-        $row = CortexAgentLlmSetting::query()
-            ->where('tenant_id', $tenantId)
+        $row = CortexAgentLlmSetting::queryForTenant($tenantId)
             ->where('agent_key', $key)
             ->first();
 

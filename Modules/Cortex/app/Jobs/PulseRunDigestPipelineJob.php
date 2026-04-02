@@ -12,12 +12,14 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Modules\Cortex\Models\CortexAgentLlmSetting;
 use Modules\Cortex\Models\PulseDailyDigest;
 use Modules\Cortex\Models\PulseSetting;
 use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Services\PulseDigestGenerator;
 use Modules\Cortex\Services\PulseFeedRefresher;
 use Modules\Cortex\Support\CortexAgentKey;
+use Modules\Cortex\Support\CortexLlmProvider;
 
 final class PulseRunDigestPipelineJob implements ShouldQueue
 {
@@ -96,7 +98,10 @@ final class PulseRunDigestPipelineJob implements ShouldQueue
                 if (! $llmFactory->isTenantAgentConfigured($this->tenantId, CortexAgentKey::Pulse)) {
                     $digest->refresh();
                     $digest->ideas_status = 'failed';
-                    $digest->ideas_error = 'LLM is not configured for Pulse (missing API key for the selected provider).';
+                    $provider = CortexAgentLlmSetting::resolvedProviderFor($this->tenantId, CortexAgentKey::Pulse);
+                    $envKey = $provider === CortexLlmProvider::Anthropic ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+                    $digest->ideas_error = 'LLM is not configured for Pulse: '.$envKey.' is missing or empty for the '
+                        .$provider->value.' provider. Set it in .env, then restart the queue worker; run php artisan config:clear if you use config caching.';
                     $digest->save();
 
                     return;

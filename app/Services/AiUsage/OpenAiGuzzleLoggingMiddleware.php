@@ -67,9 +67,20 @@ final class OpenAiGuzzleLoggingMiddleware
         $total = null;
         if (is_array($json) && isset($json['usage']) && is_array($json['usage'])) {
             $u = $json['usage'];
+            // OpenAI-style
             $prompt = isset($u['prompt_tokens']) ? (int) $u['prompt_tokens'] : null;
             $completion = isset($u['completion_tokens']) ? (int) $u['completion_tokens'] : null;
             $total = isset($u['total_tokens']) ? (int) $u['total_tokens'] : null;
+            // Anthropic Messages API (input_tokens / output_tokens)
+            if ($prompt === null && isset($u['input_tokens'])) {
+                $prompt = (int) $u['input_tokens'];
+            }
+            if ($completion === null && isset($u['output_tokens'])) {
+                $completion = (int) $u['output_tokens'];
+            }
+            if ($total === null && $prompt !== null && $completion !== null) {
+                $total = $prompt + $completion;
+            }
         }
 
         $success = $httpStatus < 400;
@@ -154,6 +165,7 @@ final class OpenAiGuzzleLoggingMiddleware
         $path = strtolower($path);
 
         return match (true) {
+            str_contains($path, '/messages') => 'messages',
             str_contains($path, '/chat/completions') => 'chat.completions',
             str_contains($path, '/responses') => 'responses',
             str_contains($path, '/images/edits') => 'images.edits',

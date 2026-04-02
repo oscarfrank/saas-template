@@ -43,8 +43,7 @@ class CortexLlmSettingsController extends Controller
         $chatModel = isset($validated['chat_model']) ? trim((string) $validated['chat_model']) : '';
         $chatModel = $chatModel === '' ? null : $chatModel;
 
-        $existing = CortexAgentLlmSetting::query()
-            ->where('tenant_id', $tenantId)
+        $existing = CortexAgentLlmSetting::queryForTenant($tenantId)
             ->where('agent_key', $agentKeyEnum->value)
             ->first();
 
@@ -65,12 +64,12 @@ class CortexLlmSettingsController extends Controller
             ]);
         }
 
-        CortexAgentLlmSetting::query()->updateOrCreate(
+        CortexAgentLlmSetting::queryForTenant($tenantId)->updateOrCreate(
             [
-                'tenant_id' => $tenantId,
                 'agent_key' => $agentKeyEnum->value,
             ],
             [
+                'tenant_id' => $tenantId,
                 'llm_provider' => $providerEnum,
                 'chat_model' => $chatModel,
             ],
@@ -122,12 +121,12 @@ class CortexLlmSettingsController extends Controller
 
         DB::transaction(function () use ($tenantId, $providerEnum, $chatModel, &$count): void {
             foreach (CortexAgentKey::cases() as $agentKey) {
-                CortexAgentLlmSetting::query()->updateOrCreate(
+                CortexAgentLlmSetting::queryForTenant($tenantId)->updateOrCreate(
                     [
-                        'tenant_id' => $tenantId,
                         'agent_key' => $agentKey->value,
                     ],
                     [
+                        'tenant_id' => $tenantId,
                         'llm_provider' => $providerEnum,
                         'chat_model' => $chatModel,
                     ],

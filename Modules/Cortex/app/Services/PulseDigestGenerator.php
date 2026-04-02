@@ -10,6 +10,7 @@ use Modules\Cortex\Models\PulseSetting;
 use Modules\Cortex\Neuron\Output\PulseDigestIdeaItem;
 use Modules\Cortex\Neuron\Output\PulseDigestOutput;
 use Modules\Cortex\Neuron\PulseDigestAgent;
+use Modules\Cortex\Support\CortexAgentKey;
 use NeuronAI\Chat\Messages\UserMessage;
 
 final class PulseDigestGenerator
@@ -48,6 +49,7 @@ PROMPT;
 
     public function __construct(
         private readonly PulseFeedSignalsBuilder $signalsBuilder,
+        private readonly CortexLlmProviderFactory $llmFactory,
     ) {}
 
     public function generateAndStore(PulseDailyDigest $digest): void
@@ -76,6 +78,7 @@ PROMPT;
 
         try {
             $agent = PulseDigestAgent::make()
+                ->setAiProvider($this->llmFactory->makeForTenantAgent($tenantId, CortexAgentKey::Pulse))
                 ->toolMaxRuns(0);
 
             /** @var PulseDigestOutput $output */

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Cortex\Console\PulseScheduledDigestsCommand;
 use Modules\Cortex\Services\BaitTitleService;
+use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Services\MirageImageService;
 use Modules\Cortex\Services\MirageReferenceVisionService;
 use Modules\Cortex\Services\PulseRssFetcher;
@@ -42,6 +43,7 @@ class CortexServiceProvider extends ServiceProvider
     {
         $this->app->singleton(YoutubeTranscriptService::class);
         $this->app->singleton(PulseRssFetcher::class);
+        $this->app->singleton(CortexLlmProviderFactory::class);
         $this->app->singleton(BaitTitleService::class);
         $this->app->singleton(MirageImageService::class);
         $this->app->singleton(MirageReferenceVisionService::class);

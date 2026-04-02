@@ -11,6 +11,7 @@ import { AgentMarkdown } from '@/components/cortex/agent-markdown';
 import axios from 'axios';
 import { ArrowLeft, Loader2, Youtube } from 'lucide-react';
 import { useState } from 'react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 interface Props {
     openAiConfigured: boolean;
@@ -81,22 +82,27 @@ export default function CortexYoutubeAgentPage({ openAiConfigured }: Props) {
                                 All agents
                             </Link>
                         </Button>
-                        <div className="flex items-center gap-2">
-                            <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
-                                <Youtube className="size-5" />
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
+                                    <Youtube className="size-5" />
+                                </div>
+                                <h1 className="text-2xl font-semibold tracking-tight">YouTube video analyst</h1>
                             </div>
-                            <h1 className="text-2xl font-semibold tracking-tight">YouTube video analyst</h1>
+                            <CortexAgentSettingsMenu agentKey="youtube-video" />
                         </div>
                         <p className="text-muted-foreground mt-2 text-sm">
-                            Paste a video URL (or ID). Cortex fetches captions when available, then OpenAI summarizes and suggests improvements.
+                            Paste a video URL (or ID). Cortex fetches captions when available, then your selected model summarizes and suggests improvements.
                         </p>
                     </div>
                 </div>
 
                 {!openAiConfigured && (
                     <Alert variant="destructive">
-                        <AlertTitle>OpenAI not configured</AlertTitle>
-                        <AlertDescription>Set OPENAI_API_KEY (and optionally OPENAI_CHAT_MODEL) in your environment, then reload.</AlertDescription>
+                        <AlertTitle>AI not configured for this agent</AlertTitle>
+                        <AlertDescription>
+                            Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                        </AlertDescription>
                     </Alert>
                 )}
 

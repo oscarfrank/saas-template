@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AgentMarkdown } from '@/components/cortex/agent-markdown';
 
 import { Loader2, Send, PenLine } from 'lucide-react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 type QuillChatMessage = {
     role: 'user' | 'assistant';
@@ -100,11 +101,14 @@ export default function QuillPage({ openAiConfigured, promptKey, promptLabel, pr
             <Head title="Quill - Cortex" />
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
-                            <PenLine className="size-5" />
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
+                                <PenLine className="size-5" />
+                            </div>
+                            <h1 className="text-2xl font-semibold tracking-tight">Quill</h1>
                         </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">Quill</h1>
+                        <CortexAgentSettingsMenu agentKey="quill" />
                     </div>
                     <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
                         {promptDescription || 'YouTube scripts in your configured voice.'} The active system prompt is{' '}
@@ -116,10 +120,12 @@ export default function QuillPage({ openAiConfigured, promptKey, promptLabel, pr
                     </p>
                 </div>
 
-                {!openAiConfigured && (
+                {!canUseAgent && (
                     <Alert variant="destructive">
-                        <AlertTitle>OpenAI not configured</AlertTitle>
-                        <AlertDescription>Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                        <AlertTitle>AI not configured for this agent</AlertTitle>
+                        <AlertDescription>
+                            Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                        </AlertDescription>
                     </Alert>
                 )}
 

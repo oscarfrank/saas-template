@@ -18,6 +18,7 @@ import { AgentMarkdown } from '@/components/cortex/agent-markdown';
 
 import { Loader2, Send, Calendar, Sparkles, Brain } from 'lucide-react';
 import type React from 'react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 type NexusChatMessage = {
     role: 'user' | 'assistant';
@@ -224,21 +225,26 @@ export default function NexusPlannerPage({ openAiConfigured, canApply }: Props) 
             <div className="flex flex-col gap-6 p-4 md:p-6 lg:flex-row lg:gap-8">
                 <div className="flex w-full flex-col gap-4 lg:w-1/2">
                     <div>
-                        <div className="flex items-center gap-2">
-                            <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
-                                <Brain className="size-5" />
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-primary/10 text-primary flex size-9 items-center justify-center rounded-md">
+                                    <Brain className="size-5" />
+                                </div>
+                                <h1 className="text-2xl font-semibold tracking-tight">Nexus planner</h1>
                             </div>
-                            <h1 className="text-2xl font-semibold tracking-tight">Nexus planner</h1>
+                            <CortexAgentSettingsMenu agentKey="nexus-planner" />
                         </div>
                         <p className="text-muted-foreground mt-2 text-sm">
                             Chat to refine the plan, then tick candidates to create HR tasks.
                         </p>
                     </div>
 
-                    {!openAiConfigured && (
+                    {!canUseAgent && (
                         <Alert variant="destructive">
-                            <AlertTitle>OpenAI not configured</AlertTitle>
-                            <AlertDescription>Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                            <AlertTitle>AI not configured for this agent</AlertTitle>
+                            <AlertDescription>
+                                Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                            </AlertDescription>
                         </Alert>
                     )}
 
@@ -381,7 +387,7 @@ export default function NexusPlannerPage({ openAiConfigured, canApply }: Props) 
                             <Button
                                 type="button"
                                 onClick={() => void createTasks()}
-                                disabled={!canApply || selectedKeys.size === 0 || loading || !openAiConfigured}
+                                disabled={!canApply || selectedKeys.size === 0 || loading || !canUseAgent}
                                 className="w-full"
                             >
                                 {loading ? (

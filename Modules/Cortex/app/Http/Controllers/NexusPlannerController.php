@@ -12,9 +12,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Neuron\NexusPlannerAgent;
 use Modules\Cortex\Neuron\Output\NexusAction;
 use Modules\Cortex\Neuron\Output\NexusPlanOutput;
+use Modules\Cortex\Support\CortexAgentKey;
 use Modules\HR\Models\Staff;
 use Modules\HR\Models\Task;
 use Modules\Script\Models\Script;
@@ -22,6 +24,7 @@ use NeuronAI\Chat\Messages\UserMessage;
 
 class NexusPlannerController extends Controller
 {
+    use InteractsWithCortexLlm;
     use LevelBasedAuthorization;
 
     /** Minimum role level to create HR tasks from Nexus (manager and above). */
@@ -29,8 +32,10 @@ class NexusPlannerController extends Controller
 
     public function index(): Response
     {
+        $tenantId = tenant('id');
+
         return Inertia::render('cortex/agents/nexus', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::NexusPlanner),
             'canApply' => $this->hasLevel(self::APPLY_LEVEL),
         ]);
     }
@@ -39,9 +44,14 @@ class NexusPlannerController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::NexusPlanner)) {
             return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::NexusPlanner),
             ], 503);
         }
 
@@ -54,7 +64,6 @@ class NexusPlannerController extends Controller
             'selected_keys.*' => ['nullable', 'string'],
         ]);
 
-        $tenantId = tenant('id');
         $range = $this->planningRangeFromRequest($validated, Carbon::now());
 
         $scripts = $this->loadScriptsForPlanning($tenantId, $range['start'], $range['end']);
@@ -67,6 +76,7 @@ class NexusPlannerController extends Controller
 
         try {
             $agent = NexusPlannerAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::NexusPlanner))
                 ->setInstructions($assistantSystemContext)
                 ->toolMaxRuns(0);
 
@@ -220,13 +230,6 @@ class NexusPlannerController extends Controller
             'created' => $created,
             'skipped' => $skipped,
         ]);
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     private function raiseRuntimeLimitForAgent(): void

@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 
 import { Check, ChevronDown, Copy, Loader2, Sparkles, Type } from 'lucide-react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 type FramingToggle = 'None' | 'Polarizing Take' | 'Strong Opinion' | 'Contrarian Framing';
 type Phase = 'analysis' | 'generation' | null;
@@ -65,6 +66,7 @@ export default function BaitPage({ openAiConfigured, promptKey, promptLabel, pro
     const [copiedWinner, setCopiedWinner] = useState(false);
 
     const busy = phase !== null;
+    const canUseAgent = openAiConfigured;
 
     const winnerBlock = extractBlock(result, 'WINNER');
     const runnerOneBlock = extractBlock(result, 'RUNNER UP 1');
@@ -207,8 +209,6 @@ export default function BaitPage({ openAiConfigured, promptKey, promptLabel, pro
         }
     };
 
-    const canUseAgent = openAiConfigured;
-
     const copyWinnerTitle = async () => {
         if (!winnerTitle) return;
         try {
@@ -226,11 +226,14 @@ export default function BaitPage({ openAiConfigured, promptKey, promptLabel, pro
             <Head title="Bait - Cortex" />
             <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 pb-16 md:p-6">
                 <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-xl">
-                            <Type className="size-5" />
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-xl">
+                                <Type className="size-5" />
+                            </div>
+                            <h1 className="text-2xl font-semibold tracking-tight">Bait</h1>
                         </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">Bait</h1>
+                        <CortexAgentSettingsMenu agentKey="bait" />
                     </div>
                     <p className="text-muted-foreground max-w-3xl text-sm">
                         {promptDescription ||
@@ -238,10 +241,13 @@ export default function BaitPage({ openAiConfigured, promptKey, promptLabel, pro
                     </p>
                 </div>
 
-                {!openAiConfigured && (
+                {!canUseAgent && (
                     <Alert variant="destructive">
-                        <AlertTitle>OpenAI not configured</AlertTitle>
-                        <AlertDescription>Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                        <AlertTitle>AI not configured for this agent</AlertTitle>
+                        <AlertDescription>
+                            Open <strong>Settings → Agent settings</strong> and add the API key for your chosen provider, or set keys in{' '}
+                            <code className="text-xs">.env</code>.
+                        </AlertDescription>
                     </Alert>
                 )}
 

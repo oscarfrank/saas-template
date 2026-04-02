@@ -201,6 +201,25 @@
   100% { transform: translateX(-100%); }
 }
 
+/* Cortex dashboard — “futuristic” mode ambient motion */
+@keyframes cortex-blob-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(5%, -6%) scale(1.1);
+    opacity: 0.7;
+  }
+}
+
+@layer utilities {
+  .animate-cortex-blob-drift {
+    animation: cortex-blob-drift 22s ease-in-out infinite;
+  }
+}
+
 /* Blocks inserted via "Apply above original" (retention suggestions) */
 .bn-editor [data-id^="suggestion-"] {
   background-color: hsl(45 93% 94% / 0.9);

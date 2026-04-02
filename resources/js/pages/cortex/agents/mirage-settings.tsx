@@ -69,6 +69,16 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
                             <div>
                                 <h1 className="text-2xl font-semibold tracking-tight">Mirage image settings</h1>
                                 <p className="text-muted-foreground text-sm">Choose which engine creates thumbnail images.</p>
+                                <p className="text-muted-foreground mt-1 text-xs">
+                                    Chat and JSON ideas use the{' '}
+                                    <Link
+                                        href={tenantRouter.route('cortex.agents.agent_settings.show', { agent: 'mirage' })}
+                                        className="text-primary font-medium underline-offset-4 hover:underline"
+                                    >
+                                        Mirage agent settings
+                                    </Link>{' '}
+                                    page (LLM provider).
+                                </p>
                             </div>
                         </div>
                     </div>

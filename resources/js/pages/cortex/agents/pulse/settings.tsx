@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 
 import { ArrowLeft, Clock, Settings2, Sparkles } from 'lucide-react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 interface Props {
     openAiConfigured: boolean;
@@ -66,27 +67,33 @@ export default function PulseSettingsPage({
             <div className="relative min-h-[calc(100vh-8rem)]">
                 <div className="pointer-events-none absolute inset-x-0 -top-px h-32 bg-gradient-to-b from-primary/12 via-primary/5 to-transparent" />
                 <div className="relative mx-auto max-w-lg space-y-6 p-4 md:p-6">
-                    <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" className="shrink-0" asChild>
-                            <Link href={tenantRouter.route('cortex.agents.pulse')} aria-label="Back to Pulse">
-                                <ArrowLeft className="size-5" />
-                            </Link>
-                        </Button>
+                    <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <div className="bg-primary/15 text-primary flex size-11 items-center justify-center rounded-2xl ring-1 ring-primary/20">
-                                <Sparkles className="size-6" />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-semibold tracking-tight">Pulse settings</h1>
-                                <p className="text-muted-foreground text-sm">Feeds, daily digest schedule, and refresh limits.</p>
+                            <Button variant="ghost" size="icon" className="shrink-0" asChild>
+                                <Link href={tenantRouter.route('cortex.agents.pulse')} aria-label="Back to Pulse">
+                                    <ArrowLeft className="size-5" />
+                                </Link>
+                            </Button>
+                            <div className="flex items-center gap-3">
+                                <div className="bg-primary/15 text-primary flex size-11 items-center justify-center rounded-2xl ring-1 ring-primary/20">
+                                    <Sparkles className="size-6" />
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-semibold tracking-tight">Pulse settings</h1>
+                                    <p className="text-muted-foreground text-sm">Feeds, daily digest schedule, and refresh limits.</p>
+                                </div>
                             </div>
                         </div>
+                        <CortexAgentSettingsMenu agentKey="pulse" />
                     </div>
 
                     {!openAiConfigured && (
                         <Alert variant="destructive">
-                            <AlertTitle>OpenAI not configured</AlertTitle>
-                            <AlertDescription>Set OPENAI_API_KEY in your environment for chat and digest ideas; feed refresh still works.</AlertDescription>
+                            <AlertTitle>AI not configured for Pulse</AlertTitle>
+                            <AlertDescription>
+                                Chat and digest ideas need an API key. Configure the model under <strong>Settings → Agent settings</strong>. Feed refresh
+                                still works without it.
+                            </AlertDescription>
                         </Alert>
                     )}
 

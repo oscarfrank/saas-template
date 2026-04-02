@@ -12,15 +12,19 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Models\MirageSetting;
 use Modules\Cortex\Neuron\MirageAgent;
 use Modules\Cortex\Services\MirageImageService;
 use Modules\Cortex\Services\MirageReferenceVisionService;
+use Modules\Cortex\Support\CortexAgentKey;
 use Modules\Cortex\Support\MirageDataImageDecoder;
 use NeuronAI\Chat\Messages\UserMessage;
 
 class MirageController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     public const PROMPT_KEY = 'cortex.mirage';
 
     public function __construct(
@@ -45,7 +49,7 @@ class MirageController extends Controller
         }
 
         return Inertia::render('cortex/agents/mirage', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Mirage),
             'promptKey' => self::PROMPT_KEY,
             'promptLabel' => is_array($meta) ? (string) ($meta['label'] ?? 'Mirage') : 'Mirage',
             'promptDescription' => is_array($meta) ? (string) ($meta['description'] ?? '') : '',
@@ -58,15 +62,15 @@ class MirageController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
-            return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
-            ], 503);
-        }
-
         $tenantId = tenant('id');
         if (! is_string($tenantId) || $tenantId === '') {
             return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Mirage)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Mirage),
+            ], 503);
         }
 
         $systemPrompt = trim($this->promptResolver->resolve($tenantId, self::PROMPT_KEY));
@@ -111,6 +115,7 @@ class MirageController extends Controller
 
         try {
             $agent = MirageAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::Mirage))
                 ->setInstructions($systemPrompt)
                 ->toolMaxRuns(0);
 
@@ -143,15 +148,15 @@ class MirageController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
-            return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
-            ], 503);
-        }
-
         $tenantId = tenant('id');
         if (! is_string($tenantId) || $tenantId === '') {
             return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Mirage)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Mirage),
+            ], 503);
         }
 
         $systemPrompt = trim($this->promptResolver->resolve($tenantId, self::PROMPT_KEY));
@@ -212,6 +217,7 @@ class MirageController extends Controller
 
         try {
             $agent = MirageAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::Mirage))
                 ->setInstructions($mergedSystem)
                 ->toolMaxRuns(0);
 
@@ -290,7 +296,7 @@ class MirageController extends Controller
         $setting = MirageSetting::getOrCreateForTenant($tenantId);
         $provider = $setting->image_provider;
 
-        if ($provider->isOpenAi() && ! $this->openAiIsConfigured()) {
+        if ($provider->isOpenAi() && ! $this->cortexLlmFactory()->isOpenAiKeyConfigured()) {
             return response()->json([
                 'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
             ], 503);
@@ -446,13 +452,6 @@ TXT;
         }
 
         return null;
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     private function raiseRuntimeLimitForAgent(): void

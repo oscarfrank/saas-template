@@ -16,15 +16,19 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Models\YoutubeDocSetting;
 use Modules\Cortex\Neuron\YoutubeDocAgent;
 use Modules\Cortex\Services\YoutubeDocAnalyticsSnapshotService;
+use Modules\Cortex\Support\CortexAgentKey;
 use NeuronAI\Chat\Messages\AssistantMessage;
 use NeuronAI\Chat\Messages\UserMessage;
 use RuntimeException;
 
 final class YoutubeDocController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     /**
      * Channel analytics strategist UI.
      */
@@ -38,7 +42,7 @@ final class YoutubeDocController extends Controller
         $setting = YoutubeDocSetting::getOrCreateForTenant($tenantId);
 
         return Inertia::render('cortex/agents/youtube-doc', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp($tenantId, CortexAgentKey::YoutubeDoc),
             'connected' => $setting->hasConnectedChannel(),
             'youtubeChannelTitle' => $setting->youtube_channel_title,
             'youtubeChannelId' => $setting->youtube_channel_id,
@@ -330,15 +334,15 @@ final class YoutubeDocController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
-            return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
-            ], 503);
-        }
-
         $tenantId = tenant('id');
         if (! is_string($tenantId) || $tenantId === '') {
             return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::YoutubeDoc)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::YoutubeDoc),
+            ], 503);
         }
 
         $validated = $request->validate([
@@ -400,7 +404,9 @@ final class YoutubeDocController extends Controller
         $messages[] = new UserMessage(implode("\n\n---\n\n", $bodyParts));
 
         try {
-            $agent = YoutubeDocAgent::make()->toolMaxRuns(0);
+            $agent = YoutubeDocAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::YoutubeDoc))
+                ->toolMaxRuns(0);
             $reply = $agent->chat($messages)->getMessage();
 
             $content = trim($reply->getContent() ?? '');
@@ -417,13 +423,6 @@ final class YoutubeDocController extends Controller
 
             return response()->json(['message' => 'Youtube Doc failed. Check logs or try again.'], 500);
         }
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     /**

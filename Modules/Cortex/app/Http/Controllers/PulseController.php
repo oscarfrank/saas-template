@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Jobs\PulseRunDigestPipelineJob;
 use Modules\Cortex\Models\PulseDailyDigest;
 use Modules\Cortex\Models\PulseFeed;
@@ -18,11 +19,14 @@ use Modules\Cortex\Models\PulseSetting;
 use Modules\Cortex\Neuron\PulseAgent;
 use Modules\Cortex\Services\PulseFeedRefresher;
 use Modules\Cortex\Services\PulseFeedSignalsBuilder;
+use Modules\Cortex\Support\CortexAgentKey;
 use NeuronAI\Chat\Messages\AssistantMessage;
 use NeuronAI\Chat\Messages\UserMessage;
 
 class PulseController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     public function __construct(
         private readonly PulseFeedRefresher $feedRefresher,
         private readonly PulseFeedSignalsBuilder $signalsBuilder,
@@ -58,7 +62,7 @@ class PulseController extends Controller
         }
 
         return Inertia::render('cortex/agents/pulse', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Pulse),
             'feeds' => $feeds,
             'max_items_per_feed' => $maxItems,
             'digest' => $digest,
@@ -86,7 +90,7 @@ class PulseController extends Controller
         }
 
         return Inertia::render('cortex/agents/pulse/feeds', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Pulse),
             'feeds' => $feeds,
             'max_items_per_feed' => $maxItems,
         ]);
@@ -113,7 +117,7 @@ class PulseController extends Controller
         }
 
         return Inertia::render('cortex/agents/pulse/settings', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Pulse),
             'max_items_per_feed' => $maxItems,
             'auto_pull_enabled' => $autoPullEnabled,
             'auto_pull_time' => $autoPullTime,
@@ -493,15 +497,15 @@ class PulseController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
-            return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
-            ], 503);
-        }
-
         $tenantId = tenant('id');
         if (! is_string($tenantId) || $tenantId === '') {
             return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Pulse)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Pulse),
+            ], 503);
         }
 
         $validated = $request->validate([
@@ -567,6 +571,7 @@ class PulseController extends Controller
 
         try {
             $agent = PulseAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::Pulse))
                 ->toolMaxRuns(0);
 
             $reply = $agent
@@ -602,9 +607,9 @@ class PulseController extends Controller
             'mode' => ['required', 'string', 'in:full,feeds,ideas'],
         ]);
 
-        if ($validated['mode'] !== 'feeds' && ! $this->openAiIsConfigured()) {
+        if ($validated['mode'] !== 'feeds' && ! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Pulse)) {
             return response()->json([
-                'message' => 'OpenAI is not configured. Feed refresh only, or add OPENAI_API_KEY for idea generation.',
+                'message' => 'LLM is not configured for Pulse. Feed refresh only, or add the API key for your selected provider (see Pulse → AI model) and try again.',
             ], 503);
         }
 
@@ -775,13 +780,6 @@ class PulseController extends Controller
         }
 
         return $feed;
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     private function raiseRuntimeLimitForAgent(): void

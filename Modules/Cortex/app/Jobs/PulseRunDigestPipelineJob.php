@@ -14,8 +14,10 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Modules\Cortex\Models\PulseDailyDigest;
 use Modules\Cortex\Models\PulseSetting;
+use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Services\PulseDigestGenerator;
 use Modules\Cortex\Services\PulseFeedRefresher;
+use Modules\Cortex\Support\CortexAgentKey;
 
 final class PulseRunDigestPipelineJob implements ShouldQueue
 {
@@ -46,6 +48,7 @@ final class PulseRunDigestPipelineJob implements ShouldQueue
     public function handle(
         PulseFeedRefresher $feedRefresher,
         PulseDigestGenerator $digestGenerator,
+        CortexLlmProviderFactory $llmFactory,
     ): void {
         $tenant = Tenant::query()->find($this->tenantId);
         if ($tenant === null) {
@@ -90,10 +93,10 @@ final class PulseRunDigestPipelineJob implements ShouldQueue
             }
 
             if ($this->mode === 'full' || $this->mode === 'ideas') {
-                if (! $this->openAiConfigured()) {
+                if (! $llmFactory->isTenantAgentConfigured($this->tenantId, CortexAgentKey::Pulse)) {
                     $digest->refresh();
                     $digest->ideas_status = 'failed';
-                    $digest->ideas_error = 'OpenAI is not configured.';
+                    $digest->ideas_error = 'LLM is not configured for Pulse (missing API key for the selected provider).';
                     $digest->save();
 
                     return;
@@ -134,12 +137,5 @@ final class PulseRunDigestPipelineJob implements ShouldQueue
         } finally {
             tenancy()->end();
         }
-    }
-
-    private function openAiConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 }

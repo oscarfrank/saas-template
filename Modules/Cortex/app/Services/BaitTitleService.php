@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Cortex\Services;
 
-use OpenAI\Laravel\Facades\OpenAI;
+use Modules\Cortex\Models\CortexAgentLlmSetting;
+use Modules\Cortex\Support\CortexAgentKey;
+use Modules\Cortex\Support\CortexLlmProvider;
+use NeuronAI\Chat\Messages\UserMessage;
 
 final class BaitTitleService
 {
+    public function __construct(
+        private readonly CortexLlmProviderFactory $llmFactory,
+    ) {}
+
     /**
      * @return array{
      *   parsed: array<string, mixed>|null,
@@ -15,7 +22,7 @@ final class BaitTitleService
      *   attempts: int
      * }
      */
-    public function analyzeScript(string $script): array
+    public function analyzeScript(string $script, string $tenantId): array
     {
         $attempts = 0;
         $lastRaw = '';
@@ -24,6 +31,7 @@ final class BaitTitleService
         while ($attempts < 2 && $parsed === null) {
             $attempts++;
             $lastRaw = $this->chat(
+                $tenantId,
                 $this->callOneSystemPrompt(),
                 $script,
                 0.2
@@ -38,7 +46,7 @@ final class BaitTitleService
         ];
     }
 
-    public function generateTitles(string $script, array $analysis, string $framingToggle): string
+    public function generateTitles(string $script, array $analysis, string $framingToggle, string $tenantId): string
     {
         $payload = implode("\n\n", [
             'ORIGINAL SCRIPT:',
@@ -49,6 +57,7 @@ final class BaitTitleService
         ]);
 
         return $this->chat(
+            $tenantId,
             $this->callTwoSystemPrompt(),
             $payload,
             0.5
@@ -85,19 +94,19 @@ final class BaitTitleService
         return null;
     }
 
-    private function chat(string $systemInstruction, string $userMessage, float $temperature): string
+    private function chat(string $tenantId, string $systemInstruction, string $userMessage, float $temperature): string
     {
-        $response = OpenAI::chat()->create([
-            'model' => config('openai.chat_model', 'gpt-4o-mini'),
-            'messages' => [
-                ['role' => 'system', 'content' => $systemInstruction],
-                ['role' => 'user', 'content' => $userMessage],
-            ],
-            'temperature' => $temperature,
-            'max_completion_tokens' => 4000,
-        ]);
+        $kind = CortexAgentLlmSetting::resolvedProviderFor($tenantId, CortexAgentKey::Bait);
 
-        $content = $response->choices[0]->message->content ?? '';
+        $extra = $kind === CortexLlmProvider::OpenAI
+            ? ['temperature' => $temperature, 'max_completion_tokens' => 4000]
+            : ['temperature' => $temperature, 'max_tokens' => 8192];
+
+        $provider = $this->llmFactory->makeForTenantAgent($tenantId, CortexAgentKey::Bait, $extra);
+        $provider->systemPrompt($systemInstruction);
+
+        $response = $provider->chat(new UserMessage($userMessage));
+        $content = $response->getContent();
 
         return trim(is_string($content) ? $content : '');
     }
@@ -139,7 +148,7 @@ Using the analysis provided, generate one title candidate for each of the follow
 If the framing toggle is set to Polarizing Take: up-rank Contrarian and Stakes Raiser patterns - generate two variants for each instead of one, and mark them.
 If the framing toggle is set to Strong Opinion: shift all titles toward first-person conviction language. Use words like "actually," "always," "never," "stop," "the truth about." Generate an additional conviction-framed variant for your top three patterns.
 If the framing toggle is set to Contrarian Framing: identify the consensus belief from the analysis object. Check whether the script genuinely supports the opposite position. If yes - build the title around that inversion. If only partially - flag it explicitly and still generate the title but mark it as [Partially Supported].
-If the framing toggle is None: proceed with standard weighting across all patterns.
+If the framing toggle is set to None: proceed with standard weighting across all patterns.
 
 ---
 

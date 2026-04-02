@@ -10,10 +10,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Services\BaitTitleService;
+use Modules\Cortex\Support\CortexAgentKey;
 
 class BaitController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     public function __construct(
         private readonly BaitTitleService $baitTitleService,
     ) {}
@@ -24,8 +28,10 @@ class BaitController extends Controller
         $definitions = config('ai_prompts.definitions', []);
         $meta = $definitions['cortex.bait'] ?? [];
 
+        $tenantId = tenant('id');
+
         return Inertia::render('cortex/agents/bait', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Bait),
             'promptKey' => 'cortex.bait',
             'promptLabel' => is_array($meta) ? (string) ($meta['label'] ?? 'Bait') : 'Bait',
             'promptDescription' => is_array($meta) ? (string) ($meta['description'] ?? '') : '',
@@ -36,9 +42,14 @@ class BaitController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Bait)) {
             return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Bait),
             ], 503);
         }
 
@@ -47,7 +58,7 @@ class BaitController extends Controller
         ]);
 
         try {
-            $result = $this->baitTitleService->analyzeScript(trim((string) $validated['script']));
+            $result = $this->baitTitleService->analyzeScript(trim((string) $validated['script']), $tenantId);
             $analysis = $result['parsed'];
 
             if (! is_array($analysis)) {
@@ -80,9 +91,14 @@ class BaitController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Bait)) {
             return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Bait),
             ], 503);
         }
 
@@ -101,7 +117,8 @@ class BaitController extends Controller
             $output = $this->baitTitleService->generateTitles(
                 trim((string) $validated['script']),
                 $validated['analysis'],
-                $framingToggle
+                $framingToggle,
+                $tenantId
             );
 
             if ($output === '') {
@@ -119,13 +136,6 @@ class BaitController extends Controller
                 'message' => 'Bait title generation failed. Check logs or try again.',
             ], 500);
         }
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     private function raiseRuntimeLimitForAgent(): void

@@ -8,12 +8,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Neuron\YouTubeVideoAgent;
+use Modules\Cortex\Support\CortexAgentKey;
 use Modules\Cortex\Support\CortexAgents;
+use Modules\Cortex\Support\CortexLlmModelCatalog;
+use Modules\Cortex\Support\CortexLlmProvider;
 use NeuronAI\Chat\Messages\UserMessage;
 
 class CortexController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     /**
      * Cortex home: directory of available agents.
      */
@@ -21,6 +27,14 @@ class CortexController extends Controller
     {
         return Inertia::render('cortex/index', [
             'agents' => CortexAgents::definitions(),
+            'cortexLlm' => [
+                'default_openai_model' => (string) config('openai.chat_model', 'gpt-4o-mini'),
+                'default_anthropic_model' => (string) config('anthropic.chat_model', 'claude-sonnet-4-20250514'),
+                'openai_key_configured' => $this->cortexLlmFactory()->isOpenAiKeyConfigured(),
+                'anthropic_key_configured' => $this->cortexLlmFactory()->isAnthropicKeyConfigured(),
+                'openai_model_options' => CortexLlmModelCatalog::optionsFor(CortexLlmProvider::OpenAI),
+                'anthropic_model_options' => CortexLlmModelCatalog::optionsFor(CortexLlmProvider::Anthropic),
+            ],
         ]);
     }
 
@@ -29,8 +43,10 @@ class CortexController extends Controller
      */
     public function youtubeAgent(): Response
     {
+        $tenantId = tenant('id');
+
         return Inertia::render('cortex/agents/youtube', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::YoutubeVideo),
         ]);
     }
 
@@ -41,9 +57,14 @@ class CortexController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::YoutubeVideo)) {
             return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::YoutubeVideo),
             ], 503);
         }
 
@@ -60,6 +81,7 @@ TXT;
 
         try {
             $message = YouTubeVideoAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::YoutubeVideo))
                 ->toolMaxRuns(6)
                 ->chat(new UserMessage($prompt))
                 ->getMessage();
@@ -80,13 +102,6 @@ TXT;
                 'message' => 'The agent run failed. Check logs or try again in a moment.',
             ], 500);
         }
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     /**

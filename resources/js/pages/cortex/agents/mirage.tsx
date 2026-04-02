@@ -15,7 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 
-import { Loader2, Settings2, Sparkles, Wand2 } from 'lucide-react';
+import { Loader2, Sparkles, Wand2 } from 'lucide-react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 type MirageIdea = {
     id: string;
@@ -245,19 +246,17 @@ export default function MiragePage({
                                 ) : null}
                             </div>
                         </div>
-                        <Button variant="outline" size="sm" className="shrink-0 gap-2 self-center sm:self-start" asChild>
-                            <Link href={tenantRouter.route('cortex.agents.mirage.settings')}>
-                                <Settings2 className="size-4" />
-                                Image settings
-                            </Link>
-                        </Button>
+                        <CortexAgentSettingsMenu agentKey="mirage" className="self-center sm:self-start" />
                     </div>
                 </div>
 
-                {!openAiConfigured && (
+                {!canUseAgent && (
                     <Alert variant="destructive">
-                        <AlertTitle>OpenAI is not set up</AlertTitle>
-                        <AlertDescription>Add OPENAI_API_KEY to your environment and reload.</AlertDescription>
+                        <AlertTitle>Chat / ideas model not configured</AlertTitle>
+                        <AlertDescription>
+                            Open <strong>Settings → Agent settings</strong> to choose OpenAI or Anthropic for chat and ideas. Image generation is
+                            configured separately under Settings → Image generation.
+                        </AlertDescription>
                     </Alert>
                 )}
 

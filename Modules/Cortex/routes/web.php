@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Cortex\Http\Controllers\CortexController;
 use Modules\Cortex\Http\Controllers\BaitController;
+use Modules\Cortex\Http\Controllers\CortexAgentSettingsController;
+use Modules\Cortex\Http\Controllers\CortexController;
+use Modules\Cortex\Http\Controllers\CortexLlmSettingsController;
 use Modules\Cortex\Http\Controllers\MirageController;
 use Modules\Cortex\Http\Controllers\MirageSettingsController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
@@ -19,6 +21,11 @@ Route::middleware([
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
     Route::get('cortex', [CortexController::class, 'index'])->name('cortex.index');
+    Route::patch('cortex/agents/llm-settings', [CortexLlmSettingsController::class, 'update'])->name('cortex.agents.llm_settings.update');
+    Route::post('cortex/agents/llm-settings/bulk', [CortexLlmSettingsController::class, 'bulkReset'])->name('cortex.agents.llm_settings.bulk');
+    Route::get('cortex/agents/{agent}/agent-settings', [CortexAgentSettingsController::class, 'show'])
+        ->name('cortex.agents.agent_settings.show')
+        ->where('agent', 'youtube-video|youtube-doc|nexus-planner|pulse|quill|bait|mirage');
     Route::get('cortex/agents/youtube', [CortexController::class, 'youtubeAgent'])->name('cortex.agents.youtube');
     Route::post('cortex/agents/youtube/run', [CortexController::class, 'youtubeAgentRun'])->name('cortex.agents.youtube.run');
 

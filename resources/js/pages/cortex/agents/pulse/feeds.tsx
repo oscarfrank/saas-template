@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 import { Loader2, Rss, RefreshCw, Trash2, Plus, Settings, Download, Upload, ArrowLeft } from 'lucide-react';
 
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 import { type PulseFeedRow } from './types';
 
 interface Props {
@@ -292,7 +293,8 @@ export default function PulseFeedsPage({ openAiConfigured, feeds: initialFeeds, 
                             </div>
                         </div>
                         <div className="flex flex-col gap-3 md:items-end">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <CortexAgentSettingsMenu agentKey="pulse" />
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -342,10 +344,12 @@ export default function PulseFeedsPage({ openAiConfigured, feeds: initialFeeds, 
                         </div>
                     </div>
 
-                    {!openAiConfigured && (
+                    {!canUseAgent && (
                         <Alert variant="destructive">
-                            <AlertTitle>OpenAI not configured</AlertTitle>
-                            <AlertDescription>Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                            <AlertTitle>AI not configured for Pulse</AlertTitle>
+                            <AlertDescription>
+                                Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                            </AlertDescription>
                         </Alert>
                     )}
 

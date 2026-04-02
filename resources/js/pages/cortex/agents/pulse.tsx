@@ -17,8 +17,9 @@ import { Switch } from '@/components/ui/switch';
 import { AgentMarkdown } from '@/components/cortex/agent-markdown';
 import { cn } from '@/lib/utils';
 
-import { ChevronDown, Loader2, Send, Sparkles, Settings, Rss } from 'lucide-react';
+import { ChevronDown, Loader2, Send, Sparkles, Rss } from 'lucide-react';
 
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 import { PulseDigestSection } from './pulse/pulse-digest-section';
 import { type PulseDigest, type PulseFeedRow } from './pulse/types';
 
@@ -272,33 +273,22 @@ export default function PulsePage({
                                 </p>
                             </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                            <Button type="button" variant="default" size="sm" className="gap-1.5" asChild>
-                                <Link href={tenantRouter.route('cortex.agents.pulse.feeds')}>
-                                    <Rss className="size-3.5" />
-                                    Manage feeds
-                                </Link>
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
-                                <Link href={tenantRouter.route('cortex.agents.pulse.settings')}>
-                                    <Settings className="size-3.5" />
-                                    Settings
-                                </Link>
-                            </Button>
-                        </div>
+                        <CortexAgentSettingsMenu agentKey="pulse" />
                     </div>
 
-                    {!openAiConfigured && (
+                    {!canUseAgent && (
                         <Alert variant="destructive">
-                            <AlertTitle>OpenAI not configured</AlertTitle>
-                            <AlertDescription>Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                            <AlertTitle>AI not configured for Pulse</AlertTitle>
+                            <AlertDescription>
+                                Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                            </AlertDescription>
                         </Alert>
                     )}
 
                     <PulseDigestSection
                         digest={digest}
                         digestDate={digestDate}
-                        openAiConfigured={openAiConfigured}
+                        openAiConfigured={canUseAgent}
                         digestRunning={digestRunning}
                         onRun={(mode) => void runDigest(mode)}
                     />

@@ -11,12 +11,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Neuron\QuillAgent;
+use Modules\Cortex\Support\CortexAgentKey;
 use NeuronAI\Chat\Messages\AssistantMessage;
 use NeuronAI\Chat\Messages\UserMessage;
 
 class QuillController extends Controller
 {
+    use InteractsWithCortexLlm;
+
     public const PROMPT_KEY = 'cortex.quill';
 
     public function __construct(
@@ -29,8 +33,10 @@ class QuillController extends Controller
         $definitions = config('ai_prompts.definitions', []);
         $meta = $definitions[self::PROMPT_KEY] ?? [];
 
+        $tenantId = tenant('id');
+
         return Inertia::render('cortex/agents/quill', [
-            'openAiConfigured' => $this->openAiIsConfigured(),
+            'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Quill),
             'promptKey' => self::PROMPT_KEY,
             'promptLabel' => is_array($meta) ? (string) ($meta['label'] ?? 'Quill') : 'Quill',
             'promptDescription' => is_array($meta) ? (string) ($meta['description'] ?? '') : '',
@@ -41,15 +47,15 @@ class QuillController extends Controller
     {
         $this->raiseRuntimeLimitForAgent();
 
-        if (! $this->openAiIsConfigured()) {
-            return response()->json([
-                'message' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.',
-            ], 503);
-        }
-
         $tenantId = tenant('id');
         if (! is_string($tenantId) || $tenantId === '') {
             return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Quill)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Quill),
+            ], 503);
         }
 
         $systemPrompt = trim($this->promptResolver->resolve($tenantId, self::PROMPT_KEY));
@@ -94,6 +100,7 @@ class QuillController extends Controller
 
         try {
             $agent = QuillAgent::make()
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::Quill))
                 ->setInstructions($systemPrompt)
                 ->toolMaxRuns(0);
 
@@ -117,13 +124,6 @@ class QuillController extends Controller
                 'message' => 'Quill failed. Check logs or try again.',
             ], 500);
         }
-    }
-
-    private function openAiIsConfigured(): bool
-    {
-        $key = config('openai.api_key');
-
-        return is_string($key) && $key !== '';
     }
 
     private function raiseRuntimeLimitForAgent(): void

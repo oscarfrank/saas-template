@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 import { ChevronDown, Loader2, Send, Settings2, Sparkles, Youtube } from 'lucide-react';
+import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 
 type ManagedChannel = { id: string; title: string };
 
@@ -208,8 +209,10 @@ export default function YoutubeDocPage({ openAiConfigured, connected, youtubeCha
             <div className="flex min-h-[calc(100dvh-7rem)] flex-col gap-4 px-4 pb-6 pt-2 md:gap-5 md:px-6 lg:mx-auto lg:max-w-5xl">
                 {!openAiConfigured && (
                     <Alert variant="destructive" className="shrink-0 py-2">
-                        <AlertTitle className="text-sm">OpenAI not configured</AlertTitle>
-                        <AlertDescription className="text-xs">Set OPENAI_API_KEY in your environment, then reload.</AlertDescription>
+                        <AlertTitle className="text-sm">AI not configured for this agent</AlertTitle>
+                        <AlertDescription className="text-xs">
+                            Open <strong>Settings → Agent settings</strong> and configure your provider and API keys.
+                        </AlertDescription>
                     </Alert>
                 )}
 
@@ -236,8 +239,9 @@ export default function YoutubeDocPage({ openAiConfigured, connected, youtubeCha
                         </div>
                     </div>
 
-                    {connected && (
-                        <div className="flex shrink-0 items-center gap-2 sm:pt-1">
+                    <div className="flex shrink-0 items-center gap-2 sm:pt-1">
+                        <CortexAgentSettingsMenu agentKey="youtube-doc" />
+                        {connected && (
                             <Popover open={channelMenuOpen} onOpenChange={setChannelMenuOpen}>
                                 <Tooltip delayDuration={300}>
                                     <TooltipTrigger asChild>
@@ -310,8 +314,8 @@ export default function YoutubeDocPage({ openAiConfigured, connected, youtubeCha
                                     </div>
                                 </PopoverContent>
                             </Popover>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </header>
 
                 {!connected && (

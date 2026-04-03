@@ -11,7 +11,10 @@ import {
     type CapabilityOption,
     type ScopeOption,
     type LlmMeta,
+    type WorkerFormFields,
 } from './worker-agent-form';
+
+const EMPTY_WORKER_FORM: Partial<WorkerFormFields> = {};
 
 interface Props {
     goals: GoalOption[];
@@ -44,7 +47,7 @@ export default function WorkerAgentsCreate({ goals, projects, reportingOptions, 
                     capabilityOptions={capabilityOptions}
                     inputScopeOptions={inputScopeOptions}
                     llm={llm}
-                    initial={{}}
+                    workerForm={EMPTY_WORKER_FORM}
                 />
             </div>
         </AppLayout>

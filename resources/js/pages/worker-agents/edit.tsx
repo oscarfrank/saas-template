@@ -1,7 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import { resolveWorkerAgentRouteParam } from '@/utils/worker-agent-route';
 import {
     WorkerAgentForm,
     type GoalOption,
@@ -22,7 +23,7 @@ interface WorkerSummary {
 
 interface Props {
     worker: WorkerSummary;
-    initial: Partial<WorkerFormFields>;
+    workerForm: Partial<WorkerFormFields>;
     goals: GoalOption[];
     projects: ProjectOption[];
     reportingOptions: ReportingOption[];
@@ -34,7 +35,7 @@ interface Props {
 
 export default function WorkerAgentsEdit({
     worker,
-    initial,
+    workerForm,
     goals,
     projects,
     reportingOptions,
@@ -44,10 +45,26 @@ export default function WorkerAgentsEdit({
     llm,
 }: Props) {
     const tenantRouter = useTenantRouter();
+    const page = usePage();
+    const workerAgentKey = resolveWorkerAgentRouteParam(worker, page.url);
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Worker agents', href: tenantRouter.route('worker-agents.index') },
-        { title: worker.name, href: tenantRouter.route('worker-agents.show', { worker_agent: worker.uuid }) },
-        { title: 'Edit', href: tenantRouter.route('worker-agents.edit', { worker_agent: worker.uuid }) },
+        ...(workerAgentKey
+            ? [
+                  {
+                      title: worker.name,
+                      href: tenantRouter.route('worker-agents.show', { worker_agent: workerAgentKey }),
+                  },
+                  {
+                      title: 'Edit',
+                      href: tenantRouter.route('worker-agents.edit', { worker_agent: workerAgentKey }),
+                  },
+              ]
+            : [
+                  { title: worker.name, href: tenantRouter.route('worker-agents.index') },
+                  { title: 'Edit', href: '#' },
+              ]),
     ];
 
     return (
@@ -56,8 +73,9 @@ export default function WorkerAgentsEdit({
             <div className="p-4 md:p-6">
                 <h1 className="mb-6 text-2xl font-semibold tracking-tight">Edit worker agent</h1>
                 <WorkerAgentForm
+                    key={worker.id}
                     mode="edit"
-                    workerUuid={worker.uuid}
+                    workerUuid={workerAgentKey ?? undefined}
                     currentWorkerId={worker.id}
                     goals={goals}
                     projects={projects}
@@ -66,7 +84,7 @@ export default function WorkerAgentsEdit({
                     capabilityOptions={capabilityOptions}
                     inputScopeOptions={inputScopeOptions}
                     llm={llm}
-                    initial={initial}
+                    workerForm={workerForm}
                 />
             </div>
         </AppLayout>

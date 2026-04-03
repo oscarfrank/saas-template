@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
-import { useForm, Link } from '@inertiajs/react';
+import { useForm, Link, usePage } from '@inertiajs/react';
+import { useLayoutEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SCHEDULE_KIND_OPTIONS, WEEKDAY_OPTIONS } from './schedule-presets';
 
@@ -58,6 +59,67 @@ function toggleStr(list: string[], v: string): string[] {
     return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
 }
 
+const WORKER_AGENT_FORM_DEFAULTS: WorkerFormFields = {
+    name: '',
+    department: 'Automation',
+    reports_to_staff_id: '',
+    skills: '',
+    capabilities: [],
+    organization_goal_ids: [],
+    schedule_kind: 'off',
+    schedule_time: '09:00',
+    schedule_day_of_week: '1',
+    schedule_cron_custom: '',
+    schedule_timezone: 'UTC',
+    input_scope: 'all_workers',
+    input_worker_agent_ids: [],
+    input_project_ids: [],
+    automation_enabled: true,
+    requires_approval: false,
+    max_runs_per_hour: '',
+    daily_llm_budget_cents: '',
+    enabled: true,
+    llm_provider: 'openai',
+    chat_model: '',
+};
+
+function mergeWorkerFormState(workerForm: Partial<WorkerFormFields> | undefined): WorkerFormFields {
+    const w = workerForm ?? {};
+    const merged: WorkerFormFields = { ...WORKER_AGENT_FORM_DEFAULTS, ...w };
+
+    // JSON may deserialize nulls; keep controlled inputs as strings / defined arrays.
+    merged.name = merged.name ?? '';
+    merged.skills = merged.skills ?? '';
+    merged.department = merged.department ?? 'Automation';
+    merged.schedule_time = merged.schedule_time ?? '09:00';
+    merged.schedule_cron_custom = merged.schedule_cron_custom ?? '';
+    merged.schedule_timezone = merged.schedule_timezone ?? 'UTC';
+    merged.schedule_kind = merged.schedule_kind ?? 'off';
+    merged.input_scope = merged.input_scope ?? 'all_workers';
+    merged.max_runs_per_hour = merged.max_runs_per_hour ?? '';
+    merged.daily_llm_budget_cents = merged.daily_llm_budget_cents ?? '';
+    merged.llm_provider = merged.llm_provider ?? 'openai';
+    merged.chat_model = merged.chat_model ?? '';
+    merged.capabilities = Array.isArray(merged.capabilities) ? merged.capabilities : [];
+    merged.organization_goal_ids = Array.isArray(merged.organization_goal_ids) ? merged.organization_goal_ids : [];
+    merged.input_worker_agent_ids = Array.isArray(merged.input_worker_agent_ids) ? merged.input_worker_agent_ids : [];
+    merged.input_project_ids = Array.isArray(merged.input_project_ids) ? merged.input_project_ids : [];
+    if (typeof merged.automation_enabled !== 'boolean') {
+        merged.automation_enabled = WORKER_AGENT_FORM_DEFAULTS.automation_enabled;
+    }
+    if (typeof merged.requires_approval !== 'boolean') {
+        merged.requires_approval = WORKER_AGENT_FORM_DEFAULTS.requires_approval;
+    }
+    if (typeof merged.enabled !== 'boolean') {
+        merged.enabled = WORKER_AGENT_FORM_DEFAULTS.enabled;
+    }
+
+    merged.reports_to_staff_id =
+        w.reports_to_staff_id != null && w.reports_to_staff_id !== '' ? String(w.reports_to_staff_id) : '';
+    merged.schedule_day_of_week = String(w.schedule_day_of_week ?? merged.schedule_day_of_week ?? '1');
+    return merged;
+}
+
 export function WorkerAgentForm({
     mode,
     goals,
@@ -67,7 +129,7 @@ export function WorkerAgentForm({
     capabilityOptions,
     inputScopeOptions,
     llm,
-    initial,
+    workerForm,
     currentWorkerId,
     workerUuid,
 }: {
@@ -79,44 +141,34 @@ export function WorkerAgentForm({
     capabilityOptions: CapabilityOption[];
     inputScopeOptions: ScopeOption[];
     llm: LlmMeta;
-    initial: Partial<WorkerFormFields>;
+    /** Server state for edit; omit or {} for create. */
+    workerForm?: Partial<WorkerFormFields>;
     currentWorkerId?: number;
     workerUuid?: string;
 }) {
     const tenantRouter = useTenantRouter();
-
-    const defaults: WorkerFormFields = {
-        name: '',
-        department: 'Automation',
-        reports_to_staff_id: '',
-        skills: '',
-        capabilities: [],
-        organization_goal_ids: [],
-        schedule_kind: 'off',
-        schedule_time: '09:00',
-        schedule_day_of_week: '1',
-        schedule_cron_custom: '',
-        schedule_timezone: 'UTC',
-        input_scope: 'all_workers',
-        input_worker_agent_ids: [],
-        input_project_ids: [],
-        automation_enabled: true,
-        requires_approval: false,
-        max_runs_per_hour: '',
-        daily_llm_budget_cents: '',
-        enabled: true,
-        llm_provider: 'openai',
-        chat_model: '',
+    const pageProps = usePage().props as {
+        workerForm?: Partial<WorkerFormFields>;
+        worker_form?: Partial<WorkerFormFields>;
+        worker?: { uuid?: string };
     };
 
-    const mergedInitial: WorkerFormFields = { ...defaults, ...initial };
-    mergedInitial.reports_to_staff_id =
-        initial.reports_to_staff_id != null && initial.reports_to_staff_id !== ''
-            ? String(initial.reports_to_staff_id)
-            : '';
-    mergedInitial.schedule_day_of_week = String(initial.schedule_day_of_week ?? mergedInitial.schedule_day_of_week ?? '1');
+    /** Prefer explicit prop; fall back to full page props (avoids missed drilling / SSR quirks). */
+    const resolvedWorkerForm = workerForm ?? pageProps.workerForm ?? pageProps.worker_form;
 
-    const { data, setData, post, put, processing, errors, transform } = useForm<WorkerFormFields>(mergedInitial);
+    /** Route key for PUT — must match worker_agents.uuid; fall back to page `worker.uuid`. */
+    const workerAgentRouteUuid = workerUuid ?? pageProps.worker?.uuid;
+    const editFormSignature = mode === 'edit' ? JSON.stringify(resolvedWorkerForm ?? {}) : '';
+
+    const { data, setData, post, put, processing, errors, transform } = useForm<WorkerFormFields>(WORKER_AGENT_FORM_DEFAULTS);
+
+    useLayoutEffect(() => {
+        if (mode !== 'edit') {
+            return;
+        }
+        setData(mergeWorkerFormState(resolvedWorkerForm));
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- sync when serialized payload from Inertia changes
+    }, [mode, editFormSignature, setData]);
 
     transform((raw) => ({
         ...raw,
@@ -136,8 +188,8 @@ export function WorkerAgentForm({
         e.preventDefault();
         if (mode === 'create') {
             post(tenantRouter.route('worker-agents.store'));
-        } else if (workerUuid) {
-            put(tenantRouter.route('worker-agents.update', { worker_agent: workerUuid }));
+        } else if (workerAgentRouteUuid) {
+            put(tenantRouter.route('worker-agents.update', { worker_agent: workerAgentRouteUuid }));
         }
     };
 

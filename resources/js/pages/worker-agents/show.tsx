@@ -1,10 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import { resolveWorkerAgentRouteParam } from '@/utils/worker-agent-route';
 import { Bot, Pencil, Play, Pause, PlayCircle } from 'lucide-react';
 
 type RunRow = {
@@ -84,26 +85,28 @@ interface Props {
 
 export default function WorkerAgentsShow({ worker, runs, messages, incoming_handoffs, latest_run_events }: Props) {
     const tenantRouter = useTenantRouter();
+    const page = usePage();
+    const wa = resolveWorkerAgentRouteParam(worker, page.url) ?? worker.uuid;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Worker agents', href: tenantRouter.route('worker-agents.index') },
-        { title: worker.name, href: tenantRouter.route('worker-agents.show', { worker_agent: worker.uuid }) },
+        { title: worker.name, href: tenantRouter.route('worker-agents.show', { worker_agent: wa }) },
     ];
 
     const runNow = () => {
-        router.post(tenantRouter.route('worker-agents.run', { worker_agent: worker.uuid }));
+        router.post(tenantRouter.route('worker-agents.run', { worker_agent: wa }));
     };
 
     const pause = () => {
-        router.patch(tenantRouter.route('worker-agents.pause', { worker_agent: worker.uuid }));
+        router.patch(tenantRouter.route('worker-agents.pause', { worker_agent: wa }));
     };
 
     const resume = () => {
-        router.patch(tenantRouter.route('worker-agents.resume', { worker_agent: worker.uuid }));
+        router.patch(tenantRouter.route('worker-agents.resume', { worker_agent: wa }));
     };
 
     const acceptHandoff = (handoffUuid: string) => {
-        tenantRouter.post('worker-agents.handoffs.accept', {}, { worker_agent: worker.uuid, handoff: handoffUuid });
+        tenantRouter.post('worker-agents.handoffs.accept', {}, { worker_agent: wa, handoff: handoffUuid });
     };
 
     const declineHandoff = (handoffUuid: string) => {
@@ -111,7 +114,7 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
         tenantRouter.post(
             'worker-agents.handoffs.decline',
             { note: note ?? '' },
-            { worker_agent: worker.uuid, handoff: handoffUuid }
+            { worker_agent: wa, handoff: handoffUuid }
         );
     };
 
@@ -132,7 +135,7 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                             <Link href={tenantRouter.route('worker-agents.proposals.index')}>Proposals</Link>
                         </Button>
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={tenantRouter.route('worker-agents.edit', { worker_agent: worker.uuid })}>
+                            <Link href={tenantRouter.route('worker-agents.edit', { worker_agent: wa })}>
                                 <Pencil className="mr-1 size-4" />
                                 Edit
                             </Link>

@@ -88,14 +88,16 @@ class WorkerAgentController extends Controller
         return redirect()->route('worker-agents.index', ['tenant' => tenant('slug')])->with('success', 'Worker agent created.');
     }
 
-    public function show(WorkerAgent $worker): Response
+    public function show(WorkerAgent $worker_agent): Response
     {
-        $worker->load([
+        $this->ensureWorkerAgentUuid($worker_agent);
+
+        $worker_agent->load([
             'staff:id,uuid,employee_id,job_title,department,kind,reports_to_staff_id',
             'staff.reportsTo:id,uuid,job_title,kind,user_id',
             'staff.reportsTo.user:id,first_name,last_name,email',
         ]);
-        $runs = $worker->runs()->orderByDesc('id')->limit(30)->get();
+        $runs = $worker_agent->runs()->orderByDesc('id')->limit(30)->get();
 
         $latestRun = $runs->first();
 
@@ -114,7 +116,7 @@ class WorkerAgentController extends Controller
         }
 
         $messages = WorkerAgentMessage::query()
-            ->where('worker_agent_id', $worker->id)
+            ->where('worker_agent_id', $worker_agent->id)
             ->orderByDesc('id')
             ->limit(40)
             ->get()
@@ -128,7 +130,7 @@ class WorkerAgentController extends Controller
             ]);
 
         $incomingHandoffs = WorkerAgentHandoff::query()
-            ->where('to_worker_agent_id', $worker->id)
+            ->where('to_worker_agent_id', $worker_agent->id)
             ->where('status', WorkerAgentHandoffStatus::Pending)
             ->with(['fromWorkerAgent:id,uuid,name'])
             ->orderByDesc('id')
@@ -144,7 +146,7 @@ class WorkerAgentController extends Controller
             ]);
 
         return Inertia::render('worker-agents/show', [
-            'worker' => $this->serializeWorker($worker),
+            'worker' => $this->serializeWorker($worker_agent),
             'runs' => $runs,
             'messages' => $messages,
             'incoming_handoffs' => $incomingHandoffs,
@@ -153,62 +155,67 @@ class WorkerAgentController extends Controller
         ]);
     }
 
-    public function edit(WorkerAgent $worker): Response
+    public function edit(WorkerAgent $worker_agent): Response
     {
-        $worker->load('staff');
+        $worker_agent->load('staff');
+        $this->ensureWorkerAgentUuid($worker_agent);
 
-        $props = $this->formSharedProps($worker->staff_id);
+        $props = $this->formSharedProps($worker_agent->staff_id);
         $props['otherWorkers'] = WorkerAgent::query()
-            ->where('id', '!=', $worker->id)
+            ->where('id', '!=', $worker_agent->id)
             ->orderBy('name')
             ->get(['id', 'uuid', 'name']);
 
+        $formState = $this->workerToFormState($worker_agent);
+
         return Inertia::render('worker-agents/edit', array_merge($props, [
             'worker' => [
-                'id' => $worker->id,
-                'uuid' => $worker->uuid,
-                'name' => $worker->name,
+                'id' => $worker_agent->id,
+                'uuid' => $worker_agent->uuid,
+                'name' => $worker_agent->name,
             ],
-            'initial' => $this->workerToFormState($worker),
+            'workerForm' => $formState,
+            // Some stacks / serializers expect snake_case page props; keep both in sync.
+            'worker_form' => $formState,
         ]));
     }
 
-    public function update(Request $request, WorkerAgent $worker): RedirectResponse
+    public function update(Request $request, WorkerAgent $worker_agent): RedirectResponse
     {
-        $data = $this->validated($request, $worker->id);
-        $this->seatService->update($worker, $data);
+        $data = $this->validated($request, $worker_agent->id);
+        $this->seatService->update($worker_agent, $data);
 
-        return redirect()->route('worker-agents.show', ['tenant' => tenant('slug'), 'worker_agent' => $worker])->with('success', 'Worker agent updated.');
+        return redirect()->route('worker-agents.show', ['tenant' => tenant('slug'), 'worker_agent' => $worker_agent])->with('success', 'Worker agent updated.');
     }
 
-    public function destroy(WorkerAgent $worker): RedirectResponse
+    public function destroy(WorkerAgent $worker_agent): RedirectResponse
     {
-        $this->seatService->delete($worker);
+        $this->seatService->delete($worker_agent);
 
         return redirect()->route('worker-agents.index', ['tenant' => tenant('slug')])->with('success', 'Worker agent removed.');
     }
 
-    public function pause(WorkerAgent $worker): RedirectResponse
+    public function pause(WorkerAgent $worker_agent): RedirectResponse
     {
-        $worker->update(['paused_at' => now()]);
+        $worker_agent->update(['paused_at' => now()]);
 
         return redirect()->back()->with('success', 'Worker paused.');
     }
 
-    public function resume(WorkerAgent $worker): RedirectResponse
+    public function resume(WorkerAgent $worker_agent): RedirectResponse
     {
-        $worker->update(['paused_at' => null]);
+        $worker_agent->update(['paused_at' => null]);
 
         return redirect()->back()->with('success', 'Worker resumed.');
     }
 
-    public function runNow(WorkerAgent $worker): RedirectResponse
+    public function runNow(WorkerAgent $worker_agent): RedirectResponse
     {
-        if (! $worker->enabled) {
+        if (! $worker_agent->enabled) {
             return redirect()->back()->with('error', 'Worker is disabled.');
         }
 
-        RunWorkerAgentJob::dispatch((string) $worker->tenant_id, $worker->id, 'manual');
+        RunWorkerAgentJob::dispatch((string) $worker_agent->tenant_id, $worker_agent->id, 'manual');
 
         return redirect()->back()->with('success', 'Run queued.');
     }
@@ -487,5 +494,22 @@ class WorkerAgentController extends Controller
         unset($validated['schedule_cron_custom']);
 
         return $validated;
+    }
+
+    private function ensureWorkerAgentUuid(WorkerAgent $worker): void
+    {
+        if (is_string($worker->uuid) && $worker->uuid !== '') {
+            return;
+        }
+
+        $id = $worker->getKey();
+        if ($id === null) {
+            return;
+        }
+
+        // Use a plain UPDATE so Eloquent never runs an INSERT (missing staff_id would fail).
+        $newUuid = (string) \Illuminate\Support\Str::uuid();
+        WorkerAgent::query()->whereKey($id)->update(['uuid' => $newUuid]);
+        $worker->uuid = $newUuid;
     }
 }

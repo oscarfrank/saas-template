@@ -65,13 +65,17 @@ final class WorkerAgentSeatService
     public function update(WorkerAgent $worker, array $attributes): WorkerAgent
     {
         return DB::transaction(function () use ($worker, $attributes): WorkerAgent {
+            // Always persist a row loaded from the DB. Route-bound instances must not `insert` on save()
+            // (e.g. edge cases where `exists` is out of sync), which would violate NOT NULL on staff_id.
+            $model = WorkerAgent::query()->whereKey($worker->getKey())->firstOrFail();
+
             if (isset($attributes['name'])) {
-                $worker->name = $attributes['name'];
-                $worker->staff?->update(['job_title' => $attributes['name']]);
+                $model->name = $attributes['name'];
+                $model->staff?->update(['job_title' => $attributes['name']]);
             }
 
             if (array_key_exists('reports_to_staff_id', $attributes)) {
-                $worker->staff?->update(['reports_to_staff_id' => $attributes['reports_to_staff_id']]);
+                $model->staff?->update(['reports_to_staff_id' => $attributes['reports_to_staff_id']]);
             }
 
             $fields = [
@@ -88,18 +92,18 @@ final class WorkerAgentSeatService
                 }
                 $value = $attributes[$field];
                 if ($field === 'capabilities') {
-                    $worker->capabilities = $this->normalizeCapabilities(is_array($value) ? $value : []);
+                    $model->capabilities = $this->normalizeCapabilities(is_array($value) ? $value : []);
                 } elseif ($field === 'organization_goal_ids') {
-                    $worker->organization_goal_ids = $this->normalizeGoalIds(is_array($value) ? $value : []);
+                    $model->organization_goal_ids = $this->normalizeGoalIds(is_array($value) ? $value : []);
                 } else {
-                    $worker->{$field} = $value;
+                    $model->{$field} = $value;
                 }
             }
 
-            $worker->config_version = (int) $worker->config_version + 1;
-            $worker->save();
+            $model->config_version = (int) $model->config_version + 1;
+            $model->save();
 
-            return $worker->fresh(['staff']);
+            return $model->fresh(['staff']);
         });
     }
 

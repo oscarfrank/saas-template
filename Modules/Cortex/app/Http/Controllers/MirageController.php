@@ -13,10 +13,13 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
+use Modules\Cortex\Models\MirageReferenceAsset;
 use Modules\Cortex\Models\MirageSetting;
+use Modules\Cortex\Models\MirageUserPreference;
 use Modules\Cortex\Neuron\MirageAgent;
 use Modules\Cortex\Services\MirageImageService;
 use Modules\Cortex\Services\MirageReferenceVisionService;
+use Modules\Cortex\Services\YoutubeTranscriptService;
 use Modules\Cortex\Support\CortexAgentKey;
 use Modules\Cortex\Support\MirageDataImageDecoder;
 use NeuronAI\Chat\Messages\UserMessage;
@@ -31,9 +34,10 @@ class MirageController extends Controller
         private readonly TenantAiPromptResolver $promptResolver,
         private readonly MirageImageService $mirageImageService,
         private readonly MirageReferenceVisionService $mirageReferenceVision,
+        private readonly YoutubeTranscriptService $youtubeTranscript,
     ) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         /** @var array<string, mixed> $definitions */
         $definitions = config('ai_prompts.definitions', []);
@@ -48,6 +52,23 @@ class MirageController extends Controller
             $imageProviderLabel = $setting->image_provider->label();
         }
 
+        $referencePreferences = [
+            'use_default_face_reference' => false,
+            'use_default_style_references' => false,
+        ];
+        if (is_string($tenantId) && $tenantId !== '' && $request->user() !== null) {
+            $pref = MirageUserPreference::query()
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $request->user()->id)
+                ->first();
+            if ($pref !== null) {
+                $referencePreferences = [
+                    'use_default_face_reference' => $pref->use_default_face_reference,
+                    'use_default_style_references' => $pref->use_default_style_references,
+                ];
+            }
+        }
+
         return Inertia::render('cortex/agents/mirage', [
             'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Mirage),
             'promptKey' => self::PROMPT_KEY,
@@ -55,6 +76,7 @@ class MirageController extends Controller
             'promptDescription' => is_array($meta) ? (string) ($meta['description'] ?? '') : '',
             'imageProvider' => $imageProvider,
             'imageProviderLabel' => $imageProviderLabel,
+            'referencePreferences' => $referencePreferences,
         ]);
     }
 
@@ -167,12 +189,16 @@ class MirageController extends Controller
         }
 
         $validated = $request->validate([
-            'input' => ['required', 'string', 'max:120000'],
+            'input_mode' => ['required', 'string', 'in:script,youtube,prompt'],
+            'input' => ['nullable', 'string', 'max:120000'],
+            'youtube_url' => ['nullable', 'string', 'max:2048'],
             'context' => ['nullable', 'string', 'max:20000'],
             'idea_count' => ['required', 'integer', 'min:1', 'max:12'],
             'focus' => ['nullable', 'string', 'in:face,product,mixed,scene'],
             'face_reference' => ['nullable', 'string', 'max:12000000'],
             'product_reference' => ['nullable', 'string', 'max:12000000'],
+            'style_references' => ['nullable', 'array', 'max:'.MirageDataImageDecoder::MAX_STYLE_SAMPLES],
+            'style_references.*' => ['nullable', 'string', 'max:12000000'],
         ]);
 
         $badRef = $this->mirageReferencePayloadError($request);
@@ -180,20 +206,28 @@ class MirageController extends Controller
             return response()->json(['message' => $badRef], 422);
         }
 
+        $resolved = $this->resolveMirageIdeasBody($validated);
+        if (isset($resolved['error'])) {
+            return response()->json(['message' => $resolved['error']], 422);
+        }
+
         $ideaCount = (int) $validated['idea_count'];
-        $input = trim((string) $validated['input']);
+        $input = $resolved['input'];
         $context = trim((string) ($validated['context'] ?? ''));
         $focus = isset($validated['focus']) ? (string) $validated['focus'] : null;
 
         $faceRef = isset($validated['face_reference']) ? trim((string) $validated['face_reference']) : '';
         $productRef = isset($validated['product_reference']) ? trim((string) $validated['product_reference']) : '';
+        $styleRefStrings = $this->normalizeStyleReferenceInput($validated['style_references'] ?? null);
+        $this->applyLibraryDefaultReferences($request, $tenantId, $faceRef, $styleRefStrings);
         $referenceLayers = MirageDataImageDecoder::referenceLayers(
             $faceRef !== '' ? $faceRef : null,
             $productRef !== '' ? $productRef : null,
         );
         $hasReferencePhotos = $referenceLayers !== [];
+        $hasStyleSamples = $styleRefStrings !== [];
 
-        $mergedSystem = $systemPrompt."\n\n".$this->ideasJsonModeSuffix($ideaCount, $hasReferencePhotos);
+        $mergedSystem = $systemPrompt."\n\n".$this->ideasJsonModeSuffix($ideaCount, $hasReferencePhotos, $hasStyleSamples);
 
         $userParts = [];
         $userParts[] = $this->visualFocusInstruction($focus);
@@ -209,6 +243,14 @@ class MirageController extends Controller
                 $userParts[] = "User reference photos — use these FACE / PRODUCT notes in every title and image_prompt (match appearance; no real names):\n---\n{$vision}\n---";
             } else {
                 $userParts[] = 'User attached reference photo(s) for face and/or product. Preserve recognizable likeness and product appearance in every image_prompt.';
+            }
+        }
+        if ($hasStyleSamples) {
+            $styleVision = $this->mirageReferenceVision->summarizeStyleSamplesForIdeas($styleRefStrings);
+            if ($styleVision !== '') {
+                $userParts[] = "User sample thumbnails — match this **look and layout** in every title, thumb_text, and image_prompt (same energy, composition, and typography style; adapt to this video’s topic):\n---\n{$styleVision}\n---";
+            } else {
+                $userParts[] = 'User attached sample thumbnail image(s). Echo their composition, color, and typography style in every image_prompt while keeping this video’s subject matter.';
             }
         }
         $userParts[] = 'Generate exactly '.$ideaCount.' distinct YouTube thumbnail packaging concepts from the following topic or script. Follow the JSON-only rules in your instructions.';
@@ -268,7 +310,13 @@ class MirageController extends Controller
                 return response()->json(['message' => 'No valid ideas were returned. Try again.'], 422);
             }
 
-            return response()->json(['ideas' => $ideas]);
+            return response()->json([
+                'ideas' => $ideas,
+                'source' => [
+                    'input_mode' => $resolved['input_mode'],
+                    'youtube_title' => $resolved['youtube_title'] ?? null,
+                ],
+            ]);
         } catch (\Throwable $e) {
             Log::error('MirageController::ideas failed', [
                 'error' => $e->getMessage(),
@@ -308,6 +356,8 @@ class MirageController extends Controller
             'items.*.idea_id' => ['nullable', 'string', 'max:64'],
             'face_reference' => ['nullable', 'string', 'max:12000000'],
             'product_reference' => ['nullable', 'string', 'max:12000000'],
+            'style_references' => ['nullable', 'array', 'max:'.MirageDataImageDecoder::MAX_STYLE_SAMPLES],
+            'style_references.*' => ['nullable', 'string', 'max:12000000'],
         ]);
 
         $badRef = $this->mirageReferencePayloadError($request);
@@ -317,9 +367,12 @@ class MirageController extends Controller
 
         $faceRef = isset($validated['face_reference']) ? trim((string) $validated['face_reference']) : '';
         $productRef = isset($validated['product_reference']) ? trim((string) $validated['product_reference']) : '';
-        $referenceLayers = MirageDataImageDecoder::referenceLayers(
+        $styleRefStrings = $this->normalizeStyleReferenceInput($validated['style_references'] ?? null);
+        $this->applyLibraryDefaultReferences($request, $tenantId, $faceRef, $styleRefStrings);
+        $referenceLayers = MirageDataImageDecoder::allGenerationLayers(
             $faceRef !== '' ? $faceRef : null,
             $productRef !== '' ? $productRef : null,
+            $styleRefStrings,
         );
 
         $results = [];
@@ -361,10 +414,67 @@ class MirageController extends Controller
         return response()->json(['results' => $results]);
     }
 
-    private function ideasJsonModeSuffix(int $ideaCount, bool $hasReferencePhotos): string
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array{input: string, input_mode: string, youtube_title?: string|null}|array{error: string}
+     */
+    private function resolveMirageIdeasBody(array $validated): array
+    {
+        $mode = (string) ($validated['input_mode'] ?? 'script');
+        if (! in_array($mode, ['script', 'youtube', 'prompt'], true)) {
+            $mode = 'script';
+        }
+
+        if ($mode === 'youtube') {
+            $url = trim((string) ($validated['youtube_url'] ?? ''));
+            if ($url === '') {
+                return ['error' => 'Paste a YouTube watch URL or an 11-character video ID.'];
+            }
+
+            $tx = $this->youtubeTranscript->fetchTranscript($url);
+            if (! $tx['success']) {
+                return ['error' => $tx['error']];
+            }
+
+            $title = trim((string) ($tx['title'] ?? ''));
+            $text = trim((string) ($tx['text'] ?? ''));
+            $input = 'YouTube video: '.($title !== '' ? $title : 'Unknown title')."\n\nTranscript:\n".$text;
+            if (! empty($tx['truncated'])) {
+                $input .= "\n\n[Note: transcript was truncated for length.]";
+            }
+
+            return [
+                'input' => $input,
+                'input_mode' => $mode,
+                'youtube_title' => $title !== '' ? $title : null,
+            ];
+        }
+
+        $rawInput = trim((string) ($validated['input'] ?? ''));
+        if ($rawInput === '') {
+            return ['error' => $mode === 'prompt'
+                ? 'Add a short creative brief (tone, niche, or what the thumbnails should feel like).'
+                : 'Paste a script, outline, or topic.'];
+        }
+
+        $input = $mode === 'prompt'
+            ? "Creative brief from the user (short prompt — infer the video topic and thumbnail angles):\n---\n{$rawInput}\n---"
+            : $rawInput;
+
+        return [
+            'input' => $input,
+            'input_mode' => $mode,
+            'youtube_title' => null,
+        ];
+    }
+
+    private function ideasJsonModeSuffix(int $ideaCount, bool $hasReferencePhotos, bool $hasStyleSamples = false): string
     {
         $refNote = $hasReferencePhotos
             ? "\n\nWhen the user message includes FACE / PRODUCT reference notes or photos, every **image_prompt** must stay consistent with that likeness and product look (no real-person names)."
+            : '';
+        $styleNote = $hasStyleSamples
+            ? "\n\nWhen the user message includes STYLE_SAMPLES or sample-thumbnail notes, every **thumb_text** and **image_prompt** should reflect that layout, palette, and typography vibe (adapted to this video’s topic)."
             : '';
 
         return <<<TXT
@@ -384,7 +494,7 @@ The JSON must match this shape exactly (types are descriptive):
   ]
 }
 
-Produce **exactly {$ideaCount}** objects in \`ideas\`, each with a **distinct** angle (curiosity hook, emotion, or visual approach). Base everything on the user’s script or topic and the visual focus.{$refNote}
+Produce **exactly {$ideaCount}** objects in \`ideas\`, each with a **distinct** angle (curiosity hook, emotion, or visual approach). Base everything on the user’s script or topic and the visual focus.{$refNote}{$styleNote}
 TXT;
     }
 
@@ -407,7 +517,105 @@ TXT;
             }
         }
 
+        $styles = $request->input('style_references');
+        if (is_array($styles) && count($styles) > MirageDataImageDecoder::MAX_STYLE_SAMPLES) {
+            return 'At most '.MirageDataImageDecoder::MAX_STYLE_SAMPLES.' sample thumbnails are allowed.';
+        }
+        if (is_array($styles)) {
+            foreach ($styles as $idx => $raw) {
+                if (! is_string($raw)) {
+                    continue;
+                }
+                $trim = trim($raw);
+                if ($trim === '') {
+                    continue;
+                }
+                if (MirageDataImageDecoder::fromDataUrl($trim) === null) {
+                    return 'Invalid sample thumbnail #'.(((int) $idx) + 1).': use a PNG, JPEG, GIF, or WebP image under 5MB (browser data URL).';
+                }
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * @param  mixed  $raw
+     * @return list<string>
+     */
+    private function normalizeStyleReferenceInput($raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $item) {
+            if (count($out) >= MirageDataImageDecoder::MAX_STYLE_SAMPLES) {
+                break;
+            }
+            if (! is_string($item)) {
+                continue;
+            }
+            $t = trim($item);
+            if ($t === '') {
+                continue;
+            }
+            $out[] = $t;
+        }
+
+        return $out;
+    }
+
+    /**
+     * When the user enabled “use saved defaults” and left refs empty, load their default library assets.
+     *
+     * @param  list<string>  $styleRefStrings
+     */
+    private function applyLibraryDefaultReferences(
+        Request $request,
+        string $tenantId,
+        string &$faceRef,
+        array &$styleRefStrings,
+    ): void {
+        $user = $request->user();
+        if ($user === null) {
+            return;
+        }
+
+        $pref = MirageUserPreference::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($pref === null) {
+            return;
+        }
+
+        if ($pref->use_default_face_reference && trim($faceRef) === '') {
+            $dataUrl = $this->defaultLibraryAssetDataUrl($tenantId, (int) $user->id, MirageReferenceAsset::KIND_FACE);
+            if ($dataUrl !== null && MirageDataImageDecoder::fromDataUrl($dataUrl) !== null) {
+                $faceRef = $dataUrl;
+            }
+        }
+
+        if ($pref->use_default_style_references && $styleRefStrings === []) {
+            $dataUrl = $this->defaultLibraryAssetDataUrl($tenantId, (int) $user->id, MirageReferenceAsset::KIND_STYLE);
+            if ($dataUrl !== null && MirageDataImageDecoder::fromDataUrl($dataUrl) !== null) {
+                $styleRefStrings = [$dataUrl];
+            }
+        }
+    }
+
+    private function defaultLibraryAssetDataUrl(string $tenantId, int $userId, string $kind): ?string
+    {
+        $asset = MirageReferenceAsset::query()
+            ->where('tenant_id', $tenantId)
+            ->forUser($userId)
+            ->kind($kind)
+            ->where('is_default', true)
+            ->first();
+
+        return $asset?->toDataUrlString();
     }
 
     /**

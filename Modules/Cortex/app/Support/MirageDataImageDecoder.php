@@ -8,6 +8,9 @@ final class MirageDataImageDecoder
 {
     public const MAX_BYTES = 5_242_880;
 
+    /** Optional style-reference thumbnails (in addition to face/product). */
+    public const MAX_STYLE_SAMPLES = 3;
+
     /**
      * Decode a browser data URL (data:image/...;base64,...).
      *
@@ -65,5 +68,44 @@ final class MirageDataImageDecoder
         }
 
         return $out;
+    }
+
+    /**
+     * Optional sample thumbnails for layout/color/style (max {@see MAX_STYLE_SAMPLES}).
+     *
+     * @param  list<string>  $dataUrlStrings
+     * @return list<array{binary: string, mime: string}>
+     */
+    public static function styleLayersFromDataUrls(array $dataUrlStrings): array
+    {
+        $out = [];
+        foreach ($dataUrlStrings as $raw) {
+            if (count($out) >= self::MAX_STYLE_SAMPLES) {
+                break;
+            }
+            if (! is_string($raw)) {
+                continue;
+            }
+            $decoded = self::fromDataUrl(trim($raw));
+            if ($decoded === null) {
+                continue;
+            }
+            $out[] = ['binary' => $decoded['binary'], 'mime' => $decoded['mime']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Face → product → style samples (GPT Image multi-image order).
+     *
+     * @param  list<string>  $styleDataUrlStrings
+     * @return list<array{binary: string, mime: string}>
+     */
+    public static function allGenerationLayers(?string $faceDataUrl, ?string $productDataUrl, array $styleDataUrlStrings = []): array
+    {
+        $base = self::referenceLayers($faceDataUrl, $productDataUrl);
+
+        return [...$base, ...self::styleLayersFromDataUrls($styleDataUrlStrings)];
     }
 }

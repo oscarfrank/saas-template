@@ -6,7 +6,9 @@ use Modules\Cortex\Http\Controllers\CortexAgentSettingsController;
 use Modules\Cortex\Http\Controllers\CortexController;
 use Modules\Cortex\Http\Controllers\CortexLlmSettingsController;
 use Modules\Cortex\Http\Controllers\MirageController;
+use Modules\Cortex\Http\Controllers\MirageReferenceAssetController;
 use Modules\Cortex\Http\Controllers\MirageSettingsController;
+use Modules\Cortex\Http\Controllers\MirageUserPreferenceController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
 use Modules\Cortex\Http\Controllers\PulseController;
 use Modules\Cortex\Http\Controllers\QuillController;
@@ -61,6 +63,14 @@ Route::middleware([
     Route::post('cortex/agents/mirage/chat', [MirageController::class, 'chat'])->name('cortex.agents.mirage.chat');
     Route::post('cortex/agents/mirage/ideas', [MirageController::class, 'ideas'])->name('cortex.agents.mirage.ideas');
     Route::post('cortex/agents/mirage/images', [MirageController::class, 'images'])->name('cortex.agents.mirage.images');
+
+    Route::get('cortex/agents/mirage/reference-assets', [MirageReferenceAssetController::class, 'index'])->name('cortex.agents.mirage.reference_assets.index');
+    Route::post('cortex/agents/mirage/reference-assets', [MirageReferenceAssetController::class, 'store'])->name('cortex.agents.mirage.reference_assets.store');
+    Route::get('cortex/agents/mirage/reference-assets/{mirageReferenceAsset}/file', [MirageReferenceAssetController::class, 'file'])->name('cortex.agents.mirage.reference_assets.file');
+    Route::patch('cortex/agents/mirage/reference-assets/{mirageReferenceAsset}/default', [MirageReferenceAssetController::class, 'setDefault'])->name('cortex.agents.mirage.reference_assets.default');
+    Route::delete('cortex/agents/mirage/reference-assets/{mirageReferenceAsset}', [MirageReferenceAssetController::class, 'destroy'])->name('cortex.agents.mirage.reference_assets.destroy');
+
+    Route::patch('cortex/agents/mirage/reference-preferences', [MirageUserPreferenceController::class, 'update'])->name('cortex.agents.mirage.reference_preferences.update');
 
     Route::get('cortex/agents/youtube-doc', [YoutubeDocController::class, 'index'])->name('cortex.agents.youtube_doc');
     Route::get('cortex/agents/youtube-doc/connect', [YoutubeDocController::class, 'connect'])->name('cortex.agents.youtube_doc.connect');

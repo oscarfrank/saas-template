@@ -88,4 +88,85 @@ TXT,
             return '';
         }
     }
+
+    /**
+     * Short STYLE notes from optional sample thumbnails (layout, palette, typography vibe).
+     *
+     * @param  list<string>  $styleDataUrls  Valid data:image/...;base64,... strings
+     */
+    public function summarizeStyleSamplesForIdeas(array $styleDataUrls): string
+    {
+        $decoded = [];
+        foreach ($styleDataUrls as $raw) {
+            if (count($decoded) >= MirageDataImageDecoder::MAX_STYLE_SAMPLES) {
+                break;
+            }
+            if (! is_string($raw)) {
+                continue;
+            }
+            $one = MirageDataImageDecoder::fromDataUrl(trim($raw));
+            if ($one !== null) {
+                $decoded[] = $one;
+            }
+        }
+
+        if ($decoded === []) {
+            return '';
+        }
+
+        $key = config('openai.api_key');
+        if (! is_string($key) || $key === '') {
+            return '';
+        }
+
+        $parts = [
+            [
+                'type' => 'text',
+                'text' => <<<'TXT'
+You help design YouTube thumbnails. The user attached one or more **sample thumbnails** (examples of the look they want — not necessarily the same topic).
+
+Write short notes for a thumbnail designer (max ~120 words total).
+
+Rules:
+- Describe composition (rule of thirds, split layout, face placement, arrows, borders).
+- Color palette and contrast (background vs text).
+- Typography feel (bold sans, handwritten, outline stroke) without quoting trademark fonts.
+- Energy level (calm vs high-energy) and overall vibe.
+- Do not describe unrelated topics; focus on reusable **style** only.
+
+Use exactly this format (plain text, no markdown):
+
+STYLE_SAMPLES: ...
+TXT,
+            ],
+        ];
+
+        foreach ($decoded as $row) {
+            $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $row['data_url']]];
+        }
+
+        $model = (string) config('openai.mirage_reference_vision_model', 'gpt-4o-mini');
+
+        try {
+            $response = OpenAI::chat()->create([
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'user', 'content' => $parts],
+                ],
+                'max_tokens' => 450,
+                'temperature' => 0.2,
+            ]);
+
+            $content = $response->choices[0]->message->content ?? '';
+            $text = trim(is_string($content) ? $content : '');
+
+            return $text;
+        } catch (\Throwable $e) {
+            Log::warning('MirageReferenceVisionService::summarizeStyleSamplesForIdeas failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
 }

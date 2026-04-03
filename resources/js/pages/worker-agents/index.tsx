@@ -40,8 +40,8 @@ export default function WorkerAgentsIndex({ workers, pending_proposals_count }: 
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight">Worker agents</h1>
                         <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-                            Tenant automation workers with HR seats, capabilities, schedules, and audit runs. Distinct from Cortex product agents
-                            (Nexus, Pulse, …).
+                            Digital staff for your tenant: HR seats, org goals, handoffs to people or other agents, long-term memory, and full run history.
+                            Separate from Cortex product agents (Nexus, Pulse, …).
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -64,9 +64,9 @@ export default function WorkerAgentsIndex({ workers, pending_proposals_count }: 
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-lg">
                             <Bot className="size-5" />
-                            Roster
+                            Team roster
                         </CardTitle>
-                        <CardDescription>Each worker has a staff seat for tasks and assignments.</CardDescription>
+                        <CardDescription>Each agent is a first-class teammate: staff record, reporting line, and permissions like everyone else.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {workers.length === 0 ? (

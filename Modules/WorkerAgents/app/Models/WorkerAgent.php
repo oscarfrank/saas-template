@@ -90,6 +90,11 @@ class WorkerAgent extends Model
         return $this->hasMany(WorkerAgentHandoff::class, 'to_worker_agent_id');
     }
 
+    public function memories(): HasMany
+    {
+        return $this->hasMany(WorkerAgentMemory::class, 'worker_agent_id');
+    }
+
     public function getRouteKeyName(): string
     {
         return 'uuid';

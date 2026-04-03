@@ -20,6 +20,7 @@ use Modules\HR\Support\StaffReportingOptions;
 use Modules\WorkerAgents\Jobs\RunWorkerAgentJob;
 use Modules\WorkerAgents\Models\WorkerAgent;
 use Modules\WorkerAgents\Models\WorkerAgentHandoff;
+use Modules\WorkerAgents\Models\WorkerAgentMemory;
 use Modules\WorkerAgents\Models\WorkerAgentMessage;
 use Modules\WorkerAgents\Models\WorkerAgentProposal;
 use Modules\WorkerAgents\Models\WorkerAgentRunEvent;
@@ -145,6 +146,27 @@ class WorkerAgentController extends Controller
                 'created_at' => $h->created_at?->toIso8601String(),
             ]);
 
+        $memories = WorkerAgentMemory::query()
+            ->where('worker_agent_id', $worker_agent->id)
+            ->with(['author:id,first_name,last_name,email'])
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (WorkerAgentMemory $m) => [
+                'uuid' => $m->uuid,
+                'body' => $m->body,
+                'source' => $m->source,
+                'created_at' => $m->created_at?->toIso8601String(),
+                'author' => $m->author !== null
+                    ? [
+                        'id' => $m->author->id,
+                        'label' => trim(($m->author->first_name ?? '').' '.($m->author->last_name ?? '')) !== ''
+                            ? trim(($m->author->first_name ?? '').' '.($m->author->last_name ?? ''))
+                            : (string) $m->author->email,
+                    ]
+                    : null,
+            ]);
+
         return Inertia::render('worker-agents/show', [
             'worker' => $this->serializeWorker($worker_agent),
             'runs' => $runs,
@@ -152,7 +174,37 @@ class WorkerAgentController extends Controller
             'incoming_handoffs' => $incomingHandoffs,
             'latest_run_events' => $runEvents,
             'latest_run_id' => $latestRun?->id,
+            'memories' => $memories,
         ]);
+    }
+
+    public function storeMemory(Request $request, WorkerAgent $worker_agent): RedirectResponse
+    {
+        $validated = $request->validate([
+            'body' => ['required', 'string', 'max:20000'],
+        ]);
+
+        WorkerAgentMemory::query()->create([
+            'tenant_id' => $worker_agent->tenant_id,
+            'worker_agent_id' => $worker_agent->id,
+            'body' => $validated['body'],
+            'source' => 'manual',
+            'user_id' => $request->user()?->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Memory saved.');
+    }
+
+    public function destroyMemory(WorkerAgent $worker_agent, string $memory_uuid): RedirectResponse
+    {
+        $row = WorkerAgentMemory::query()
+            ->where('tenant_id', (string) tenant('id'))
+            ->where('worker_agent_id', $worker_agent->id)
+            ->where('uuid', $memory_uuid)
+            ->firstOrFail();
+        $row->delete();
+
+        return redirect()->back()->with('success', 'Memory removed.');
     }
 
     public function edit(WorkerAgent $worker_agent): Response

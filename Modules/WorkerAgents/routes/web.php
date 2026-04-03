@@ -29,6 +29,8 @@ Route::middleware([
     Route::patch('worker-agents/{worker_agent}/pause', [WorkerAgentController::class, 'pause'])->name('worker-agents.pause');
     Route::patch('worker-agents/{worker_agent}/resume', [WorkerAgentController::class, 'resume'])->name('worker-agents.resume');
     Route::post('worker-agents/{worker_agent}/run', [WorkerAgentController::class, 'runNow'])->name('worker-agents.run');
+    Route::post('worker-agents/{worker_agent}/memories', [WorkerAgentController::class, 'storeMemory'])->name('worker-agents.memories.store');
+    Route::delete('worker-agents/{worker_agent}/memories/{memory_uuid}', [WorkerAgentController::class, 'destroyMemory'])->name('worker-agents.memories.destroy');
     Route::post('worker-agents/{worker_agent}/handoffs/{handoff}/accept', [WorkerAgentHandoffController::class, 'accept'])->name('worker-agents.handoffs.accept');
     Route::post('worker-agents/{worker_agent}/handoffs/{handoff}/decline', [WorkerAgentHandoffController::class, 'decline'])->name('worker-agents.handoffs.decline');
 });

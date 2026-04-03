@@ -10,6 +10,7 @@ use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Support\CortexLlmProvider;
 use Modules\HR\Models\OrganizationGoal;
 use Modules\WorkerAgents\Models\WorkerAgent;
+use Modules\WorkerAgents\Models\WorkerAgentMemory;
 use OpenAI\Laravel\Facades\OpenAI;
 
 final class WorkerAgentLlmService
@@ -19,7 +20,7 @@ final class WorkerAgentLlmService
     ) {}
 
     /**
-     * @param  array{trigger: string, goals: list<array{title: string, description: string|null}>}  $context
+     * @param  array{trigger: string, goals: list<array{title: string, description: string|null}>, memories?: list<array{body: string, source: string, created_at: string|null}>}  $context
      * @return array{summary: string, actions: list<array<string, mixed>>, raw_error: string|null}
      */
     public function plan(WorkerAgent $worker, array $context): array
@@ -92,7 +93,7 @@ final class WorkerAgentLlmService
     }
 
     /**
-     * @param  array{trigger: string, goals: list<array{title: string, description: string|null}>}  $context
+     * @param  array{trigger: string, goals: list<array{title: string, description: string|null}>, memories?: list<array{body: string, source: string, created_at: string|null}>}  $context
      * @return array{0: string, 1: string}
      */
     private function buildPrompts(WorkerAgent $worker, array $context): array
@@ -110,6 +111,20 @@ final class WorkerAgentLlmService
             $goalLines[] = $d !== '' ? "- {$t}: {$d}" : "- {$t}";
         }
         $goalsBlock = $goalLines !== [] ? implode("\n", $goalLines) : '- (no goals linked)';
+
+        $memoryLines = [];
+        foreach ($context['memories'] ?? [] as $mem) {
+            if (! is_array($mem)) {
+                continue;
+            }
+            $b = trim((string) ($mem['body'] ?? ''));
+            if ($b === '') {
+                continue;
+            }
+            $src = trim((string) ($mem['source'] ?? 'note'));
+            $memoryLines[] = $src !== '' ? "- [{$src}] {$b}" : "- {$b}";
+        }
+        $memoriesBlock = $memoryLines !== [] ? implode("\n", $memoryLines) : '- (none yet)';
 
         $system = <<<'TXT'
 You are an HR automation worker agent. Respond with a single JSON object only (no markdown fences).
@@ -135,16 +150,18 @@ Schema:
 Rules:
 - Prefer at most 1–3 task_create actions unless the user goals clearly need more.
 - Use handoff_request when another worker agent should own follow-up work or a specific task reassignment is implied.
+- You may rely on long-term memory when it helps continuity; do not contradict explicit organization goals.
 - If nothing actionable is appropriate, return an empty "actions" array.
 TXT;
 
         $user = sprintf(
-            "Worker name: %s\nTrigger: %s\nSkills / focus:\n%s\n\nLinked organization goals:\n%s\n\nCapabilities:\n%s\n",
+            "Worker name: %s\nTrigger: %s\nSkills / focus:\n%s\n\nLinked organization goals:\n%s\n\nCapabilities:\n%s\n\nLong-term memory (established context for this worker; may include teammate notes):\n%s\n",
             $worker->name,
             $context['trigger'] ?? 'scheduled',
             $worker->skills ?? '(none)',
             $goalsBlock,
-            $capBlock
+            $capBlock,
+            $memoriesBlock
         );
 
         return [$system, $user];
@@ -250,6 +267,28 @@ TXT;
                 'title' => (string) $g->title,
                 'description' => $g->description,
             ])
+            ->all();
+    }
+
+    /**
+     * Recent memories visible to this worker in the tenant (and to teammates on the profile). Newest first, capped for prompt size.
+     *
+     * @return list<array{body: string, source: string, created_at: string|null}>
+     */
+    public function memoriesForWorker(WorkerAgent $worker): array
+    {
+        return WorkerAgentMemory::query()
+            ->where('tenant_id', $worker->tenant_id)
+            ->where('worker_agent_id', $worker->id)
+            ->orderByDesc('id')
+            ->limit(25)
+            ->get(['body', 'source', 'created_at'])
+            ->map(fn (WorkerAgentMemory $m) => [
+                'body' => (string) $m->body,
+                'source' => (string) $m->source,
+                'created_at' => $m->created_at?->toIso8601String(),
+            ])
+            ->values()
             ->all();
     }
 }

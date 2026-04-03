@@ -37,9 +37,11 @@ final class WorkerAgentRunOrchestrator
         $this->appendMessage($worker, $run, WorkerAgentMessageRole::Agent, 'Starting run…');
 
         $goals = $this->llm->goalsForWorker($worker);
+        $memories = $this->llm->memoriesForWorker($worker);
         $plan = $this->llm->plan($worker, [
             'trigger' => $run->trigger,
             'goals' => $goals,
+            'memories' => $memories,
         ]);
 
         $summary = $plan['summary'];

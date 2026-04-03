@@ -1,12 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { resolveWorkerAgentRouteParam } from '@/utils/worker-agent-route';
-import { Bot, Pencil, Play, Pause, PlayCircle } from 'lucide-react';
+import { Bot, Pencil, Play, Pause, PlayCircle, Trash2 } from 'lucide-react';
 
 type RunRow = {
     id: number;
@@ -40,6 +42,14 @@ type RunEventRow = {
     event_type: string;
     message: string;
     created_at: string | null;
+};
+
+type MemoryRow = {
+    uuid: string;
+    body: string;
+    source: string;
+    created_at: string | null;
+    author: { id: number; label: string } | null;
 };
 
 interface WorkerShow {
@@ -81,12 +91,30 @@ interface Props {
     incoming_handoffs: HandoffIn[];
     latest_run_events: RunEventRow[];
     latest_run_id: number | null;
+    memories: MemoryRow[];
 }
 
-export default function WorkerAgentsShow({ worker, runs, messages, incoming_handoffs, latest_run_events }: Props) {
+export default function WorkerAgentsShow({ worker, runs, messages, incoming_handoffs, latest_run_events, memories }: Props) {
     const tenantRouter = useTenantRouter();
     const page = usePage();
     const wa = resolveWorkerAgentRouteParam(worker, page.url) ?? worker.uuid;
+
+    const memoryForm = useForm({ body: '' });
+
+    const submitMemory = (e: React.FormEvent) => {
+        e.preventDefault();
+        memoryForm.post(tenantRouter.route('worker-agents.memories.store', { worker_agent: wa }), {
+            preserveScroll: true,
+            onSuccess: () => memoryForm.reset('body'),
+        });
+    };
+
+    const removeMemory = (uuid: string) => {
+        if (!window.confirm('Remove this memory? The agent will no longer see it in future runs.')) {
+            return;
+        }
+        tenantRouter.delete('worker-agents.memories.destroy', { worker_agent: wa, memory_uuid: uuid });
+    };
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Worker agents', href: tenantRouter.route('worker-agents.index') },
@@ -128,7 +156,11 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                             <Bot className="size-7" />
                             {worker.name}
                         </h1>
-                        <p className="text-muted-foreground mt-1 text-sm">Config v{worker.config_version} · Seat: {worker.staff?.employee_id ?? '—'}</p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            Digital staff member · Config v{worker.config_version} · Seat: {worker.staff?.employee_id ?? '—'}
+                            {worker.staff?.job_title ? ` · ${worker.staff.job_title}` : ''}
+                            {worker.staff?.department ? ` · ${worker.staff.department}` : ''}
+                        </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" asChild>
@@ -159,6 +191,16 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Role on the team</CardTitle>
+                            <CardDescription>Same org fabric as people: seat, reporting, and scoped work.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-muted-foreground text-sm">
+                            This worker participates as <span className="text-foreground font-medium">digital staff</span>—handoffs, HR tasks, and memory
+                            are shared with teammates who can open this profile.
+                        </CardContent>
+                    </Card>
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Status</CardTitle>
@@ -192,6 +234,68 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm whitespace-pre-wrap">{worker.skills || '—'}</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Long-term memory</CardTitle>
+                        <CardDescription>
+                            Facts and context this agent keeps across runs. Visible to anyone who can open this profile in the tenant; the model sees the most
+                            recent entries when planning.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <form onSubmit={submitMemory} className="space-y-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="memory-body">Add a note for this teammate</Label>
+                                <Textarea
+                                    id="memory-body"
+                                    rows={3}
+                                    value={memoryForm.data.body}
+                                    onChange={(e) => memoryForm.setData('body', e.target.value)}
+                                    placeholder="e.g. Alex prefers async updates; Jordan is the onboarding buddy."
+                                    className="resize-y"
+                                />
+                                {memoryForm.errors.body && <p className="text-destructive text-sm">{memoryForm.errors.body}</p>}
+                            </div>
+                            <Button type="submit" size="sm" disabled={memoryForm.processing}>
+                                {memoryForm.processing ? 'Saving…' : 'Save memory'}
+                            </Button>
+                        </form>
+
+                        {memories.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">No memories yet. Add notes so future runs stay aligned with the team.</p>
+                        ) : (
+                            <ul className="divide-y rounded-md border text-sm">
+                                {memories.map((m) => (
+                                    <li key={m.uuid} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="min-w-0 flex-1 space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge variant="outline">{m.source}</Badge>
+                                                {m.created_at && (
+                                                    <span className="text-muted-foreground text-xs">{m.created_at}</span>
+                                                )}
+                                                {m.author && (
+                                                    <span className="text-muted-foreground text-xs">by {m.author.label}</span>
+                                                )}
+                                            </div>
+                                            <p className="whitespace-pre-wrap">{m.body}</p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                                            onClick={() => removeMemory(m.uuid)}
+                                            aria-label="Remove memory"
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </CardContent>
                 </Card>
 

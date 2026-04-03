@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
-import { Plus, Search, Users, FolderKanban, ListTodo, DollarSign, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Users, FolderKanban, ListTodo, DollarSign, Star, ChevronLeft, ChevronRight, Target } from 'lucide-react';
 
 interface User {
     id: number;
@@ -96,6 +96,12 @@ export default function HRStaffIndex({ members, pagination, filters }: Props) {
                         <Link href={tenantRouter.route('hr.projects.index')}>
                             <FolderKanban className="h-6 w-6" />
                             <span>Projects</span>
+                        </Link>
+                    </Button>
+                    <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
+                        <Link href={tenantRouter.route('hr.goals.index')}>
+                            <Target className="h-6 w-6" />
+                            <span>Goals</span>
                         </Link>
                     </Button>
                     <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>

@@ -96,7 +96,7 @@ return [
     |
     */
 
-    'gpt_image_model' => env('OPENAI_GPT_IMAGE_MODEL', 'gpt-image-1'),
+    'gpt_image_model' => env('OPENAI_GPT_IMAGE_MODEL', 'gpt-image-1.5'),
 
     /*
     |--------------------------------------------------------------------------

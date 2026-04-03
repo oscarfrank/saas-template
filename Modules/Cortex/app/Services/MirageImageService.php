@@ -22,7 +22,7 @@ final class MirageImageService
             return ['error' => 'Empty prompt.'];
         }
 
-        $gptModel = (string) config('openai.gpt_image_model', 'gpt-image-1');
+        $gptModel = (string) config('openai.gpt_image_model', 'gpt-image-1.5');
 
         return match ($provider) {
             MirageImageProvider::DallE3 => $this->openAiImage(
@@ -61,10 +61,10 @@ final class MirageImageService
 
         try {
             foreach ($layers as $layer) {
-                $path = tempnam(sys_get_temp_dir(), 'mirage_ref_');
-                if ($path === false) {
-                    return ['error' => 'Could not create a temporary file for reference images.'];
-                }
+                // openai-php multipart uses the temp path’s extension to set Content-Type per part.
+                // Extensionless tempnam() paths yield no MIME → GPT Image edit rejects image[0].
+                $ext = self::extensionForImageMime($layer['mime']);
+                $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'mirage_ref_'.uniqid('', true).'.'.$ext;
                 if (file_put_contents($path, $layer['binary']) === false) {
                     @unlink($path);
 
@@ -137,6 +137,17 @@ final class MirageImageService
                 }
             }
         }
+    }
+
+    private static function extensionForImageMime(string $mime): string
+    {
+        return match (strtolower($mime)) {
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            default => 'png',
+        };
     }
 
     /**

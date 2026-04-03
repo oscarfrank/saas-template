@@ -1,0 +1,1 @@
+function l(r){var f;if(!r)return"—";if(r.user){const t=`${r.user.first_name??""} ${r.user.last_name??""}`.trim();if(t!=="")return t}if(r.kind==="agent"){const t=((f=r.job_title)==null?void 0:f.trim())||"Digital worker";return r.employee_id?`${t} (${r.employee_id})`:t}return r.employee_id?`Staff ${r.employee_id}`:r.id!=null?`Staff #${r.id}`:"—"}export{l as f};

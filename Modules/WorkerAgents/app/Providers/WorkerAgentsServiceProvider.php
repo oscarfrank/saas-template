@@ -4,6 +4,7 @@ namespace Modules\WorkerAgents\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\WorkerAgents\Console\DemoChainWorkerAgentsCommand;
 use Modules\WorkerAgents\Console\DispatchDueWorkerAgentsCommand;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
@@ -46,6 +47,7 @@ class WorkerAgentsServiceProvider extends ServiceProvider
     {
         $this->commands([
             DispatchDueWorkerAgentsCommand::class,
+            DemoChainWorkerAgentsCommand::class,
         ]);
     }
 

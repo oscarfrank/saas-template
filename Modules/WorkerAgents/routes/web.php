@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\WorkerAgents\Http\Controllers\WorkerAgentController;
+use Modules\WorkerAgents\Http\Controllers\WorkerAgentDemoChainController;
 use Modules\WorkerAgents\Http\Controllers\WorkerAgentHandoffController;
 use Modules\WorkerAgents\Http\Controllers\WorkerAgentProposalController;
 use Stancl\Tenancy\Middleware\InitializeTenancyByPath;
@@ -15,6 +16,9 @@ Route::middleware([
     InitializeTenancyByPath::class,
     'ensure.tenant.access',
 ])->prefix('{tenant}')->group(function () {
+    Route::get('worker-agents/demo-chain', [WorkerAgentDemoChainController::class, 'show'])->name('worker-agents.demo-chain');
+    Route::post('worker-agents/demo-chain', [WorkerAgentDemoChainController::class, 'store'])->name('worker-agents.demo-chain.store');
+
     Route::get('worker-agents/proposals', [WorkerAgentProposalController::class, 'index'])->name('worker-agents.proposals.index');
     Route::post('worker-agents/proposals/{proposal}/approve', [WorkerAgentProposalController::class, 'approve'])->name('worker-agents.proposals.approve');
     Route::post('worker-agents/proposals/{proposal}/reject', [WorkerAgentProposalController::class, 'reject'])->name('worker-agents.proposals.reject');

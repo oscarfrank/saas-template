@@ -52,14 +52,17 @@ class WorkerAgentProposalController extends Controller
             return redirect()->back()->with('error', 'This proposal is no longer pending.');
         }
 
-        DB::transaction(function () use ($proposal): void {
+        $createdTaskUuid = null;
+
+        DB::transaction(function () use ($proposal, &$createdTaskUuid): void {
             $worker = $proposal->workerAgent;
             if ($worker === null) {
                 throw new \RuntimeException('Missing worker agent.');
             }
 
             if ($proposal->type === WorkerAgentProposalType::TaskCreate) {
-                $this->applier->applyTaskCreate($worker, $proposal->payload ?? []);
+                $task = $this->applier->applyTaskCreate($worker, $proposal->payload ?? []);
+                $createdTaskUuid = $task->uuid;
             }
 
             $proposal->update([
@@ -69,7 +72,9 @@ class WorkerAgentProposalController extends Controller
             ]);
         });
 
-        return redirect()->back()->with('success', 'Proposal applied.');
+        return redirect()->back()
+            ->with('success', 'Proposal applied. The HR task was created.')
+            ->with('applied_task_uuid', $createdTaskUuid);
     }
 
     public function reject(Request $request, WorkerAgentProposal $proposal): RedirectResponse

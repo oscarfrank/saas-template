@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import { formatTaskAssigneeLabel } from '@/utils/task-assignee';
 import { Pencil, CheckCircle, ShieldAlert, Link2 } from 'lucide-react';
 
 interface BlockerTask {
@@ -12,7 +13,12 @@ interface BlockerTask {
     uuid: string;
     title: string;
     status: string;
-    assignee?: { user?: { first_name: string; last_name: string } };
+    assignee?: {
+        kind?: string | null;
+        employee_id?: string | null;
+        job_title?: string | null;
+        user?: { first_name: string; last_name: string };
+    };
 }
 
 interface BlockingTask {
@@ -32,7 +38,13 @@ interface Task {
     due_at: string | null;
     completed_at: string | null;
     project?: { id: number; name: string };
-    assignee?: { user?: { first_name: string; last_name: string; email: string } };
+    assignee?: {
+        id?: number;
+        kind?: string | null;
+        employee_id?: string | null;
+        job_title?: string | null;
+        user?: { first_name: string; last_name: string; email: string };
+    };
     script?: { id: number; uuid?: string; title: string; scheduled_at: string | null };
     blocked_by_task?: BlockerTask | null;
     blocking_tasks?: BlockingTask[];
@@ -110,11 +122,18 @@ export default function HRTasksShow({ task, canManageTask = false, canUpdateStat
                                     </dd>
                                 </>
                             )}
-                            {task.assignee?.user && (
+                            {task.assignee && (
                                 <>
                                     <dt className="text-muted-foreground">Assignee</dt>
                                     <dd>
-                                        {task.assignee.user.first_name} {task.assignee.user.last_name} ({task.assignee.user.email})
+                                        {task.assignee.user ? (
+                                            <>
+                                                {task.assignee.user.first_name} {task.assignee.user.last_name} (
+                                                {task.assignee.user.email})
+                                            </>
+                                        ) : (
+                                            formatTaskAssigneeLabel(task.assignee)
+                                        )}
                                     </dd>
                                 </>
                             )}
@@ -163,8 +182,8 @@ export default function HRTasksShow({ task, canManageTask = false, canUpdateStat
                                         </Link>
                                         <span className="text-muted-foreground text-sm ml-1">
                                             ({task.blocked_by_task.status}
-                                            {task.blocked_by_task.assignee?.user
-                                                ? ` · assigned to ${task.blocked_by_task.assignee.user.first_name} ${task.blocked_by_task.assignee.user.last_name}`
+                                            {task.blocked_by_task.assignee
+                                                ? ` · assigned to ${formatTaskAssigneeLabel(task.blocked_by_task.assignee)}`
                                                 : ''}
                                             )
                                         </span>

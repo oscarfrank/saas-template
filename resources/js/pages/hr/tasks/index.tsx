@@ -20,6 +20,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { toast } from 'sonner';
+import { formatTaskAssigneeLabel } from '@/utils/task-assignee';
 
 export type TaskItem = {
     id: number;
@@ -30,7 +31,13 @@ export type TaskItem = {
     due_at: string | null;
     completed_at: string | null;
     project?: { id: number; name: string };
-    assignee?: { id: number; user?: { first_name: string; last_name: string } };
+    assignee?: {
+        id: number;
+        kind?: string | null;
+        employee_id?: string | null;
+        job_title?: string | null;
+        user?: { first_name: string; last_name: string };
+    };
     script?: { id: number; title: string; scheduled_at: string | null };
     blocked_by_task?: { id: number; uuid: string; title: string; status: string } | null;
 };
@@ -59,9 +66,7 @@ const STATUS_COLUMNS: { key: string; label: string }[] = [
 ];
 
 function assigneeName(t: TaskItem): string {
-    return t.assignee?.user
-        ? `${t.assignee.user.first_name || ''} ${t.assignee.user.last_name || ''}`.trim() || '—'
-        : '—';
+    return formatTaskAssigneeLabel(t.assignee);
 }
 
 export default function HRTasksIndex({ tasks, allTasks, staffOptions, projectOptions, filters, tasksView = 'all', currentStaffId = null, canManageAnyTask = false }: Props) {

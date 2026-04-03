@@ -1,0 +1,1 @@
+const u=new Set(["create","proposals","demo-chain"]);function o(n,r){if(typeof n.uuid=="string"&&n.uuid.length>0)return n.uuid;const e=r.match(/\/worker-agents\/([^/]+)\/edit(?:\?|#|$|\/)/);if(e!=null&&e[1])return e[1];const t=r.match(/\/worker-agents\/([^/?#]+)/);return t!=null&&t[1]&&!u.has(t[1])?t[1]:null}export{o as r};

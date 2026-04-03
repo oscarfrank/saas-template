@@ -9,9 +9,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\HR\Models\Task;
 use Modules\HR\Models\Project;
 use Modules\HR\Models\Staff;
+use Modules\HR\Models\Task;
 use Modules\Script\Models\Script;
 
 class TaskController extends Controller
@@ -26,6 +26,7 @@ class TaskController extends Controller
         $staff = Staff::where('tenant_id', tenant('id'))
             ->where('user_id', auth()->id())
             ->first();
+
         return $staff?->id;
     }
 
@@ -44,6 +45,7 @@ class TaskController extends Controller
     private function isAssignee(Task $task): bool
     {
         $staffId = $this->currentStaffId();
+
         return $staffId !== null && (int) $task->assigned_to === (int) $staffId;
     }
 
@@ -58,12 +60,18 @@ class TaskController extends Controller
         $tenantId = tenant('id');
         $view = $request->input('view', 'table');
         $query = Task::query()
-            ->with(['project:id,name', 'assignee.user:id,first_name,last_name,email', 'script:id,title,scheduled_at', 'blockedByTask:id,uuid,title,status'])
+            ->with([
+                'project:id,name',
+                'assignee:id,kind,employee_id,job_title,user_id',
+                'assignee.user:id,first_name,last_name,email',
+                'script:id,title,scheduled_at',
+                'blockedByTask:id,uuid,title,status',
+            ])
             ->where('tenant_id', $tenantId);
 
         $currentStaffId = $this->currentStaffId();
         $tasksViewAll = $this->canViewAllTasks();
-        if (!$tasksViewAll) {
+        if (! $tasksViewAll) {
             if ($currentStaffId === null) {
                 $query->whereRaw('1 = 0');
             } else {
@@ -73,7 +81,7 @@ class TaskController extends Controller
 
         if ($request->filled('search')) {
             $search = trim($request->search);
-            $query->where('title', 'like', '%' . $search . '%');
+            $query->where('title', 'like', '%'.$search.'%');
         }
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -117,7 +125,7 @@ class TaskController extends Controller
         }
 
         $staffOptions = Staff::where('tenant_id', $tenantId)->with('user:id,first_name,last_name')->orderBy('id')->get()
-            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name . ' ' . $s->user->last_name) : 'Staff #' . $s->id]);
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name.' '.$s->user->last_name) : 'Staff #'.$s->id]);
         $projectOptions = Project::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('hr/tasks/index', [
@@ -136,13 +144,14 @@ class TaskController extends Controller
     {
         $tenantId = tenant('id');
         $staff = Staff::where('tenant_id', $tenantId)->with('user:id,first_name,last_name,email')->orderBy('id')->get()
-            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name . ' ' . $s->user->last_name) : 'Staff #' . $s->id]);
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name.' '.$s->user->last_name) : 'Staff #'.$s->id]);
         $projects = Project::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $scripts = Script::where('tenant_id', $tenantId)->orderBy('title')->get(['id', 'title', 'scheduled_at'])->map(fn ($s) => [
             'id' => $s->id, 'title' => $s->title, 'scheduled_at' => $s->scheduled_at?->toIso8601String(),
         ]);
         $taskOptions = Task::where('tenant_id', $tenantId)->orderBy('title')->get(['id', 'uuid', 'title'])
             ->map(fn ($t) => ['id' => $t->id, 'uuid' => $t->uuid, 'title' => $t->title]);
+
         return Inertia::render('hr/tasks/create', [
             'staff' => $staff,
             'projects' => $projects,
@@ -173,7 +182,7 @@ class TaskController extends Controller
         $validated['assigned_to'] = $request->filled('assigned_to') ? $request->input('assigned_to') : null;
         $validated['script_id'] = $request->filled('script_id') ? $request->input('script_id') : null;
         $validated['blocked_by_task_id'] = $request->filled('blocked_by_task_id') ? $request->input('blocked_by_task_id') : null;
-        if (!$this->canViewAllTasks()) {
+        if (! $this->canViewAllTasks()) {
             $staffId = $this->currentStaffId();
             if ($staffId === null) {
                 abort(403, 'You must be a staff member to create tasks.');
@@ -181,6 +190,7 @@ class TaskController extends Controller
             $validated['assigned_to'] = $staffId;
         }
         $task = Task::create($validated);
+
         return redirect()->route('hr.tasks.show', ['tenant' => tenant('slug'), 'task' => $task->uuid])
             ->with('success', 'Task created.');
     }
@@ -190,21 +200,24 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canViewAllTasks() && !$this->isAssignee($task)) {
+        if (! $this->canViewAllTasks() && ! $this->isAssignee($task)) {
             abort(403, 'You can only view tasks assigned to you.');
         }
         $task->load([
             'project',
+            'assignee:id,kind,employee_id,job_title,user_id',
             'assignee.user:id,first_name,last_name,email',
             'script:id,uuid,title,scheduled_at',
             'blockedByTask:id,uuid,title,status,assigned_to',
+            'blockedByTask.assignee:id,kind,employee_id,job_title,user_id',
             'blockedByTask.assignee.user:id,first_name,last_name',
             'blockingTasks:id,uuid,title,status',
         ]);
+
         return Inertia::render('hr/tasks/show', [
             'task' => $task,
             'canManageTask' => $this->canManageTask($task),
-            'canUpdateStatusOnly' => !$this->canViewAllTasks() && $this->isAssignee($task),
+            'canUpdateStatusOnly' => ! $this->canViewAllTasks() && $this->isAssignee($task),
         ]);
     }
 
@@ -213,18 +226,19 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canManageTask($task)) {
+        if (! $this->canManageTask($task)) {
             abort(403, 'Only admins can edit and reschedule tasks.');
         }
         $tenantId = tenant('id');
         $staff = Staff::where('tenant_id', $tenantId)->with('user:id,first_name,last_name')->orderBy('id')->get()
-            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name . ' ' . $s->user->last_name) : 'Staff #' . $s->id]);
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->user ? trim($s->user->first_name.' '.$s->user->last_name) : 'Staff #'.$s->id]);
         $projects = Project::where('tenant_id', $tenantId)->orderBy('name')->get(['id', 'name']);
         $scripts = Script::where('tenant_id', $tenantId)->orderBy('title')->get(['id', 'title', 'scheduled_at'])->map(fn ($s) => [
             'id' => $s->id, 'title' => $s->title, 'scheduled_at' => $s->scheduled_at?->toIso8601String(),
         ]);
         $taskOptions = Task::where('tenant_id', $tenantId)->where('id', '!=', $task->id)->orderBy('title')->get(['id', 'uuid', 'title'])
             ->map(fn ($t) => ['id' => $t->id, 'uuid' => $t->uuid, 'title' => $t->title]);
+
         return Inertia::render('hr/tasks/edit', [
             'task' => $task,
             'staff' => $staff,
@@ -239,7 +253,7 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canManageTask($task)) {
+        if (! $this->canManageTask($task)) {
             abort(403, 'Only admins can edit tasks.');
         }
         $validated = $request->validate([
@@ -272,6 +286,7 @@ class TaskController extends Controller
         $validated['script_id'] = $request->filled('script_id') ? $request->input('script_id') : null;
         $validated['blocked_by_task_id'] = $blockedBy;
         $task->update($validated);
+
         return redirect()->route('hr.tasks.show', ['tenant' => tenant('slug'), 'task' => $task->uuid])
             ->with('success', 'Task updated.');
     }
@@ -281,10 +296,11 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canManageTask($task)) {
+        if (! $this->canManageTask($task)) {
             abort(403, 'Only admins can delete tasks.');
         }
         $task->delete();
+
         return redirect()->route('hr.tasks.index', ['tenant' => tenant('slug')])
             ->with('success', 'Task deleted.');
     }
@@ -294,7 +310,7 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canManageTask($task)) {
+        if (! $this->canManageTask($task)) {
             return response()->json(['message' => 'Only admins can reschedule tasks.'], 403);
         }
         $validated = $request->validate(['due_at' => 'required|date']);
@@ -306,6 +322,7 @@ class TaskController extends Controller
             }
         }
         $task->update(['due_at' => $dueAt]);
+
         return response()->json(['success' => true, 'task' => $task->fresh()]);
     }
 
@@ -314,7 +331,7 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canUpdateStatus($task)) {
+        if (! $this->canUpdateStatus($task)) {
             return response()->json(['message' => 'You can only update status for your own tasks.'], 403);
         }
         $validated = $request->validate(['status' => 'required|string|in:todo,in_progress,done,cancelled']);
@@ -325,7 +342,15 @@ class TaskController extends Controller
             $update['completed_at'] = null;
         }
         $task->update($update);
-        return response()->json(['success' => true, 'task' => $task->fresh(['project:id,name', 'assignee.user:id,first_name,last_name,email'])]);
+
+        return response()->json([
+            'success' => true,
+            'task' => $task->fresh([
+                'project:id,name',
+                'assignee:id,kind,employee_id,job_title,user_id',
+                'assignee.user:id,first_name,last_name,email',
+            ]),
+        ]);
     }
 
     public function complete(Request $request, Task $task): RedirectResponse
@@ -333,7 +358,7 @@ class TaskController extends Controller
         if ($task->tenant_id !== tenant('id')) {
             abort(404);
         }
-        if (!$this->canUpdateStatus($task)) {
+        if (! $this->canUpdateStatus($task)) {
             return back()->withErrors(['task' => 'You can only complete your own tasks.']);
         }
         $completedAt = now();
@@ -344,6 +369,7 @@ class TaskController extends Controller
             }
         }
         $task->update(['status' => 'done', 'completed_at' => $completedAt]);
+
         return back()->with('success', 'Task marked complete.');
     }
 }

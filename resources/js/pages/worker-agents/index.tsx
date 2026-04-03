@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
-import { Bot, ClipboardList, Plus } from 'lucide-react';
+import { Bot, ClipboardList, GitBranch, Plus } from 'lucide-react';
 
 export type WorkerAgentListItem = {
     id: number;
@@ -49,6 +49,12 @@ export default function WorkerAgentsIndex({ workers, pending_proposals_count }: 
                             <Link href={tenantRouter.route('worker-agents.proposals.index')}>
                                 <ClipboardList className="mr-2 size-4" />
                                 Proposals{pending_proposals_count > 0 ? ` (${pending_proposals_count})` : ''}
+                            </Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                            <Link href={tenantRouter.route('worker-agents.demo-chain')}>
+                                <GitBranch className="mr-2 size-4" />
+                                Demo chain
                             </Link>
                         </Button>
                         <Button asChild>

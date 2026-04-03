@@ -1,6 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { resolveWorkerAgentRouteParam } from '@/utils/worker-agent-route';
-import { Bot, Pencil, Play, Pause, PlayCircle, Trash2 } from 'lucide-react';
+import { Bot, Loader2, Pencil, Play, Pause, PlayCircle, Trash2 } from 'lucide-react';
 
 type RunRow = {
     id: number;
@@ -97,7 +99,19 @@ interface Props {
 export default function WorkerAgentsShow({ worker, runs, messages, incoming_handoffs, latest_run_events, memories }: Props) {
     const tenantRouter = useTenantRouter();
     const page = usePage();
+    const { flash } = page.props as { flash?: { success?: string; error?: string } };
     const wa = resolveWorkerAgentRouteParam(worker, page.url) ?? worker.uuid;
+
+    const [runNowPending, setRunNowPending] = useState(false);
+
+    useEffect(() => {
+        if (flash?.success) {
+            toast.success(flash.success);
+        }
+        if (flash?.error) {
+            toast.error(flash.error);
+        }
+    }, [flash?.success, flash?.error]);
 
     const memoryForm = useForm({ body: '' });
 
@@ -122,7 +136,17 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
     ];
 
     const runNow = () => {
-        router.post(tenantRouter.route('worker-agents.run', { worker_agent: wa }));
+        setRunNowPending(true);
+        tenantRouter.post(
+            'worker-agents.run',
+            {},
+            { worker_agent: wa },
+            {
+                preserveScroll: true,
+                onFinish: () => setRunNowPending(false),
+                onError: () => toast.error('Could not queue run. Check your connection and try again.'),
+            }
+        );
     };
 
     const pause = () => {
@@ -183,8 +207,16 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                                 Pause
                             </Button>
                         )}
-                        <Button size="sm" onClick={runNow} disabled={!worker.enabled}>
-                            <Play className="mr-1 size-4" />
+                        <Button
+                            size="sm"
+                            onClick={runNow}
+                            disabled={!worker.enabled || runNowPending}
+                        >
+                            {runNowPending ? (
+                                <Loader2 className="mr-1 size-4 animate-spin" />
+                            ) : (
+                                <Play className="mr-1 size-4" />
+                            )}
                             Run now
                         </Button>
                     </div>
@@ -380,7 +412,11 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                 <Card>
                     <CardHeader>
                         <CardTitle>Recent runs</CardTitle>
-                        <CardDescription>History of queued and completed runs.</CardDescription>
+                        <CardDescription>
+                            History of queued and completed runs. Runs execute in the background; use{' '}
+                            <code className="rounded bg-muted px-1 py-0.5 text-xs">composer dev</code> (includes a queue
+                            worker) so manual runs are processed.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {runs.length === 0 ? (

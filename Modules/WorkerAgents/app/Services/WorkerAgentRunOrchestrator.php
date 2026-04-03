@@ -7,6 +7,7 @@ namespace Modules\WorkerAgents\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\HR\Models\Task;
+use Modules\WorkerAgents\Jobs\RunWorkerAgentJob;
 use Modules\WorkerAgents\Models\WorkerAgent;
 use Modules\WorkerAgents\Models\WorkerAgentHandoff;
 use Modules\WorkerAgents\Models\WorkerAgentMessage;
@@ -38,11 +39,12 @@ final class WorkerAgentRunOrchestrator
 
         $goals = $this->llm->goalsForWorker($worker);
         $memories = $this->llm->memoriesForWorker($worker);
-        $plan = $this->llm->plan($worker, [
+        $planning = $this->llm->planningContextForWorker($worker);
+        $plan = $this->llm->plan($worker, array_merge([
             'trigger' => $run->trigger,
             'goals' => $goals,
             'memories' => $memories,
-        ]);
+        ], $planning));
 
         $summary = $plan['summary'];
         $actions = $plan['actions'];
@@ -63,6 +65,9 @@ final class WorkerAgentRunOrchestrator
         $proposalsCreated = 0;
         $tasksApplied = 0;
         $handoffsCreated = 0;
+        $tasksCompleted = 0;
+        $handoffFollowupsDispatched = 0;
+        $lastCreatedTaskId = null;
 
         foreach ($actions as $action) {
             $type = isset($action['type']) ? (string) $action['type'] : '';
@@ -84,20 +89,33 @@ final class WorkerAgentRunOrchestrator
                             'title' => $payload['title'] ?? '',
                         ]);
                     } else {
-                        $this->applier->applyTaskCreate($worker, $payload);
+                        $createdTask = $this->applier->applyTaskCreate($worker, $payload);
                         $tasksApplied++;
+                        $lastCreatedTaskId = $createdTask->id;
                         $this->logEvent($run, WorkerAgentRunEventLevel::Info, 'task.created', 'Created HR task.', [
                             'title' => $payload['title'] ?? '',
+                            'hr_task_id' => $createdTask->id,
                         ]);
                     }
                 } elseif ($type === 'handoff_request') {
-                    $created = $this->createHandoffFromAction($worker, $run, $action);
+                    [$created, $dispatchedFollowup] = $this->createHandoffFromAction($worker, $run, $action, $lastCreatedTaskId);
                     if ($created !== null) {
                         $handoffsCreated++;
+                        if ($dispatchedFollowup) {
+                            $handoffFollowupsDispatched++;
+                        }
                         $this->logEvent($run, WorkerAgentRunEventLevel::Info, 'handoff.created', 'Created handoff request.', [
                             'uuid' => $created->uuid,
+                            'auto_accept' => $dispatchedFollowup,
                         ]);
                     }
+                } elseif ($type === 'task_complete') {
+                    $payload = $this->normalizeTaskCompletePayload($action);
+                    $this->applier->applyTaskComplete($worker, $payload);
+                    $tasksCompleted++;
+                    $this->logEvent($run, WorkerAgentRunEventLevel::Info, 'task.completed', 'Marked HR task done.', [
+                        'hr_task_id' => $payload['hr_task_id'] ?? null,
+                    ]);
                 }
             } catch (\Throwable $e) {
                 Log::warning('WorkerAgentRunOrchestrator action failed', [
@@ -118,7 +136,9 @@ final class WorkerAgentRunOrchestrator
             'goal_ids' => $worker->organization_goal_ids ?? [],
             'proposals_created' => $proposalsCreated,
             'tasks_applied' => $tasksApplied,
+            'tasks_completed' => $tasksCompleted,
             'handoffs_created' => $handoffsCreated,
+            'handoff_followups_dispatched' => $handoffFollowupsDispatched,
             'llm_error' => $rawError,
         ];
 
@@ -151,14 +171,31 @@ final class WorkerAgentRunOrchestrator
 
     /**
      * @param  array<string, mixed>  $action
+     * @return array{hr_task_id: int, note?: string}
      */
-    private function createHandoffFromAction(WorkerAgent $worker, WorkerAgentRun $run, array $action): ?WorkerAgentHandoff
+    private function normalizeTaskCompletePayload(array $action): array
+    {
+        $hrTaskId = isset($action['hr_task_id']) ? (int) $action['hr_task_id'] : 0;
+        $note = isset($action['note']) ? trim((string) $action['note']) : '';
+
+        $out = ['hr_task_id' => $hrTaskId];
+        if ($note !== '') {
+            $out['note'] = $note;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{0: WorkerAgentHandoff|null, 1: bool}
+     */
+    private function createHandoffFromAction(WorkerAgent $worker, WorkerAgentRun $run, array $action, ?int $lastCreatedTaskId): array
     {
         $tenantId = (string) $worker->tenant_id;
 
         $toId = isset($action['to_worker_agent_id']) ? (int) $action['to_worker_agent_id'] : 0;
         if ($toId <= 0 || $toId === $worker->id) {
-            return null;
+            return [null, false];
         }
 
         $target = WorkerAgent::query()
@@ -166,11 +203,13 @@ final class WorkerAgentRunOrchestrator
             ->whereKey($toId)
             ->first();
         if ($target === null) {
-            return null;
+            return [null, false];
         }
 
+        $autoAccept = isset($action['auto_accept']) && filter_var($action['auto_accept'], FILTER_VALIDATE_BOOLEAN);
+
         $taskId = null;
-        if (isset($action['hr_task_id']) && $action['hr_task_id'] !== null) {
+        if (isset($action['hr_task_id']) && $action['hr_task_id'] !== null && $action['hr_task_id'] !== '') {
             $tid = (int) $action['hr_task_id'];
             $ok = Task::query()
                 ->where('tenant_id', $worker->tenant_id)
@@ -179,11 +218,13 @@ final class WorkerAgentRunOrchestrator
             if ($ok) {
                 $taskId = $tid;
             }
+        } elseif ($lastCreatedTaskId !== null) {
+            $taskId = $lastCreatedTaskId;
         }
 
         $message = isset($action['message']) ? trim((string) $action['message']) : '';
 
-        return DB::transaction(function () use ($worker, $run, $target, $taskId, $message, $tenantId) {
+        $handoff = DB::transaction(function () use ($worker, $run, $target, $taskId, $message, $tenantId, $autoAccept) {
             $handoff = WorkerAgentHandoff::query()->create([
                 'tenant_id' => $tenantId,
                 'from_worker_agent_id' => $worker->id,
@@ -194,8 +235,23 @@ final class WorkerAgentRunOrchestrator
                 'worker_agent_run_id' => $run->id,
             ]);
 
+            if ($autoAccept) {
+                $handoff->update([
+                    'status' => WorkerAgentHandoffStatus::Accepted,
+                    'resolved_at' => now(),
+                    'resolved_by_user_id' => null,
+                ]);
+                if ($taskId !== null && $target->staff_id !== null) {
+                    Task::query()
+                        ->where('tenant_id', $tenantId)
+                        ->whereKey($taskId)
+                        ->update(['assigned_to' => $target->staff_id]);
+                }
+            }
+
             $body = 'Handoff from '.$worker->name.' to '.$target->name.'.'
-                .($message !== '' ? "\n\n".$message : '');
+                .($message !== '' ? "\n\n".$message : '')
+                .($autoAccept ? "\n\n(Auto-accepted for agent-to-agent flow.)" : '');
 
             WorkerAgentMessage::query()->create([
                 'tenant_id' => $tenantId,
@@ -206,11 +262,18 @@ final class WorkerAgentRunOrchestrator
                 'metadata' => [
                     'handoff_uuid' => $handoff->uuid,
                     'from_worker_agent_uuid' => $worker->uuid,
+                    'auto_accept' => $autoAccept,
                 ],
             ]);
 
             return $handoff;
         });
+
+        if ($autoAccept) {
+            RunWorkerAgentJob::dispatch($tenantId, $target->id, 'handoff_followup');
+        }
+
+        return [$handoff, $autoAccept];
     }
 
     private function logEvent(

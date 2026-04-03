@@ -1,5 +1,5 @@
 /** Segments under `worker-agents/` that are not a worker UUID. */
-const RESERVED_SEGMENTS = new Set(['create', 'proposals']);
+const RESERVED_SEGMENTS = new Set(['create', 'proposals', 'demo-chain']);
 
 /**
  * Resolve the `worker_agent` route parameter for Ziggy. Prefer `worker.uuid` from Inertia;

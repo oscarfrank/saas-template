@@ -13,6 +13,7 @@ use Inertia\Response;
 use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Support\CortexLlmModelCatalog;
 use Modules\Cortex\Support\CortexLlmProvider;
+use Modules\HR\Models\Department;
 use Modules\HR\Models\OrganizationGoal;
 use Modules\HR\Models\Project;
 use Modules\HR\Models\Staff;
@@ -94,7 +95,8 @@ class WorkerAgentController extends Controller
         $this->ensureWorkerAgentUuid($worker_agent);
 
         $worker_agent->load([
-            'staff:id,uuid,employee_id,job_title,department,kind,reports_to_staff_id',
+            'staff:id,uuid,employee_id,job_title,department_id,kind,reports_to_staff_id',
+            'staff.department:id,name',
             'staff.reportsTo:id,uuid,job_title,kind,user_id',
             'staff.reportsTo.user:id,first_name,last_name,email',
         ]);
@@ -209,7 +211,7 @@ class WorkerAgentController extends Controller
 
     public function edit(WorkerAgent $worker_agent): Response
     {
-        $worker_agent->load('staff');
+        $worker_agent->load(['staff', 'staff.department']);
         $this->ensureWorkerAgentUuid($worker_agent);
 
         $props = $this->formSharedProps($worker_agent->staff_id);
@@ -292,6 +294,7 @@ class WorkerAgentController extends Controller
             ->get(['id', 'name']);
 
         return [
+            'departments' => Department::optionsForSelect((string) tenant('id')),
             'goals' => $goals,
             'projects' => $projects,
             'reportingOptions' => StaffReportingOptions::forTenant((string) tenant('id'), $exceptStaffId),
@@ -330,7 +333,7 @@ class WorkerAgentController extends Controller
 
         return [
             'name' => $worker->name,
-            'department' => $worker->staff?->department ?? 'Automation',
+            'department_id' => $worker->staff?->department_id !== null ? (string) $worker->staff->department_id : '',
             'reports_to_staff_id' => $worker->staff?->reports_to_staff_id,
             'skills' => $worker->skills ?? '',
             'capabilities' => $worker->capabilities ?? [],
@@ -412,6 +415,8 @@ class WorkerAgentController extends Controller
      */
     private function validated(Request $request, ?int $ignoreWorkerId = null): array
     {
+        $this->normalizeWorkerAgentDepartmentInput($request);
+
         $tenantId = (string) tenant('id');
         $goalRule = Rule::exists('hr_organization_goals', 'id')->where('tenant_id', $tenantId);
         $workerRule = Rule::exists('worker_agents', 'id')->where('tenant_id', $tenantId);
@@ -443,7 +448,11 @@ class WorkerAgentController extends Controller
             'enabled' => ['nullable', 'boolean'],
             'llm_provider' => ['nullable', 'string', Rule::in(['openai', 'anthropic'])],
             'chat_model' => ['nullable', 'string', 'max:128'],
-            'department' => ['nullable', 'string', 'max:128'],
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('hr_departments', 'id')->where('tenant_id', $tenantId),
+            ],
         ]);
 
         $validated['reports_to_staff_id'] = isset($validated['reports_to_staff_id'])
@@ -546,6 +555,16 @@ class WorkerAgentController extends Controller
         unset($validated['schedule_cron_custom']);
 
         return $validated;
+    }
+
+    private function normalizeWorkerAgentDepartmentInput(Request $request): void
+    {
+        $v = $request->input('department_id');
+        if ($v === '' || $v === null) {
+            $request->merge(['department_id' => null]);
+        } elseif (is_numeric($v)) {
+            $request->merge(['department_id' => (int) $v]);
+        }
     }
 
     private function ensureWorkerAgentUuid(WorkerAgent $worker): void

@@ -15,6 +15,11 @@ class Staff extends Model
 
     protected $table = 'hr_staff';
 
+    /** @var list<string> Legacy string column may remain on SQLite until dropped in a non-SQLite deploy. */
+    protected $hidden = [
+        'department',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'kind',
@@ -22,7 +27,7 @@ class Staff extends Model
         'user_id',
         'uuid',
         'employee_id',
-        'department',
+        'department_id',
         'job_title',
         'salary',
         'salary_currency',
@@ -71,6 +76,11 @@ class Staff extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 
     public function reportsTo(): BelongsTo

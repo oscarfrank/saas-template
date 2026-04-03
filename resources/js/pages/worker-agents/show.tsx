@@ -79,7 +79,7 @@ interface WorkerShow {
         uuid: string;
         employee_id: string | null;
         job_title: string | null;
-        department: string | null;
+        department?: { id: number; name: string } | null;
         kind: string;
     } | null;
 }
@@ -159,7 +159,7 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                         <p className="text-muted-foreground mt-1 text-sm">
                             Digital staff member · Config v{worker.config_version} · Seat: {worker.staff?.employee_id ?? '—'}
                             {worker.staff?.job_title ? ` · ${worker.staff.job_title}` : ''}
-                            {worker.staff?.department ? ` · ${worker.staff.department}` : ''}
+                            {worker.staff?.department?.name ? ` · ${worker.staff.department.name}` : ''}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">

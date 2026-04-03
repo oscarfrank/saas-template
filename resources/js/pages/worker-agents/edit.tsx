@@ -5,6 +5,7 @@ import { useTenantRouter } from '@/hooks/use-tenant-router';
 import { resolveWorkerAgentRouteParam } from '@/utils/worker-agent-route';
 import {
     WorkerAgentForm,
+    type DepartmentOption,
     type GoalOption,
     type WorkerOption,
     type ProjectOption,
@@ -24,6 +25,7 @@ interface WorkerSummary {
 interface Props {
     worker: WorkerSummary;
     workerForm: Partial<WorkerFormFields>;
+    departments: DepartmentOption[];
     goals: GoalOption[];
     projects: ProjectOption[];
     reportingOptions: ReportingOption[];
@@ -36,6 +38,7 @@ interface Props {
 export default function WorkerAgentsEdit({
     worker,
     workerForm,
+    departments,
     goals,
     projects,
     reportingOptions,
@@ -77,6 +80,7 @@ export default function WorkerAgentsEdit({
                     mode="edit"
                     workerUuid={workerAgentKey ?? undefined}
                     currentWorkerId={worker.id}
+                    departments={departments}
                     goals={goals}
                     projects={projects}
                     reportingOptions={reportingOptions}

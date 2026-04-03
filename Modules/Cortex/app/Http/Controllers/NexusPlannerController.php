@@ -289,8 +289,9 @@ class NexusPlannerController extends Controller
             ->with([
                 'user:id,first_name,last_name',
                 'user.roles:id,name,level',
+                'department:id,name',
             ])
-            ->get(['id', 'department', 'job_title', 'user_id']);
+            ->get(['id', 'department_id', 'job_title', 'user_id']);
 
         return $staff->map(function (Staff $s) {
             $name = $s->user ? trim(($s->user->first_name ?? '').' '.($s->user->last_name ?? '')) : ('Staff #'.$s->id);
@@ -302,7 +303,7 @@ class NexusPlannerController extends Controller
             return [
                 'id' => $s->id,
                 'name' => $name,
-                'department' => $s->department,
+                'department' => $s->department?->name,
                 'job_title' => $s->job_title,
                 'roles' => $roles,
             ];

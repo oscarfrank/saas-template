@@ -53,7 +53,8 @@ interface Staff {
     user?: User;
     reports_to_staff_id: number | null;
     employee_id: string | null;
-    department: string | null;
+    department_id: number | null;
+    department?: { id: number; name: string } | null;
     job_title: string | null;
     salary: string | null;
     salary_currency: string;
@@ -78,9 +79,15 @@ interface ReportingOption {
     kind: string;
 }
 
+interface DepartmentOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     staff: Staff;
     reportingOptions: ReportingOption[];
+    departments: DepartmentOption[];
 }
 
 function toFormAllowance(a: AllowanceDeduction): { name: string; amount: string } {
@@ -97,7 +104,7 @@ function toDateInputValue(value: string | null | undefined): string {
     return d.toISOString().slice(0, 10);
 }
 
-function StaffEditForm({ staff, reportingOptions }: Props) {
+function StaffEditForm({ staff, reportingOptions, departments }: Props) {
     const tenantRouter = useTenantRouter();
     const name = staff.user
         ? `${staff.user.first_name || ''} ${staff.user.last_name || ''}`.trim() || staff.user.email
@@ -105,7 +112,7 @@ function StaffEditForm({ staff, reportingOptions }: Props) {
 
     const { data, setData, processing, errors } = useForm({
         employee_id: staff.employee_id ?? '',
-        department: staff.department ?? '',
+        department_id: staff.department_id != null ? String(staff.department_id) : '',
         reports_to_staff_id: staff.reports_to_staff_id != null ? String(staff.reports_to_staff_id) : '',
         job_title: staff.job_title ?? '',
         salary: staff.salary ?? '',
@@ -142,6 +149,7 @@ function StaffEditForm({ staff, reportingOptions }: Props) {
             _method: 'PUT',
             ...data,
             reports_to_staff_id: data.reports_to_staff_id === '' ? null : Number(data.reports_to_staff_id),
+            department_id: data.department_id === '' ? null : Number(data.department_id),
             allowances: filteredAllowances,
             deductions: filteredDeductions,
             salary: data.salary === '' ? null : data.salary,
@@ -261,13 +269,23 @@ function StaffEditForm({ staff, reportingOptions }: Props) {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="department">Department</Label>
-                                                <Input
-                                                    id="department"
-                                                    value={data.department}
-                                                    onChange={(e) => setData('department', e.target.value)}
-                                                    className="bg-background"
-                                                />
+                                                <Label htmlFor="department_id">Department</Label>
+                                                <Select
+                                                    value={data.department_id === '' ? 'none' : String(data.department_id)}
+                                                    onValueChange={(v) => setData('department_id', v === 'none' ? '' : v)}
+                                                >
+                                                    <SelectTrigger id="department_id" className="bg-background">
+                                                        <SelectValue placeholder="Select department" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {departments.map((d) => (
+                                                            <SelectItem key={d.id} value={String(d.id)}>
+                                                                {d.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                         </div>
                                         <div className="space-y-2">

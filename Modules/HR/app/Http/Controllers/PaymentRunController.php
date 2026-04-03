@@ -3,6 +3,7 @@
 namespace Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -10,7 +11,6 @@ use Inertia\Response;
 use Modules\HR\Models\PaymentRun;
 use Modules\HR\Models\PaymentRunItem;
 use Modules\HR\Models\Staff;
-use Carbon\Carbon;
 
 class PaymentRunController extends Controller
 {
@@ -38,13 +38,13 @@ class PaymentRunController extends Controller
         $tenantId = tenant('id');
         $staff = Staff::where('tenant_id', $tenantId)
             ->active()
-            ->with('user:id,first_name,last_name,email')
+            ->with(['user:id,first_name,last_name,email', 'department:id,name'])
             ->get()
             ->map(function (Staff $s) {
                 return [
                     'id' => $s->id,
                     'employee_id' => $s->employee_id,
-                    'department' => $s->department,
+                    'department' => $s->department?->name,
                     'job_title' => $s->job_title,
                     'salary' => $s->salary,
                     'salary_currency' => $s->salary_currency ?? 'USD',
@@ -53,6 +53,7 @@ class PaymentRunController extends Controller
                     'user' => $s->user,
                 ];
             });
+
         return Inertia::render('hr/payments/create', [
             'staff' => $staff,
         ]);
@@ -166,6 +167,7 @@ class PaymentRunController extends Controller
             'paid_at' => now(),
             'payment_method' => $method,
         ]);
+
         return back()->with('success', 'Payment run marked as processed. All pending items are now paid.');
     }
 
@@ -191,6 +193,7 @@ class PaymentRunController extends Controller
             'paid_at' => now(),
             'payment_method' => $validated['payment_method'],
         ]);
+
         return back()->with('success', 'Payment marked as paid.');
     }
 
@@ -204,6 +207,7 @@ class PaymentRunController extends Controller
         }
         if ($paymentRun->status === 'draft') {
             $paymentRun->delete();
+
             return redirect()->route('hr.payments.index', ['tenant' => tenant('slug')])
                 ->with('success', 'Payment run deleted.');
         }
@@ -216,6 +220,7 @@ class PaymentRunController extends Controller
             return back()->withErrors(['status' => 'Only the organization owner can delete a completed payment run.']);
         }
         $paymentRun->delete();
+
         return redirect()->route('hr.payments.index', ['tenant' => tenant('slug')])
             ->with('success', 'Payment run deleted.');
     }
@@ -299,6 +304,7 @@ class PaymentRunController extends Controller
         if (! $prorate && $frequency === 'monthly') {
             $gross = round($salary + array_sum(array_column($allowances, 'amount')), 2);
             $deductionsTotal = (float) array_sum(array_column($deductions, 'amount'));
+
             return [
                 'gross' => $gross,
                 'deductions_total' => round($deductionsTotal, 2),

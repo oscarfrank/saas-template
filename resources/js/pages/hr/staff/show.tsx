@@ -95,7 +95,7 @@ interface StaffEvent {
 interface StaffPositionHistoryItem {
     id: number;
     job_title: string | null;
-    department: string | null;
+    department?: { id: number; name: string } | null;
     started_at: string | null;
     ended_at: string | null;
     salary: string | null;
@@ -109,7 +109,8 @@ interface Staff {
     uuid: string;
     user_id: number;
     employee_id: string | null;
-    department: string | null;
+    department_id: number | null;
+    department?: { id: number; name: string } | null;
     job_title: string | null;
     salary: string | null;
     salary_currency: string;
@@ -315,10 +316,10 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                                                 {staff.job_title}
                                             </span>
                                         )}
-                                        {staff.department && (
+                                        {staff.department?.name && (
                                             <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                                                 <Building2 className="mr-1.5 h-3.5 w-3.5" />
-                                                {staff.department}
+                                                {staff.department.name}
                                             </span>
                                         )}
                                     </div>
@@ -705,7 +706,7 @@ export default function HRStaffShow({ staff, eventTypeLabels, canDeleteEvents = 
                                                 {positionHistory.map((p) => (
                                                     <tr key={p.id} className="border-b last:border-0">
                                                         <td className="py-2.5 font-medium">{p.job_title ?? '—'}</td>
-                                                        <td className="py-2.5 text-muted-foreground">{p.department ?? '—'}</td>
+                                                        <td className="py-2.5 text-muted-foreground">{p.department?.name ?? '—'}</td>
                                                         <td className="py-2.5">{p.started_at ? new Date(p.started_at).toLocaleDateString(undefined, { dateStyle: 'long' }) : '—'}</td>
                                                         <td className="py-2.5">{p.ended_at ? new Date(p.ended_at).toLocaleDateString(undefined, { dateStyle: 'long' }) : '—'}</td>
                                                         <td className="py-2.5">

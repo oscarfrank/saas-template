@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\HR\Http\Controllers\DepartmentController;
 use Modules\HR\Http\Controllers\EvaluationController;
 use Modules\HR\Http\Controllers\OrganizationGoalController;
 use Modules\HR\Http\Controllers\PaymentRunController;
@@ -22,6 +23,12 @@ Route::middleware([
     Route::post('hr/goals', [OrganizationGoalController::class, 'store'])->name('hr.goals.store');
     Route::put('hr/goals/{goal}', [OrganizationGoalController::class, 'update'])->name('hr.goals.update');
     Route::delete('hr/goals/{goal}', [OrganizationGoalController::class, 'destroy'])->name('hr.goals.destroy');
+
+    // Departments (org chart; used by staff & worker agents)
+    Route::get('hr/departments', [DepartmentController::class, 'index'])->name('hr.departments.index');
+    Route::post('hr/departments', [DepartmentController::class, 'store'])->name('hr.departments.store');
+    Route::put('hr/departments/{department}', [DepartmentController::class, 'update'])->name('hr.departments.update');
+    Route::delete('hr/departments/{department}', [DepartmentController::class, 'destroy'])->name('hr.departments.destroy');
 
     // Staff
     Route::get('hr', [StaffController::class, 'index'])->name('hr.staff.index');

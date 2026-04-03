@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
-import { Plus, Search, Users, FolderKanban, ListTodo, DollarSign, Star, ChevronLeft, ChevronRight, Target } from 'lucide-react';
+import { Plus, Search, Users, FolderKanban, ListTodo, DollarSign, Star, ChevronLeft, ChevronRight, Target, Building2 } from 'lucide-react';
 
 interface User {
     id: number;
@@ -19,7 +19,8 @@ interface StaffRecord {
     uuid: string;
     user_id: number;
     employee_id: string | null;
-    department: string | null;
+    department_id: number | null;
+    department?: { id: number; name: string } | null;
     job_title: string | null;
     salary: string | null;
     salary_currency: string;
@@ -105,6 +106,12 @@ export default function HRStaffIndex({ members, pagination, filters }: Props) {
                         </Link>
                     </Button>
                     <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
+                        <Link href={tenantRouter.route('hr.departments.index')}>
+                            <Building2 className="h-6 w-6" />
+                            <span>Departments</span>
+                        </Link>
+                    </Button>
+                    <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
                         <Link href={tenantRouter.route('hr.tasks.index')}>
                             <ListTodo className="h-6 w-6" />
                             <span>Tasks</span>
@@ -155,7 +162,7 @@ export default function HRStaffIndex({ members, pagination, filters }: Props) {
                                                 <tr key={m.user.id} className="border-b last:border-0">
                                                     <td className="p-3">{name(m.user)}</td>
                                                     <td className="p-3">{m.user.email ?? '—'}</td>
-                                                    <td className="p-3">{m.staff?.department ?? '—'}</td>
+                                                    <td className="p-3">{m.staff?.department?.name ?? '—'}</td>
                                                     <td className="p-3">{m.staff?.job_title ?? '—'}</td>
                                                     <td className="p-3 text-right">
                                                         {m.staff?.salary != null

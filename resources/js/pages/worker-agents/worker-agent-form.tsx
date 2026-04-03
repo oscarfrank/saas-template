@@ -11,6 +11,7 @@ import { useLayoutEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SCHEDULE_KIND_OPTIONS, WEEKDAY_OPTIONS } from './schedule-presets';
 
+export type DepartmentOption = { id: number; name: string };
 export type GoalOption = { id: number; uuid: string; title: string };
 export type WorkerOption = { id: number; uuid: string; name: string };
 export type ProjectOption = { id: number; name: string };
@@ -29,7 +30,8 @@ export type LlmMeta = {
 
 export type WorkerFormFields = {
     name: string;
-    department: string;
+    /** hr_departments.id as string for controlled Select */
+    department_id: string;
     reports_to_staff_id: string;
     skills: string;
     capabilities: string[];
@@ -61,7 +63,7 @@ function toggleStr(list: string[], v: string): string[] {
 
 const WORKER_AGENT_FORM_DEFAULTS: WorkerFormFields = {
     name: '',
-    department: 'Automation',
+    department_id: '',
     reports_to_staff_id: '',
     skills: '',
     capabilities: [],
@@ -90,7 +92,8 @@ function mergeWorkerFormState(workerForm: Partial<WorkerFormFields> | undefined)
     // JSON may deserialize nulls; keep controlled inputs as strings / defined arrays.
     merged.name = merged.name ?? '';
     merged.skills = merged.skills ?? '';
-    merged.department = merged.department ?? 'Automation';
+    merged.department_id =
+        w.department_id != null && String(w.department_id) !== '' ? String(w.department_id) : '';
     merged.schedule_time = merged.schedule_time ?? '09:00';
     merged.schedule_cron_custom = merged.schedule_cron_custom ?? '';
     merged.schedule_timezone = merged.schedule_timezone ?? 'UTC';
@@ -122,6 +125,7 @@ function mergeWorkerFormState(workerForm: Partial<WorkerFormFields> | undefined)
 
 export function WorkerAgentForm({
     mode,
+    departments,
     goals,
     projects,
     reportingOptions,
@@ -134,6 +138,7 @@ export function WorkerAgentForm({
     workerUuid,
 }: {
     mode: 'create' | 'edit';
+    departments: DepartmentOption[];
     goals: GoalOption[];
     projects: ProjectOption[];
     reportingOptions: ReportingOption[];
@@ -172,6 +177,7 @@ export function WorkerAgentForm({
 
     transform((raw) => ({
         ...raw,
+        department_id: raw.department_id === '' ? null : Number(raw.department_id),
         reports_to_staff_id: raw.reports_to_staff_id === '' ? null : Number(raw.reports_to_staff_id),
         schedule_day_of_week: raw.schedule_kind === 'weekly' ? Number(raw.schedule_day_of_week) : null,
         max_runs_per_hour: raw.max_runs_per_hour === '' ? null : Number(raw.max_runs_per_hour),
@@ -194,6 +200,7 @@ export function WorkerAgentForm({
     };
 
     const goalsUrl = tenantRouter.route('hr.goals.index');
+    const departmentsUrl = tenantRouter.route('hr.departments.index');
 
     return (
         <form onSubmit={submit} className="space-y-8">
@@ -210,7 +217,13 @@ export function WorkerAgentForm({
             <Card>
                 <CardHeader>
                     <CardTitle>Identity</CardTitle>
-                    <CardDescription>Name and HR seat (automation department).</CardDescription>
+                    <CardDescription>
+                        Name and HR seat. Choose a department from the{' '}
+                        <Link href={departmentsUrl} className="text-primary underline underline-offset-4">
+                            HR catalog
+                        </Link>
+                        .
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
@@ -219,8 +232,34 @@ export function WorkerAgentForm({
                         {errors.name && <p className="text-destructive text-sm">{errors.name}</p>}
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="department">Department (seat)</Label>
-                        <Input id="department" value={data.department} onChange={(e) => setData('department', e.target.value)} />
+                        <Label htmlFor="department_id">Department (seat)</Label>
+                        {departments.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">
+                                No departments yet.{' '}
+                                <Link href={departmentsUrl} className="text-primary underline underline-offset-4">
+                                    Add departments in HR
+                                </Link>{' '}
+                                first; otherwise the server will pick a default.
+                            </p>
+                        ) : (
+                            <Select
+                                value={data.department_id || 'none'}
+                                onValueChange={(v) => setData('department_id', v === 'none' ? '' : v)}
+                            >
+                                <SelectTrigger id="department_id">
+                                    <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Not set (use server default)</SelectItem>
+                                    {departments.map((d) => (
+                                        <SelectItem key={d.id} value={String(d.id)}>
+                                            {d.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        {errors.department_id && <p className="text-destructive text-sm">{errors.department_id}</p>}
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="reports_to">Reports to (optional)</Label>

@@ -12,11 +12,16 @@ class StaffPositionHistory extends Model
 
     protected $table = 'hr_staff_position_history';
 
+    /** @var list<string> Legacy string column may remain on SQLite. */
+    protected $hidden = [
+        'department',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'staff_id',
         'job_title',
-        'department',
+        'department_id',
         'started_at',
         'ended_at',
         'salary',
@@ -33,5 +38,10 @@ class StaffPositionHistory extends Model
     public function staff(): BelongsTo
     {
         return $this->belongsTo(Staff::class, 'staff_id');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 }

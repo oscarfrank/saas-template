@@ -4,6 +4,7 @@ import { Head } from '@inertiajs/react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import {
     WorkerAgentForm,
+    type DepartmentOption,
     type GoalOption,
     type WorkerOption,
     type ProjectOption,
@@ -17,6 +18,7 @@ import {
 const EMPTY_WORKER_FORM: Partial<WorkerFormFields> = {};
 
 interface Props {
+    departments: DepartmentOption[];
     goals: GoalOption[];
     projects: ProjectOption[];
     reportingOptions: ReportingOption[];
@@ -26,7 +28,7 @@ interface Props {
     llm: LlmMeta;
 }
 
-export default function WorkerAgentsCreate({ goals, projects, reportingOptions, otherWorkers, capabilityOptions, inputScopeOptions, llm }: Props) {
+export default function WorkerAgentsCreate({ departments, goals, projects, reportingOptions, otherWorkers, capabilityOptions, inputScopeOptions, llm }: Props) {
     const tenantRouter = useTenantRouter();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Worker agents', href: tenantRouter.route('worker-agents.index') },
@@ -40,6 +42,7 @@ export default function WorkerAgentsCreate({ goals, projects, reportingOptions, 
                 <h1 className="mb-6 text-2xl font-semibold tracking-tight">Add worker agent</h1>
                 <WorkerAgentForm
                     mode="create"
+                    departments={departments}
                     goals={goals}
                     projects={projects}
                     reportingOptions={reportingOptions}

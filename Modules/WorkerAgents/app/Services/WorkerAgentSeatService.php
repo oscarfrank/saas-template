@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\WorkerAgents\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\HR\Models\Department;
 use Modules\HR\Models\Staff;
 use Modules\WorkerAgents\Models\WorkerAgent;
 use Modules\WorkerAgents\Support\WorkerAgentCapability;
@@ -22,13 +23,21 @@ final class WorkerAgentSeatService
         return DB::transaction(function () use ($tenantId, $attributes): WorkerAgent {
             $employeeId = 'WA-'.substr((string) \Illuminate\Support\Str::uuid(), 0, 8);
 
+            $deptId = $attributes['department_id'] ?? null;
+            if ($deptId === null || $deptId === '') {
+                $deptId = Department::query()->where('tenant_id', $tenantId)->where('name', 'Automation')->value('id');
+            }
+            if ($deptId === null) {
+                $deptId = Department::query()->where('tenant_id', $tenantId)->orderBy('sort_order')->orderBy('name')->value('id');
+            }
+
             $staff = Staff::query()->create([
                 'tenant_id' => $tenantId,
                 'kind' => 'agent',
                 'user_id' => null,
                 'reports_to_staff_id' => $attributes['reports_to_staff_id'] ?? null,
                 'employee_id' => $employeeId,
-                'department' => $attributes['department'] ?? 'Automation',
+                'department_id' => $deptId,
                 'job_title' => $attributes['name'],
                 'started_at' => now()->toDateString(),
             ]);
@@ -76,6 +85,10 @@ final class WorkerAgentSeatService
 
             if (array_key_exists('reports_to_staff_id', $attributes)) {
                 $model->staff?->update(['reports_to_staff_id' => $attributes['reports_to_staff_id']]);
+            }
+
+            if (array_key_exists('department_id', $attributes)) {
+                $model->staff?->update(['department_id' => $attributes['department_id']]);
             }
 
             $fields = [

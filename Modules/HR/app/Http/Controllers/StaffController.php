@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\HR\Models\Department;
 use Modules\HR\Models\PaymentRunItem;
 use Modules\HR\Models\Payslip;
 use Modules\HR\Models\Staff;
@@ -56,7 +57,10 @@ class StaffController extends Controller
         $staffByUserId = Staff::query()
             ->where('tenant_id', $tenantId)
             ->whereIn('user_id', $users->pluck('id'))
-            ->with('user:id,first_name,last_name,email')
+            ->with([
+                'user:id,first_name,last_name,email',
+                'department:id,name',
+            ])
             ->get()
             ->keyBy('user_id');
 
@@ -107,6 +111,7 @@ class StaffController extends Controller
             'users' => $users,
             'preSelectUser' => $preSelectUser,
             'reportingOptions' => StaffReportingOptions::forTenant((string) $tenantId),
+            'departments' => Department::optionsForSelect((string) $tenantId),
         ]);
     }
 
@@ -135,7 +140,7 @@ class StaffController extends Controller
             'user_id' => $validated['user_id'],
             'reports_to_staff_id' => $validated['reports_to_staff_id'] ?? null,
             'employee_id' => $validated['employee_id'] ?? null,
-            'department' => $validated['department'] ?? null,
+            'department_id' => $validated['department_id'] ?? null,
             'job_title' => $validated['job_title'] ?? null,
             'salary' => $validated['salary'] ?? null,
             'salary_currency' => $validated['salary_currency'] ?? 'USD',
@@ -164,11 +169,12 @@ class StaffController extends Controller
         }
         $staff->load([
             'user:id,first_name,last_name,email',
+            'department:id,name',
             'documents' => fn ($q) => $q->orderByDesc('created_at')->limit(3),
             'assignedTasks' => fn ($q) => $q->orderBy('due_at')->limit(3),
             'ownedProjects',
             'events' => fn ($q) => $q->with('changedBy:id,first_name,last_name')->orderByDesc('created_at')->limit(3),
-            'positionHistory' => fn ($q) => $q->orderByDesc('started_at')->limit(20),
+            'positionHistory' => fn ($q) => $q->with('department:id,name')->orderByDesc('started_at')->limit(20),
             'payslips' => fn ($q) => $q->orderByDesc('period_start')->limit(5),
         ]);
 
@@ -345,11 +351,12 @@ class StaffController extends Controller
         if ($staff->tenant_id !== tenant('id')) {
             abort(404);
         }
-        $staff->load(['user:id,first_name,last_name,email', 'documents']);
+        $staff->load(['user:id,first_name,last_name,email', 'documents', 'department:id,name']);
 
         return Inertia::render('hr/staff/edit', [
             'staff' => $staff,
             'reportingOptions' => StaffReportingOptions::forTenant((string) tenant('id'), $staff->id),
+            'departments' => Department::optionsForSelect((string) tenant('id')),
         ]);
     }
 
@@ -389,7 +396,7 @@ class StaffController extends Controller
         }
 
         $oldAttributes = $staff->only([
-            'job_title', 'department', 'started_at', 'ended_at',
+            'job_title', 'department_id', 'started_at', 'ended_at',
             'salary', 'salary_currency', 'pay_frequency',
         ]);
 
@@ -406,7 +413,7 @@ class StaffController extends Controller
         $staff->update([
             'employee_id' => $validated['employee_id'] ?? null,
             'reports_to_staff_id' => array_key_exists('reports_to_staff_id', $validated) ? $validated['reports_to_staff_id'] : $staff->reports_to_staff_id,
-            'department' => $validated['department'] ?? null,
+            'department_id' => array_key_exists('department_id', $validated) ? $validated['department_id'] : $staff->department_id,
             'job_title' => $validated['job_title'] ?? null,
             'salary' => $validated['salary'] ?? null,
             'salary_currency' => $validated['salary_currency'] ?? 'USD',
@@ -531,6 +538,9 @@ class StaffController extends Controller
         if (isset($input['reports_to_staff_id']) && $input['reports_to_staff_id'] === '') {
             $input['reports_to_staff_id'] = null;
         }
+        if (isset($input['department_id']) && $input['department_id'] === '') {
+            $input['department_id'] = null;
+        }
 
         return $input;
     }
@@ -539,7 +549,11 @@ class StaffController extends Controller
     {
         return [
             'employee_id' => 'nullable|string|max:64',
-            'department' => 'nullable|string|max:128',
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('hr_departments', 'id')->where('tenant_id', (string) tenant('id')),
+            ],
             'job_title' => 'nullable|string|max:128',
             'salary' => 'nullable|numeric|min:0',
             'salary_currency' => 'nullable|string|in:USD,EUR,GBP,NGN',
@@ -572,7 +586,7 @@ class StaffController extends Controller
      */
     private static function recordPositionHistoryAndEventIfChanged(Staff $staff, array $oldAttributes): void
     {
-        $keys = ['job_title', 'department', 'started_at', 'ended_at', 'salary', 'salary_currency', 'pay_frequency'];
+        $keys = ['job_title', 'department_id', 'started_at', 'ended_at', 'salary', 'salary_currency', 'pay_frequency'];
         $newAttributes = $staff->only($keys);
         $changed = [];
         foreach ($keys as $key) {
@@ -592,7 +606,7 @@ class StaffController extends Controller
             return;
         }
 
-        $positionKeys = ['job_title', 'department', 'started_at', 'ended_at'];
+        $positionKeys = ['job_title', 'department_id', 'started_at', 'ended_at'];
         $positionChanged = ! empty(array_intersect_key($changed, array_flip($positionKeys)));
         $salaryChanged = isset($changed['salary']) || isset($changed['salary_currency']) || isset($changed['pay_frequency']);
 
@@ -602,7 +616,7 @@ class StaffController extends Controller
             $positionHistory = $staff->positionHistory()->create([
                 'tenant_id' => $staff->tenant_id,
                 'job_title' => $staff->job_title,
-                'department' => $staff->department,
+                'department_id' => $staff->department_id,
                 'started_at' => $staff->started_at,
                 'ended_at' => $staff->ended_at,
                 'salary' => $staff->salary,

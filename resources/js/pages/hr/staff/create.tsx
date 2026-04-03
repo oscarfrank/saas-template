@@ -31,7 +31,7 @@ interface StaffFormData {
     user_id: number | '';
     employee_id: string;
     reports_to_staff_id: string;
-    department: string;
+    department_id: string;
     job_title: string;
     salary: string;
     salary_currency: string;
@@ -55,9 +55,15 @@ interface ReportingOption {
     kind: string;
 }
 
+interface DepartmentOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     users: UserOption[];
     reportingOptions: ReportingOption[];
+    departments: DepartmentOption[];
     /** When coming from "Add HR details" on a specific member */
     preSelectUser?: UserOption | null;
 }
@@ -66,7 +72,7 @@ const initialFormData: StaffFormData = {
     user_id: '',
     employee_id: '',
     reports_to_staff_id: '',
-    department: '',
+    department_id: '',
     job_title: '',
     salary: '',
     salary_currency: 'USD',
@@ -84,7 +90,7 @@ const initialFormData: StaffFormData = {
     ended_at: '',
 };
 
-export default function HRStaffCreate({ users, reportingOptions, preSelectUser = null }: Props) {
+export default function HRStaffCreate({ users, reportingOptions, departments, preSelectUser = null }: Props) {
     const tenantRouter = useTenantRouter();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: tenantRouter.route('hr.staff.index') },
@@ -105,6 +111,7 @@ export default function HRStaffCreate({ users, reportingOptions, preSelectUser =
         const payload: Record<string, unknown> = {
             ...data,
             reports_to_staff_id: data.reports_to_staff_id === '' ? null : Number(data.reports_to_staff_id),
+            department_id: data.department_id === '' ? null : Number(data.department_id),
             allowances: allowances.filter((a) => a.name.trim() && a.amount !== '' && Number(a.amount) >= 0),
             deductions: deductions.filter((d) => d.name.trim() && d.amount !== '' && Number(d.amount) >= 0),
         };
@@ -189,13 +196,26 @@ export default function HRStaffCreate({ users, reportingOptions, preSelectUser =
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label htmlFor="department">Department</Label>
-                                                <Input
-                                                    id="department"
-                                                    value={data.department ?? ''}
-                                                    onChange={(e) => setData('department', e.target.value)}
-                                                    className="bg-background"
-                                                />
+                                                <Label htmlFor="department_id">Department</Label>
+                                                <Select
+                                                    value={data.department_id === '' ? 'none' : String(data.department_id)}
+                                                    onValueChange={(v) => setData('department_id', v === 'none' ? '' : v)}
+                                                >
+                                                    <SelectTrigger id="department_id" className="bg-background">
+                                                        <SelectValue placeholder="Select department" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">None</SelectItem>
+                                                        {departments.map((d) => (
+                                                            <SelectItem key={d.id} value={String(d.id)}>
+                                                                {d.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                {errors.department_id && (
+                                                    <p className="text-destructive text-sm">{errors.department_id}</p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="space-y-2">

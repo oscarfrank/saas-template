@@ -24,6 +24,7 @@ Route::middleware([
     Route::post('worker-agents/proposals/{proposal}/reject', [WorkerAgentProposalController::class, 'reject'])->name('worker-agents.proposals.reject');
 
     Route::get('worker-agents', [WorkerAgentController::class, 'index'])->name('worker-agents.index');
+    Route::patch('worker-agents/index-preferences', [WorkerAgentController::class, 'updateIndexPreferences'])->name('worker-agents.index-preferences.update');
     Route::get('worker-agents/create', [WorkerAgentController::class, 'create'])->name('worker-agents.create');
     Route::post('worker-agents', [WorkerAgentController::class, 'store'])->name('worker-agents.store');
     Route::get('worker-agents/{worker_agent}', [WorkerAgentController::class, 'show'])->name('worker-agents.show');

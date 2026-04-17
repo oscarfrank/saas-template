@@ -1,1 +1,0 @@
-import{j as o}from"./app-lj_xasSM.js";import{R as t,C as a,a as s}from"./index-DzbUqFvw.js";function i({...l}){return o.jsx(t,{"data-slot":"collapsible",...l})}function n({...l}){return o.jsx(a,{"data-slot":"collapsible-trigger",...l})}function p({...l}){return o.jsx(s,{"data-slot":"collapsible-content",...l})}export{i as C,n as a,p as b};

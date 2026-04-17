@@ -9,6 +9,7 @@ use Stancl\Tenancy\Database\Concerns\CentralConnection;
 class UserPreference extends Model
 {
     use CentralConnection;
+
     protected $fillable = [
         'user_id',
         'preferences',
@@ -33,6 +34,8 @@ class UserPreference extends Model
         'last_tenant_id' => null,
         /** 'organization_default' = use org default landing; 'last_visited' = go to last page before logout */
         'landing_behavior' => 'organization_default',
+        /** Worker agents index: "list" or "org" (reporting tree) */
+        'worker_agents_index_view' => 'list',
     ];
 
     /**
@@ -49,7 +52,7 @@ class UserPreference extends Model
     public static function getForUser(int $userId): self
     {
         \Log::info('Getting preferences for user', [
-            'user_id' => $userId
+            'user_id' => $userId,
         ]);
 
         $preferences = static::firstOrCreate(
@@ -62,7 +65,7 @@ class UserPreference extends Model
         \Log::info('User preferences retrieved/created', [
             'user_id' => $userId,
             'preferences' => $preferences->preferences,
-            'was_created' => $preferences->wasRecentlyCreated
+            'was_created' => $preferences->wasRecentlyCreated,
         ]);
 
         return $preferences;
@@ -95,6 +98,7 @@ class UserPreference extends Model
     public function updatePreferences(array $preferences): self
     {
         $this->preferences = array_merge($this->preferences, $preferences);
+
         return $this;
     }
 
@@ -114,6 +118,7 @@ class UserPreference extends Model
         $preferences = $this->preferences;
         unset($preferences[$key]);
         $this->preferences = $preferences;
+
         return $this;
     }
 
@@ -176,7 +181,7 @@ class UserPreference extends Model
             'dirty' => $this->getDirty(),
             'original' => $this->getOriginal(),
             'is_dirty' => $this->isDirty(),
-            'attributes' => $this->getAttributes()
+            'attributes' => $this->getAttributes(),
         ]);
 
         $result = parent::save($options);
@@ -185,9 +190,9 @@ class UserPreference extends Model
             'success' => $result,
             'preferences' => $this->preferences,
             'preferences_type' => gettype($this->preferences),
-            'attributes' => $this->getAttributes()
+            'attributes' => $this->getAttributes(),
         ]);
 
         return $result;
     }
-} 
+}

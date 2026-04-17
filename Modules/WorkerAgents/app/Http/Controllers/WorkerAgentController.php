@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\WorkerAgents\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,7 @@ use Modules\HR\Models\OrganizationGoal;
 use Modules\HR\Models\Project;
 use Modules\HR\Models\Staff;
 use Modules\HR\Support\StaffReportingOptions;
+use Modules\User\Models\UserPreference;
 use Modules\WorkerAgents\Jobs\RunWorkerAgentJob;
 use Modules\WorkerAgents\Models\WorkerAgent;
 use Modules\WorkerAgents\Models\WorkerAgentHandoff;
@@ -41,9 +43,9 @@ class WorkerAgentController extends Controller
         private readonly CortexLlmProviderFactory $llmFactory,
     ) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $workers = WorkerAgent::query()
+        $workerList = WorkerAgent::query()
             ->with(['staff:id,uuid,job_title,kind,reports_to_staff_id'])
             ->withCount('runs')
             ->orderBy('name')
@@ -63,17 +65,81 @@ class WorkerAgentController extends Controller
                     $w->schedule_cron,
                     $w->schedule_timezone ?? 'UTC',
                 ),
-                'staff' => $w->staff,
+                'staff' => $w->staff !== null ? [
+                    'id' => $w->staff->id,
+                    'uuid' => $w->staff->uuid,
+                    'job_title' => $w->staff->job_title,
+                    'kind' => $w->staff->kind,
+                    'reports_to_staff_id' => $w->staff->reports_to_staff_id,
+                ] : null,
                 'runs_count' => $w->runs_count,
             ]);
+
+        $byId = $workerList->keyBy('id');
+
+        $handoffEdges = WorkerAgentHandoff::query()
+            ->where('tenant_id', tenant('id'))
+            ->select(['from_worker_agent_id', 'to_worker_agent_id'])
+            ->distinct()
+            ->get()
+            ->map(function ($h) use ($byId) {
+                $from = $byId->get($h->from_worker_agent_id);
+                $to = $byId->get($h->to_worker_agent_id);
+                if ($from === null || $to === null) {
+                    return null;
+                }
+
+                return [
+                    'from_uuid' => $from['uuid'],
+                    'to_uuid' => $to['uuid'],
+                    'from_name' => $from['name'],
+                    'to_name' => $to['name'],
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $orgChart = $this->buildWorkerAgentsOrgChart($workerList);
+
+        $defaultIndexView = 'list';
+        $user = $request->user();
+        if ($user !== null) {
+            $pref = UserPreference::getForUser((int) $user->id);
+            $v = $pref->get('worker_agents_index_view', 'list');
+            $defaultIndexView = in_array($v, ['list', 'org'], true) ? $v : 'list';
+        }
 
         $pendingProposals = WorkerAgentProposal::query()
             ->where('status', WorkerAgentProposalStatus::Pending)
             ->count();
 
         return Inertia::render('worker-agents/index', [
-            'workers' => $workers,
+            'workers' => $workerList->values(),
+            'handoff_edges' => $handoffEdges,
+            'org_chart' => $orgChart,
+            'default_index_view' => $defaultIndexView,
             'pending_proposals_count' => $pendingProposals,
+        ]);
+    }
+
+    public function updateIndexPreferences(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'default_index_view' => ['required', Rule::in(['list', 'org'])],
+        ]);
+
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $pref = UserPreference::getForUser((int) $user->id);
+        $pref->updatePreferences(['worker_agents_index_view' => $validated['default_index_view']]);
+        $pref->save();
+
+        return response()->json([
+            'default_index_view' => $validated['default_index_view'],
         ]);
     }
 
@@ -582,5 +648,91 @@ class WorkerAgentController extends Controller
         $newUuid = (string) \Illuminate\Support\Str::uuid();
         WorkerAgent::query()->whereKey($id)->update(['uuid' => $newUuid]);
         $worker->uuid = $newUuid;
+    }
+
+    /**
+     * Reporting org chart: edges follow HR staff reporting lines between worker seats.
+     * Handoffs are listed separately on the page (they are not tree edges).
+     *
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $workers
+     * @return array<string, mixed>|null
+     */
+    private function buildWorkerAgentsOrgChart(\Illuminate\Support\Collection $workers): ?array
+    {
+        if ($workers->isEmpty()) {
+            return null;
+        }
+
+        $byStaffId = $workers
+            ->filter(fn (array $w): bool => $w['staff'] !== null)
+            ->keyBy(fn (array $w): int => $w['staff']['id']);
+
+        $childrenByParentUuid = [];
+
+        foreach ($workers as $w) {
+            $reportsTo = $w['staff'] !== null ? ($w['staff']['reports_to_staff_id'] ?? null) : null;
+            $parent = $reportsTo !== null ? $byStaffId->get($reportsTo) : null;
+            if ($parent !== null) {
+                $uuid = $parent['uuid'];
+                if (! isset($childrenByParentUuid[$uuid])) {
+                    $childrenByParentUuid[$uuid] = [];
+                }
+                $childrenByParentUuid[$uuid][] = $w;
+            }
+        }
+
+        $roots = [];
+        foreach ($workers as $w) {
+            $reportsTo = $w['staff'] !== null ? ($w['staff']['reports_to_staff_id'] ?? null) : null;
+            $parent = $reportsTo !== null ? $byStaffId->get($reportsTo) : null;
+            if ($parent === null) {
+                $roots[] = $w;
+            }
+        }
+
+        $buildNode = function (array $worker) use (&$buildNode, $childrenByParentUuid): array {
+            $uuid = $worker['uuid'];
+            $childWorkers = $childrenByParentUuid[$uuid] ?? [];
+
+            $children = [];
+            foreach ($childWorkers as $child) {
+                $children[] = $buildNode($child);
+            }
+
+            $jobTitle = $worker['staff'] !== null ? ($worker['staff']['job_title'] ?? null) : null;
+            $kind = $worker['staff'] !== null ? ($worker['staff']['kind'] ?? null) : null;
+
+            return [
+                'name' => $worker['name'],
+                'attributes' => [
+                    'uuid' => (string) $uuid,
+                    'job_title' => $jobTitle !== null && $jobTitle !== '' ? (string) $jobTitle : '—',
+                    'kind' => $kind !== null && $kind !== '' ? (string) $kind : '—',
+                ],
+                'children' => $children,
+            ];
+        };
+
+        $rootNodes = [];
+        foreach ($roots as $root) {
+            $rootNodes[] = $buildNode($root);
+        }
+
+        if ($rootNodes === []) {
+            return null;
+        }
+
+        if (count($rootNodes) === 1) {
+            return $rootNodes[0];
+        }
+
+        return [
+            'name' => 'Worker agents',
+            'attributes' => [
+                'uuid' => '',
+                'synthetic_root' => true,
+            ],
+            'children' => $rootNodes,
+        ];
     }
 }

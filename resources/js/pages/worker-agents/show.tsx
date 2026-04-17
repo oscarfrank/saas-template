@@ -3,7 +3,17 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -103,6 +113,7 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
     const wa = resolveWorkerAgentRouteParam(worker, page.url) ?? worker.uuid;
 
     const [runNowPending, setRunNowPending] = useState(false);
+    const [deleteWorkerOpen, setDeleteWorkerOpen] = useState(false);
 
     useEffect(() => {
         if (flash?.success) {
@@ -219,8 +230,49 @@ export default function WorkerAgentsShow({ worker, runs, messages, incoming_hand
                             )}
                             Run now
                         </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-muted-foreground hover:text-destructive size-8 shrink-0"
+                                    onClick={() => setDeleteWorkerOpen(true)}
+                                    aria-label="Delete worker"
+                                >
+                                    <Trash2 className="size-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">Delete worker</TooltipContent>
+                        </Tooltip>
                     </div>
                 </div>
+
+                <AlertDialog open={deleteWorkerOpen} onOpenChange={setDeleteWorkerOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete {worker.name}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This removes the worker agent and its linked HR staff seat. Run history, handoffs, and
+                                related records for this worker are removed as well. This cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <Button
+                                variant="destructive"
+                                onClick={() => {
+                                    tenantRouter.delete('worker-agents.destroy', { worker_agent: wa }, {
+                                        onSuccess: () => setDeleteWorkerOpen(false),
+                                        onError: () => toast.error('Could not delete this worker.'),
+                                    });
+                                }}
+                            >
+                                Delete worker
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 <div className="grid gap-4 md:grid-cols-2">
                     <Card>

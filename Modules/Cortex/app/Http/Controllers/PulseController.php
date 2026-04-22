@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -49,8 +50,21 @@ class PulseController extends Controller
         $maxItems = 25;
         $digest = null;
         $digestDate = null;
+        $deepResearchEnabled = false;
+        $chatModel = null;
+        $digestModel = null;
+        $digestIdeasModel = null;
+        $digestTweetsModel = null;
+        $scriptModel = null;
         if (is_string($tenantId) && $tenantId !== '') {
+            $s = PulseSetting::getOrCreateForTenant($tenantId);
             $maxItems = PulseSetting::maxItemsForTenant($tenantId);
+            $deepResearchEnabled = (bool) $s->deep_research_enabled;
+            $chatModel = is_string($s->chat_model) && trim($s->chat_model) !== '' ? trim($s->chat_model) : null;
+            $digestModel = is_string($s->digest_model) && trim($s->digest_model) !== '' ? trim($s->digest_model) : null;
+            $digestIdeasModel = is_string($s->digest_ideas_model) && trim($s->digest_ideas_model) !== '' ? trim($s->digest_ideas_model) : null;
+            $digestTweetsModel = is_string($s->digest_tweets_model) && trim($s->digest_tweets_model) !== '' ? trim($s->digest_tweets_model) : null;
+            $scriptModel = is_string($s->script_model) && trim($s->script_model) !== '' ? trim($s->script_model) : null;
             $digestDate = $this->todayDigestDateYmd();
             $row = PulseDailyDigest::query()
                 ->where('tenant_id', $tenantId)
@@ -67,6 +81,12 @@ class PulseController extends Controller
             'max_items_per_feed' => $maxItems,
             'digest' => $digest,
             'digest_date' => $digestDate,
+            'deep_research_enabled' => $deepResearchEnabled,
+            'chat_model' => $chatModel,
+            'digest_model' => $digestModel,
+            'digest_ideas_model' => $digestIdeasModel,
+            'digest_tweets_model' => $digestTweetsModel,
+            'script_model' => $scriptModel,
         ]);
     }
 
@@ -108,12 +128,24 @@ class PulseController extends Controller
         $autoPullTime = '07:00';
         $digestTimezone = null;
         $tweetStylePrompt = null;
+        $deepResearchEnabled = false;
+        $chatModel = null;
+        $digestModel = null;
+        $digestIdeasModel = null;
+        $digestTweetsModel = null;
+        $scriptModel = null;
         if (is_string($tenantId) && $tenantId !== '') {
             $s = PulseSetting::getOrCreateForTenant($tenantId);
             $autoPullEnabled = (bool) $s->auto_pull_enabled;
             $autoPullTime = is_string($s->auto_pull_time) && $s->auto_pull_time !== '' ? $s->auto_pull_time : '07:00';
             $digestTimezone = $s->digest_timezone;
             $tweetStylePrompt = $s->tweet_style_prompt;
+            $deepResearchEnabled = (bool) $s->deep_research_enabled;
+            $chatModel = is_string($s->chat_model) && trim($s->chat_model) !== '' ? trim($s->chat_model) : null;
+            $digestModel = is_string($s->digest_model) && trim($s->digest_model) !== '' ? trim($s->digest_model) : null;
+            $digestIdeasModel = is_string($s->digest_ideas_model) && trim($s->digest_ideas_model) !== '' ? trim($s->digest_ideas_model) : null;
+            $digestTweetsModel = is_string($s->digest_tweets_model) && trim($s->digest_tweets_model) !== '' ? trim($s->digest_tweets_model) : null;
+            $scriptModel = is_string($s->script_model) && trim($s->script_model) !== '' ? trim($s->script_model) : null;
         }
 
         return Inertia::render('cortex/agents/pulse/settings', [
@@ -123,6 +155,12 @@ class PulseController extends Controller
             'auto_pull_time' => $autoPullTime,
             'digest_timezone' => $digestTimezone,
             'tweet_style_prompt' => $tweetStylePrompt,
+            'deep_research_enabled' => $deepResearchEnabled,
+            'chat_model' => $chatModel,
+            'digest_model' => $digestModel,
+            'digest_ideas_model' => $digestIdeasModel,
+            'digest_tweets_model' => $digestTweetsModel,
+            'script_model' => $scriptModel,
         ]);
     }
 
@@ -139,6 +177,12 @@ class PulseController extends Controller
             'auto_pull_time' => ['nullable', 'string', 'regex:/^\d{2}:\d{2}$/'],
             'digest_timezone' => ['nullable', 'string', 'max:64'],
             'tweet_style_prompt' => ['nullable', 'string', 'max:10000'],
+            'deep_research_enabled' => ['sometimes', 'boolean'],
+            'chat_model' => ['nullable', 'string', 'max:100'],
+            'digest_model' => ['nullable', 'string', 'max:100'],
+            'digest_ideas_model' => ['nullable', 'string', 'max:100'],
+            'digest_tweets_model' => ['nullable', 'string', 'max:100'],
+            'script_model' => ['nullable', 'string', 'max:100'],
         ]);
 
         $row = PulseSetting::getOrCreateForTenant($tenantId);
@@ -159,6 +203,34 @@ class PulseController extends Controller
                 ? trim((string) $validated['tweet_style_prompt'])
                 : null;
         }
+        if (array_key_exists('deep_research_enabled', $validated)) {
+            $row->deep_research_enabled = (bool) $validated['deep_research_enabled'];
+        }
+        if (array_key_exists('chat_model', $validated)) {
+            $row->chat_model = isset($validated['chat_model']) && trim((string) $validated['chat_model']) !== ''
+                ? trim((string) $validated['chat_model'])
+                : null;
+        }
+        if (array_key_exists('digest_model', $validated)) {
+            $row->digest_model = isset($validated['digest_model']) && trim((string) $validated['digest_model']) !== ''
+                ? trim((string) $validated['digest_model'])
+                : null;
+        }
+        if (array_key_exists('digest_ideas_model', $validated)) {
+            $row->digest_ideas_model = isset($validated['digest_ideas_model']) && trim((string) $validated['digest_ideas_model']) !== ''
+                ? trim((string) $validated['digest_ideas_model'])
+                : null;
+        }
+        if (array_key_exists('digest_tweets_model', $validated)) {
+            $row->digest_tweets_model = isset($validated['digest_tweets_model']) && trim((string) $validated['digest_tweets_model']) !== ''
+                ? trim((string) $validated['digest_tweets_model'])
+                : null;
+        }
+        if (array_key_exists('script_model', $validated)) {
+            $row->script_model = isset($validated['script_model']) && trim((string) $validated['script_model']) !== ''
+                ? trim((string) $validated['script_model'])
+                : null;
+        }
         $row->save();
 
         if ($request->wantsJson() || $request->expectsJson()) {
@@ -171,6 +243,12 @@ class PulseController extends Controller
                 'auto_pull_time' => $row->auto_pull_time ?? '07:00',
                 'digest_timezone' => $row->digest_timezone,
                 'tweet_style_prompt' => $row->tweet_style_prompt,
+                'deep_research_enabled' => (bool) $row->deep_research_enabled,
+                'chat_model' => $row->chat_model,
+                'digest_model' => $row->digest_model,
+                'digest_ideas_model' => $row->digest_ideas_model,
+                'digest_tweets_model' => $row->digest_tweets_model,
+                'script_model' => $row->script_model,
             ]);
         }
 
@@ -570,8 +648,16 @@ class PulseController extends Controller
         $messages[] = new UserMessage($body);
 
         try {
+            $setting = PulseSetting::query()->where('tenant_id', $tenantId)->first();
+            $chatModel = $setting !== null && is_string($setting->chat_model) ? trim($setting->chat_model) : '';
+
             $agent = PulseAgent::make()
-                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent($tenantId, CortexAgentKey::Pulse))
+                ->setAiProvider($this->cortexLlmFactory()->makeForTenantAgent(
+                    $tenantId,
+                    CortexAgentKey::Pulse,
+                    [],
+                    $chatModel !== '' ? $chatModel : null,
+                ))
                 ->toolMaxRuns(0);
 
             $reply = $agent
@@ -646,6 +732,239 @@ class PulseController extends Controller
             'digest_date' => $date,
             'digest' => $digestRow !== null ? $this->digestToArray($digestRow) : null,
         ]);
+    }
+
+    public function shortScript(Request $request): JsonResponse
+    {
+        $this->raiseRuntimeLimitForAgent();
+
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! $this->cortexLlmConfigured($tenantId, CortexAgentKey::Pulse)) {
+            return response()->json([
+                'message' => $this->cortexMissingLlmKeyMessage($tenantId, CortexAgentKey::Pulse),
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'hook' => ['required', 'string', 'max:2000'],
+            'angle' => ['nullable', 'string', 'max:2000'],
+            'intro_summary' => ['nullable', 'string', 'max:5000'],
+            'digest_date' => ['required', 'date'],
+            'short_index' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $setting = PulseSetting::getOrCreateForTenant($tenantId);
+        $deepResearchEnabled = (bool) $setting->deep_research_enabled;
+        $scriptModel = is_string($setting->script_model) ? trim($setting->script_model) : '';
+
+        $digest = PulseDailyDigest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereDate('digest_date', (string) $validated['digest_date'])
+            ->first();
+        if ($digest === null) {
+            return response()->json(['message' => 'Digest not found for that date.'], 422);
+        }
+
+        $shorts = is_array($digest->shorts) ? $digest->shorts : [];
+        $shortIndex = (int) $validated['short_index'];
+        $row = $shorts[$shortIndex] ?? null;
+        if (! is_array($row)) {
+            return response()->json(['message' => 'Short idea not found for that index.'], 422);
+        }
+
+        $cachedTitle = trim((string) ($row['script_title'] ?? ''));
+        $cachedText = trim((string) ($row['script_text'] ?? ''));
+        if ($cachedTitle !== '' && $cachedText !== '') {
+            return response()->json([
+                'script' => [
+                    'title' => $cachedTitle,
+                    'text' => $cachedText,
+                ],
+                'deep_research_enabled' => $deepResearchEnabled,
+                'cached' => true,
+            ]);
+        }
+
+        $prompt = $this->shortScriptPrompt(
+            title: trim((string) $validated['title']),
+            hook: trim((string) $validated['hook']),
+            angle: isset($validated['angle']) ? trim((string) $validated['angle']) : null,
+            introSummary: isset($validated['intro_summary']) ? trim((string) $validated['intro_summary']) : null,
+            deepResearchEnabled: $deepResearchEnabled,
+        );
+
+        $out = $this->openAiShortScriptResponse($prompt, $deepResearchEnabled, $scriptModel !== '' ? $scriptModel : null);
+        if (isset($out['error'])) {
+            return response()->json(['message' => $out['error']], 422);
+        }
+
+        $script = $out['script'];
+        $shorts[$shortIndex] = array_merge($row, [
+            'script_title' => $script['title'],
+            'script_text' => $script['text'],
+            'script_generated_at' => now()->toIso8601String(),
+        ]);
+        $digest->shorts = $shorts;
+        $digest->save();
+
+        return response()->json([
+            'script' => $script,
+            'deep_research_enabled' => $deepResearchEnabled,
+            'cached' => false,
+        ]);
+    }
+
+    /**
+     * @return array{script?: array{title: string, text: string}, error?: string}
+     */
+    private function openAiShortScriptResponse(string $prompt, bool $deepResearchEnabled, ?string $modelOverride = null): array
+    {
+        $key = config('openai.api_key');
+        if (! is_string($key) || $key === '') {
+            return ['error' => 'OpenAI is not configured. Add OPENAI_API_KEY to your environment.'];
+        }
+
+        $model = is_string($modelOverride) && trim($modelOverride) !== ''
+            ? trim($modelOverride)
+            : (string) config('openai.chat_model', 'gpt-4o-mini');
+        $baseRaw = trim((string) config('openai.base_uri', ''));
+        $base = $baseRaw !== '' ? rtrim($baseRaw, '/') : 'https://api.openai.com/v1';
+        $url = $base.'/responses';
+
+        $payload = [
+            'model' => $model,
+            'input' => $prompt,
+        ];
+        if ($deepResearchEnabled) {
+            $payload['tools'] = [
+                ['type' => 'web_search_preview'],
+            ];
+        }
+
+        try {
+            $response = Http::timeout((int) config('openai.request_timeout', 120))
+                ->acceptJson()
+                ->asJson()
+                ->withToken($key)
+                ->post($url, $payload);
+
+            if (! $response->successful()) {
+                return ['error' => 'Short script generation failed: '.$response->status().' '.$response->body()];
+            }
+
+            $json = $response->json();
+            $content = '';
+            if (is_array($json)) {
+                $content = trim((string) ($json['output_text'] ?? ''));
+                if ($content === '') {
+                    $output = $json['output'] ?? null;
+                    if (is_array($output)) {
+                        foreach ($output as $entry) {
+                            if (! is_array($entry)) {
+                                continue;
+                            }
+                            $parts = $entry['content'] ?? null;
+                            if (! is_array($parts)) {
+                                continue;
+                            }
+                            foreach ($parts as $part) {
+                                if (! is_array($part)) {
+                                    continue;
+                                }
+                                $text = trim((string) ($part['text'] ?? ''));
+                                if ($text !== '') {
+                                    $content .= ($content !== '' ? "\n\n" : '').$text;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($content === '') {
+                return ['error' => 'Short script generation returned an empty response.'];
+            }
+
+            $decoded = json_decode($content, true);
+            if (! is_array($decoded)) {
+                if (preg_match('/\{[\s\S]*\}/', $content, $m) === 1) {
+                    $decoded = json_decode($m[0], true);
+                }
+            }
+            if (! is_array($decoded)) {
+                return ['error' => 'Short script response was not valid JSON.'];
+            }
+
+            $title = trim((string) ($decoded['title'] ?? ''));
+            $text = trim((string) ($decoded['text'] ?? ''));
+            if ($title === '' || $text === '') {
+                return ['error' => 'Short script response was missing title or text.'];
+            }
+
+            return [
+                'script' => [
+                    'title' => $title,
+                    'text' => $text,
+                ],
+            ];
+        } catch (\Throwable $e) {
+            Log::error('PulseController::openAiShortScriptResponse failed', [
+                'error' => $e->getMessage(),
+                'exception' => $e::class,
+                'deep_research_enabled' => $deepResearchEnabled,
+            ]);
+
+            return ['error' => 'Short script generation failed. Check logs or try again.'];
+        }
+    }
+
+    private function shortScriptPrompt(
+        string $title,
+        string $hook,
+        ?string $angle,
+        ?string $introSummary,
+        bool $deepResearchEnabled,
+    ): string {
+        $angleText = $angle !== null && $angle !== '' ? $angle : 'None provided';
+        $summaryText = $introSummary !== null && $introSummary !== '' ? $introSummary : 'None provided';
+        $researchMode = $deepResearchEnabled
+            ? 'Deep research is ON: verify claims with web search and provide sources.'
+            : 'Deep research is OFF: do not browse the web; stay conservative with claims and avoid uncertain specifics.';
+
+        return <<<TXT
+You are writing a social video script for short-form platforms.
+
+Goal:
+- Produce one conversational, natural script that takes about 60–120 seconds when spoken.
+- Make it punchy, specific, and easy to record.
+
+Context:
+- Idea title: {$title}
+- Idea hook: {$hook}
+- Idea angle: {$angleText}
+- Today's feed summary: {$summaryText}
+- {$researchMode}
+
+Output format:
+- Return only valid JSON with exactly this shape:
+{
+  "title": "short title for this script",
+  "text": "the full script text to say on camera"
+}
+
+Rules:
+- Tone must sound human, like a creator talking to camera.
+- No corporate fluff.
+- Keep sentences short and speakable.
+- Include only the final script lines. No bullets, no sections, no labels.
+- If a claim cannot be validated, rephrase to avoid false precision.
+- If deep research is enabled and you use web info, silently verify facts but do not include source lists in output.
+TXT;
     }
 
     /**

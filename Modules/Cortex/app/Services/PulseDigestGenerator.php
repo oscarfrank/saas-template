@@ -7,8 +7,9 @@ namespace Modules\Cortex\Services;
 use Illuminate\Support\Facades\Log;
 use Modules\Cortex\Models\PulseDailyDigest;
 use Modules\Cortex\Models\PulseSetting;
+use Modules\Cortex\Neuron\Output\PulseDigestIdeasOutput;
 use Modules\Cortex\Neuron\Output\PulseDigestIdeaItem;
-use Modules\Cortex\Neuron\Output\PulseDigestOutput;
+use Modules\Cortex\Neuron\Output\PulseDigestTweetsOutput;
 use Modules\Cortex\Neuron\PulseDigestAgent;
 use Modules\Cortex\Support\CortexAgentKey;
 use NeuronAI\Chat\Messages\UserMessage;
@@ -68,30 +69,62 @@ PROMPT;
         if ($tweetStylePrompt === '') {
             $tweetStylePrompt = self::DEFAULT_TWEET_STYLE_PROMPT;
         }
+        $digestModel = $setting !== null && is_string($setting->digest_model)
+            ? trim($setting->digest_model)
+            : '';
+        $digestIdeasModel = $setting !== null && is_string($setting->digest_ideas_model)
+            ? trim($setting->digest_ideas_model)
+            : '';
+        $digestTweetsModel = $setting !== null && is_string($setting->digest_tweets_model)
+            ? trim($setting->digest_tweets_model)
+            : '';
 
-        $body = "Here are today's cached feed signals:\n\n".$signals."\n\n---\n\n";
+        $ideasBody = "Here are today's cached feed signals:\n\n".$signals."\n\n---\n\n";
+        $ideasBody .= 'Generate only intro_summary, shorts, and youtube idea lists as specified.';
+        $tweetsBody = "Here are today's cached feed signals:\n\n".$signals."\n\n---\n\n";
         if ($tweetStylePrompt !== '') {
-            $body .= "Tweet style guidance (apply this heavily to the tweets list while still staying grounded in feed signals):\n".
+            $tweetsBody .= "Tweet style guidance (apply this heavily to the tweets list while still staying grounded in feed signals):\n".
                 $tweetStylePrompt."\n\n---\n\n";
         }
-        $body .= 'Generate the digest: intro_summary plus tweets, shorts, and youtube idea lists as specified.';
+        $tweetsBody .= 'Generate only the tweets idea list as specified.';
 
         try {
-            $agent = PulseDigestAgent::make()
-                ->setAiProvider($this->llmFactory->makeForTenantAgent($tenantId, CortexAgentKey::Pulse))
+            $ideasAgent = PulseDigestAgent::make()
+                ->setAiProvider($this->llmFactory->makeForTenantAgent(
+                    $tenantId,
+                    CortexAgentKey::Pulse,
+                    [],
+                    $digestIdeasModel !== '' ? $digestIdeasModel : ($digestModel !== '' ? $digestModel : null),
+                ))
                 ->toolMaxRuns(0);
 
-            /** @var PulseDigestOutput $output */
-            $output = $agent->structured(
-                messages: new UserMessage($body),
-                class: PulseDigestOutput::class,
+            /** @var PulseDigestIdeasOutput $ideasOutput */
+            $ideasOutput = $ideasAgent->structured(
+                messages: new UserMessage($ideasBody),
+                class: PulseDigestIdeasOutput::class,
                 maxRetries: 2,
             );
 
-            $digest->intro_summary = $output->intro_summary;
-            $digest->tweets = $this->normalizeIdeas($output->tweets ?? []);
-            $digest->shorts = $this->normalizeIdeas($output->shorts ?? []);
-            $digest->youtube = $this->normalizeIdeas($output->youtube ?? []);
+            $tweetsAgent = PulseDigestAgent::make()
+                ->setAiProvider($this->llmFactory->makeForTenantAgent(
+                    $tenantId,
+                    CortexAgentKey::Pulse,
+                    [],
+                    $digestTweetsModel !== '' ? $digestTweetsModel : ($digestModel !== '' ? $digestModel : null),
+                ))
+                ->toolMaxRuns(0);
+
+            /** @var PulseDigestTweetsOutput $tweetsOutput */
+            $tweetsOutput = $tweetsAgent->structured(
+                messages: new UserMessage($tweetsBody),
+                class: PulseDigestTweetsOutput::class,
+                maxRetries: 2,
+            );
+
+            $digest->intro_summary = $ideasOutput->intro_summary;
+            $digest->tweets = $this->normalizeIdeas($tweetsOutput->tweets ?? []);
+            $digest->shorts = $this->normalizeIdeas($ideasOutput->shorts ?? []);
+            $digest->youtube = $this->normalizeIdeas($ideasOutput->youtube ?? []);
             $digest->ideas_status = 'completed';
             $digest->ideas_generated_at = now();
             $digest->ideas_error = null;

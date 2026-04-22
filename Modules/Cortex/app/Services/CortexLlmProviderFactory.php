@@ -48,6 +48,7 @@ final class CortexLlmProviderFactory
         string $tenantId,
         CortexAgentKey|string $agentKey,
         array $extraParameters = [],
+        ?string $modelOverride = null,
     ): AIProviderInterface {
         $key = $agentKey instanceof CortexAgentKey ? $agentKey->value : $agentKey;
 
@@ -56,15 +57,18 @@ final class CortexLlmProviderFactory
             ->first();
 
         $provider = $row?->llm_provider ?? CortexLlmProvider::OpenAI;
-        $modelOverride = $row !== null && is_string($row->chat_model) && $row->chat_model !== ''
+        $agentModelOverride = $row !== null && is_string($row->chat_model) && $row->chat_model !== ''
             ? $row->chat_model
             : null;
+        $resolvedModelOverride = is_string($modelOverride) && trim($modelOverride) !== ''
+            ? trim($modelOverride)
+            : $agentModelOverride;
 
         $timeout = (float) config('openai.request_timeout', 120);
 
         return match ($provider) {
-            CortexLlmProvider::OpenAI => $this->makeOpenAi($modelOverride, $extraParameters, $timeout),
-            CortexLlmProvider::Anthropic => $this->makeAnthropic($modelOverride, $extraParameters, $timeout),
+            CortexLlmProvider::OpenAI => $this->makeOpenAi($resolvedModelOverride, $extraParameters, $timeout),
+            CortexLlmProvider::Anthropic => $this->makeAnthropic($resolvedModelOverride, $extraParameters, $timeout),
         };
     }
 

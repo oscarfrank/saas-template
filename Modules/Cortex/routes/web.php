@@ -38,6 +38,7 @@ Route::middleware([
     Route::get('cortex/agents/pulse', [PulseController::class, 'index'])->name('cortex.agents.pulse');
     Route::get('cortex/agents/pulse/digest/today', [PulseController::class, 'digestToday'])->name('cortex.agents.pulse.digest.today');
     Route::post('cortex/agents/pulse/digest/run', [PulseController::class, 'digestRun'])->name('cortex.agents.pulse.digest.run');
+    Route::post('cortex/agents/pulse/shorts/script', [PulseController::class, 'shortScript'])->name('cortex.agents.pulse.shorts.script');
     Route::get('cortex/agents/pulse/feeds', [PulseController::class, 'feedsIndex'])->name('cortex.agents.pulse.feeds');
     Route::get('cortex/agents/pulse/settings', [PulseController::class, 'settingsIndex'])->name('cortex.agents.pulse.settings');
     Route::patch('cortex/agents/pulse/settings', [PulseController::class, 'settingsUpdate'])->name('cortex.agents.pulse.settings.update');

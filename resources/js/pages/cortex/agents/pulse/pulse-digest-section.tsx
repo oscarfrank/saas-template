@@ -5,8 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
+import axios from 'axios';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Copy, Loader2, RefreshCw, Sparkles, Wand2, Zap } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import type { PulseDigest, PulseDigestIdea } from './types';
 
@@ -33,7 +36,17 @@ function statusBadge(status: string): { label: string; variant: 'default' | 'sec
     }
 }
 
-function IdeaCard({ idea, tone }: { idea: PulseDigestIdea; tone: 'tw' | 'sh' | 'yt' }) {
+function IdeaCard({
+    idea,
+    tone,
+    onGenerateScript,
+    scriptBusy,
+}: {
+    idea: PulseDigestIdea;
+    tone: 'tw' | 'sh' | 'yt';
+    onGenerateScript?: () => void;
+    scriptBusy?: boolean;
+}) {
     const text = `${idea.title}\n${idea.hook}${idea.angle ? `\n${idea.angle}` : ''}`;
     return (
         <div
@@ -60,12 +73,72 @@ function IdeaCard({ idea, tone }: { idea: PulseDigestIdea; tone: 'tw' | 'sh' | '
                 <Copy className="size-3.5" />
                 Copy
             </Button>
+            {onGenerateScript ? (
+                <Button type="button" variant="secondary" size="sm" className="mt-2 h-8 gap-1.5 text-xs" onClick={onGenerateScript} disabled={Boolean(scriptBusy)}>
+                    {scriptBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+                    Script
+                </Button>
+            ) : null}
         </div>
     );
 }
 
 export function PulseDigestSection({ digest, digestDate, openAiConfigured, digestRunning, onRun }: Props) {
     const tenantRouter = useTenantRouter();
+    const [scriptIdea, setScriptIdea] = useState<PulseDigestIdea | null>(null);
+    const [scriptText, setScriptText] = useState<string>('');
+    const [scriptTitle, setScriptTitle] = useState<string>('');
+    const [scriptOpen, setScriptOpen] = useState(false);
+    const [scriptBusy, setScriptBusy] = useState(false);
+    const [scriptDeepResearchEnabled, setScriptDeepResearchEnabled] = useState<boolean>(false);
+
+    const generateShortScript = async (idea: PulseDigestIdea, shortIndex: number) => {
+        if (!digest) return;
+        setScriptBusy(true);
+        try {
+            const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            const { data } = await axios.post<{ script?: { title?: string; text?: string }; message?: string; deep_research_enabled?: boolean }>(
+                tenantRouter.route('cortex.agents.pulse.shorts.script'),
+                {
+                    title: idea.title,
+                    hook: idea.hook,
+                    angle: idea.angle ?? null,
+                    intro_summary: digest.intro_summary ?? null,
+                    digest_date: digest.digest_date,
+                    short_index: shortIndex,
+                },
+                {
+                    timeout: 300_000,
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                },
+            );
+            const nextTitle = data.script?.title?.trim() ?? '';
+            const nextText = data.script?.text?.trim() ?? '';
+            if (nextTitle === '' || nextText === '') {
+                throw new Error(data.message ?? 'Script response is empty.');
+            }
+            setScriptIdea(idea);
+            setScriptTitle(nextTitle);
+            setScriptText(nextText);
+            setScriptDeepResearchEnabled(Boolean(data.deep_research_enabled));
+            setScriptOpen(true);
+        } catch (e) {
+            if (axios.isAxiosError(e)) {
+                toast.error((e.response?.data as { message?: string } | undefined)?.message ?? e.message ?? 'Could not generate script.');
+            } else if (e instanceof Error) {
+                toast.error(e.message);
+            } else {
+                toast.error('Could not generate script.');
+            }
+        } finally {
+            setScriptBusy(false);
+        }
+    };
 
     const feedsBadge = digest ? statusBadge(digest.feeds_status) : null;
     const ideasBadge = digest ? statusBadge(digest.ideas_status) : null;
@@ -218,7 +291,13 @@ export function PulseDigestSection({ digest, digestDate, openAiConfigured, diges
                         <TabsContent value="shorts" className="mt-0">
                             <div className="h-[min(420px,50vh)] space-y-3 overflow-y-auto pr-1">
                                 {digest.shorts.map((idea, i) => (
-                                    <IdeaCard key={`sh-${i}`} idea={idea} tone="sh" />
+                                    <IdeaCard
+                                        key={`sh-${i}`}
+                                        idea={idea}
+                                        tone="sh"
+                                        onGenerateScript={() => void generateShortScript(idea, i)}
+                                        scriptBusy={scriptBusy}
+                                    />
                                 ))}
                             </div>
                         </TabsContent>
@@ -249,6 +328,22 @@ export function PulseDigestSection({ digest, digestDate, openAiConfigured, diges
                     </p>
                 )}
             </CardContent>
+            <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>
+                <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Short script</DialogTitle>
+                        <DialogDescription>
+                            {scriptIdea ? `Generated from: ${scriptIdea.title}` : 'Generated script'}
+                            {' · '}
+                            {scriptDeepResearchEnabled ? 'Deep research enabled' : 'Deep research disabled'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="rounded-lg border bg-muted/20 p-4">
+                        <h3 className="text-base font-semibold">{scriptTitle}</h3>
+                        <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap">{scriptText}</p>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

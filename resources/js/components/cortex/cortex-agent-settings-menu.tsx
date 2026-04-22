@@ -13,7 +13,7 @@ import { ChevronDown, Settings } from 'lucide-react';
 
 const EXTRA_BY_AGENT: Record<string, { label: string; route: string }[]> = {
     pulse: [
-        { label: 'Feeds & digest', route: 'cortex.agents.pulse.settings' },
+        { label: 'Pulse settings', route: 'cortex.agents.pulse.settings' },
         { label: 'Manage feeds', route: 'cortex.agents.pulse.feeds' },
     ],
     mirage: [{ label: 'Image generation', route: 'cortex.agents.mirage.settings' }],

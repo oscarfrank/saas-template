@@ -19,6 +19,12 @@ class PulseSetting extends Model
         'digest_timezone',
         'last_auto_digest_date',
         'tweet_style_prompt',
+        'deep_research_enabled',
+        'chat_model',
+        'digest_model',
+        'digest_ideas_model',
+        'digest_tweets_model',
+        'script_model',
     ];
 
     protected function casts(): array
@@ -26,6 +32,7 @@ class PulseSetting extends Model
         return [
             'max_items_per_feed' => 'integer',
             'auto_pull_enabled' => 'boolean',
+            'deep_research_enabled' => 'boolean',
             'last_auto_digest_date' => 'date',
         ];
     }

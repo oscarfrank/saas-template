@@ -90,6 +90,22 @@ export default function CortexAgentSettingsPage({
 
                 <CortexAgentLlmSettingsCard llm={llm} onLlmSaved={setLlm} />
 
+                {agentKey === 'pulse' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Pulse-specific controls</CardTitle>
+                            <CardDescription>
+                                Digest scheduling, feed limits, deep research, and per-step model overrides are managed in Pulse settings.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button variant="secondary" size="sm" asChild>
+                                <Link href={tenantRouter.route('cortex.agents.pulse.settings')}>Open Pulse settings</Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <Card className="border-dashed">
                     <CardHeader>
                         <CardTitle className="text-base text-muted-foreground">Coming soon</CardTitle>

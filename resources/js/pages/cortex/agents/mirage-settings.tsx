@@ -21,10 +21,12 @@ type ProviderOption = {
 
 interface Props {
     imageProvider: string;
+    openAiImageModel: string;
     providers: ProviderOption[];
+    openAiModels: ProviderOption[];
 }
 
-export default function MirageSettingsPage({ imageProvider, providers }: Props) {
+export default function MirageSettingsPage({ imageProvider, openAiImageModel, providers, openAiModels }: Props) {
     const tenantRouter = useTenantRouter();
 
     const breadcrumbs: BreadcrumbItem[] = useMemo(
@@ -38,6 +40,7 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
 
     const form = useForm({
         image_provider: imageProvider,
+        openai_image_model: openAiImageModel,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -49,6 +52,7 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
     };
 
     const selectedMeta = providers.find((p) => p.value === form.data.image_provider);
+    const selectedOpenAiModelMeta = openAiModels.find((m) => m.value === form.data.openai_image_model);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -87,7 +91,7 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
                         <CardHeader>
                             <CardTitle>Image provider</CardTitle>
                             <CardDescription>
-                                DALL·E 3 and GPT Image 1 use your OpenAI API key. Midjourney uses a separate HTTP endpoint you configure in{' '}
+                                OpenAI provider uses your OpenAI API key (with selectable models). Midjourney uses a separate HTTP endpoint you configure in{' '}
                                 <code className="rounded bg-muted px-1 py-0.5 text-xs">.env</code> (for third-party MJ APIs or proxies).
                             </CardDescription>
                         </CardHeader>
@@ -114,6 +118,29 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
                                     {selectedMeta ? <p className="text-muted-foreground text-sm leading-relaxed">{selectedMeta.description}</p> : null}
                                     <InputError message={form.errors.image_provider} />
                                 </div>
+                                {form.data.image_provider === 'openai' ? (
+                                    <div className="space-y-2">
+                                        <Label htmlFor="openai_image_model">OpenAI model</Label>
+                                        <Select
+                                            value={form.data.openai_image_model}
+                                            onValueChange={(v) => form.setData('openai_image_model', v)}
+                                            disabled={form.processing}
+                                        >
+                                            <SelectTrigger id="openai_image_model" className="w-full">
+                                                <SelectValue placeholder="Select a model" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {openAiModels.map((m) => (
+                                                    <SelectItem key={m.value} value={m.value}>
+                                                        {m.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {selectedOpenAiModelMeta ? <p className="text-muted-foreground text-sm leading-relaxed">{selectedOpenAiModelMeta.description}</p> : null}
+                                        <InputError message={form.errors.openai_image_model} />
+                                    </div>
+                                ) : null}
 
                                 <Button type="submit" disabled={form.processing}>
                                     Save
@@ -125,7 +152,8 @@ export default function MirageSettingsPage({ imageProvider, providers }: Props) 
                     <div className="text-muted-foreground space-y-2 text-xs leading-relaxed">
                         <p>
                             <strong className="text-foreground">OpenAI:</strong> set <code className="rounded bg-muted px-1">OPENAI_API_KEY</code>. Optional:{' '}
-                            <code className="rounded bg-muted px-1">OPENAI_IMAGE_SIZE</code>, <code className="rounded bg-muted px-1">OPENAI_GPT_IMAGE_SIZE</code>.
+                            <code className="rounded bg-muted px-1">OPENAI_IMAGE_SIZE</code>, <code className="rounded bg-muted px-1">OPENAI_GPT_IMAGE_SIZE</code>,{' '}
+                            <code className="rounded bg-muted px-1">OPENAI_GPT_IMAGE_MODEL</code>.
                         </p>
                         <p>
                             <strong className="text-foreground">Midjourney-compatible API:</strong> set <code className="rounded bg-muted px-1">MIDJOURNEY_API_URL</code>{' '}

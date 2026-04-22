@@ -22,6 +22,7 @@ use Modules\Cortex\Services\MirageReferenceVisionService;
 use Modules\Cortex\Services\YoutubeTranscriptService;
 use Modules\Cortex\Support\CortexAgentKey;
 use Modules\Cortex\Support\MirageDataImageDecoder;
+use Modules\Cortex\Support\MirageImageProvider;
 use NeuronAI\Chat\Messages\UserMessage;
 
 class MirageController extends Controller
@@ -45,11 +46,15 @@ class MirageController extends Controller
 
         $tenantId = tenant('id');
         $imageProvider = null;
+        $openAiImageModel = null;
         $imageProviderLabel = null;
         if (is_string($tenantId) && $tenantId !== '') {
             $setting = MirageSetting::getOrCreateForTenant($tenantId);
             $imageProvider = $setting->image_provider->value;
-            $imageProviderLabel = $setting->image_provider->label();
+            $openAiImageModel = $setting->openai_image_model->value;
+            $imageProviderLabel = $setting->image_provider === MirageImageProvider::OpenAi
+                ? $setting->image_provider->label().' · '.$setting->openai_image_model->label()
+                : $setting->image_provider->label();
         }
 
         $referencePreferences = [
@@ -75,6 +80,7 @@ class MirageController extends Controller
             'promptLabel' => is_array($meta) ? (string) ($meta['label'] ?? 'Mirage') : 'Mirage',
             'promptDescription' => is_array($meta) ? (string) ($meta['description'] ?? '') : '',
             'imageProvider' => $imageProvider,
+            'openAiImageModel' => $openAiImageModel,
             'imageProviderLabel' => $imageProviderLabel,
             'referencePreferences' => $referencePreferences,
         ]);
@@ -391,7 +397,7 @@ class MirageController extends Controller
                 continue;
             }
 
-            $out = $this->mirageImageService->generate($prompt, $provider, $referenceLayers);
+            $out = $this->mirageImageService->generate($prompt, $provider, $setting->openai_image_model, $referenceLayers);
 
             if (isset($out['error'])) {
                 $results[] = [

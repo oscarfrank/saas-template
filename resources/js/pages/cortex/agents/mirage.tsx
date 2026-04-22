@@ -78,6 +78,7 @@ interface Props {
     promptLabel: string;
     promptDescription: string;
     imageProvider?: string | null;
+    openAiImageModel?: string | null;
     imageProviderLabel?: string | null;
     referencePreferences: {
         use_default_face_reference: boolean;
@@ -189,6 +190,7 @@ export default function MiragePage({
     promptLabel,
     promptDescription,
     imageProvider,
+    openAiImageModel,
     imageProviderLabel,
     referencePreferences,
 }: Props) {
@@ -804,7 +806,9 @@ export default function MiragePage({
                                             />
                                         </div>
                                     </div>
-                                    {imageProvider === 'dall_e_3' && (faceDataUrl || productDataUrl || styleSampleDataUrls.length > 0) ? (
+                                    {imageProvider === 'openai' &&
+                                    openAiImageModel === 'dall-e-3' &&
+                                    (faceDataUrl || productDataUrl || styleSampleDataUrls.length > 0) ? (
                                         <Alert className="py-2">
                                             <AlertTitle className="text-xs">DALL·E 3</AlertTitle>
                                             <AlertDescription className="text-[10px] leading-snug">

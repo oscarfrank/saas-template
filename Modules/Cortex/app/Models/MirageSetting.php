@@ -6,6 +6,7 @@ namespace Modules\Cortex\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Modules\Cortex\Support\MirageImageProvider;
+use Modules\Cortex\Support\MirageOpenAiImageModel;
 use Stancl\Tenancy\Database\Concerns\BelongsToTenant;
 
 final class MirageSetting extends Model
@@ -17,12 +18,14 @@ final class MirageSetting extends Model
     protected $fillable = [
         'tenant_id',
         'image_provider',
+        'openai_image_model',
     ];
 
     protected function casts(): array
     {
         return [
             'image_provider' => MirageImageProvider::class,
+            'openai_image_model' => MirageOpenAiImageModel::class,
         ];
     }
 
@@ -31,7 +34,10 @@ final class MirageSetting extends Model
         /** @var self */
         return self::query()->firstOrCreate(
             ['tenant_id' => $tenantId],
-            ['image_provider' => MirageImageProvider::DallE3],
+            [
+                'image_provider' => MirageImageProvider::OpenAi,
+                'openai_image_model' => MirageOpenAiImageModel::DallE3,
+            ],
         );
     }
 }

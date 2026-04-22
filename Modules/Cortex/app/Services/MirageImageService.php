@@ -7,6 +7,7 @@ namespace Modules\Cortex\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Modules\Cortex\Support\MirageImageProvider;
+use Modules\Cortex\Support\MirageOpenAiImageModel;
 use OpenAI\Laravel\Facades\OpenAI;
 
 final class MirageImageService
@@ -15,16 +16,34 @@ final class MirageImageService
      * @param  list<array{binary: string, mime: string}>  $referenceLayers
      * @return array{url?: string, revised_prompt?: string|null, error?: string}
      */
-    public function generate(string $prompt, MirageImageProvider $provider, array $referenceLayers = []): array
+    public function generate(
+        string $prompt,
+        MirageImageProvider $provider,
+        MirageOpenAiImageModel $openAiModel,
+        array $referenceLayers = [],
+    ): array
     {
         $prompt = trim($prompt);
         if ($prompt === '') {
             return ['error' => 'Empty prompt.'];
         }
 
-        $gptModel = (string) config('openai.gpt_image_model', 'gpt-image-1.5');
-
         return match ($provider) {
+            MirageImageProvider::OpenAi => $openAiModel->isGptImageFamily()
+                ? ($referenceLayers !== []
+                    ? $this->openAiImageEdit($prompt, $openAiModel->value, $referenceLayers)
+                    : $this->openAiImage(
+                        $prompt,
+                        $openAiModel->value,
+                        (string) config('openai.gpt_image_size', '1536x1024'),
+                        null,
+                    ))
+                : $this->openAiImage(
+                    $prompt,
+                    $openAiModel->value,
+                    (string) config('openai.image_size', '1792x1024'),
+                    (string) config('openai.image_quality', 'standard'),
+                ),
             MirageImageProvider::DallE3 => $this->openAiImage(
                 $prompt,
                 'dall-e-3',
@@ -32,10 +51,10 @@ final class MirageImageService
                 (string) config('openai.image_quality', 'standard'),
             ),
             MirageImageProvider::GptImage1 => $referenceLayers !== []
-                ? $this->openAiImageEdit($prompt, $gptModel, $referenceLayers)
+                ? $this->openAiImageEdit($prompt, 'gpt-image-1.5', $referenceLayers)
                 : $this->openAiImage(
                     $prompt,
-                    $gptModel,
+                    'gpt-image-1.5',
                     (string) config('openai.gpt_image_size', '1536x1024'),
                     null,
                 ),

@@ -92,7 +92,7 @@ return [
     | GPT Image model id (generations + edits with reference photos)
     |--------------------------------------------------------------------------
     |
-    | Examples: gpt-image-1, gpt-image-1-mini, gpt-image-1.5
+    | Examples: gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2
     |
     */
 

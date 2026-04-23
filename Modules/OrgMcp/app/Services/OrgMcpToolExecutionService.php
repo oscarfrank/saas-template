@@ -242,7 +242,7 @@ final class OrgMcpToolExecutionService
             ->get('https://sheets.googleapis.com/v4/spreadsheets/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($range));
 
         if (! $response->successful()) {
-            throw new \RuntimeException('Google Sheets read request failed.');
+            throw new \RuntimeException('Google Sheets read request failed: '.$this->googleErrorSummary($response));
         }
 
         return [
@@ -269,17 +269,19 @@ final class OrgMcpToolExecutionService
 
         $response = Http::withToken($accessToken)
             ->timeout(20)
+            ->withQueryParameters([
+                'valueInputOption' => 'USER_ENTERED',
+                'insertDataOption' => 'INSERT_ROWS',
+            ])
             ->post(
                 'https://sheets.googleapis.com/v4/spreadsheets/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($range).':append',
                 [
-                    'valueInputOption' => 'USER_ENTERED',
-                    'insertDataOption' => 'INSERT_ROWS',
                     'values' => $values,
                 ]
             );
 
         if (! $response->successful()) {
-            throw new \RuntimeException('Google Sheets append request failed.');
+            throw new \RuntimeException('Google Sheets append request failed: '.$this->googleErrorSummary($response));
         }
 
         return [
@@ -306,16 +308,18 @@ final class OrgMcpToolExecutionService
 
         $response = Http::withToken($accessToken)
             ->timeout(20)
+            ->withQueryParameters([
+                'valueInputOption' => 'USER_ENTERED',
+            ])
             ->put(
                 'https://sheets.googleapis.com/v4/spreadsheets/'.rawurlencode($spreadsheetId).'/values/'.rawurlencode($range),
                 [
-                    'valueInputOption' => 'USER_ENTERED',
                     'values' => $values,
                 ]
             );
 
         if (! $response->successful()) {
-            throw new \RuntimeException('Google Sheets update request failed.');
+            throw new \RuntimeException('Google Sheets update request failed: '.$this->googleErrorSummary($response));
         }
 
         return [
@@ -435,6 +439,16 @@ final class OrgMcpToolExecutionService
         }
 
         return (string) $response->json('access_token');
+    }
+
+    private function googleErrorSummary(\Illuminate\Http\Client\Response $response): string
+    {
+        $message = (string) ($response->json('error.message') ?? '');
+        if ($message !== '') {
+            return $message;
+        }
+
+        return 'HTTP '.$response->status();
     }
 
     private function providerForToolKey(string $toolKey): string

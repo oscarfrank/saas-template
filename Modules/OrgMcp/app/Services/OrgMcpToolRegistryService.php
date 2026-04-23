@@ -31,6 +31,24 @@ final class OrgMcpToolRegistryService
                 'integration' => null,
             ],
             [
+                'key' => 'org.assets.list_available',
+                'label' => 'List available assets',
+                'description' => 'Lists assets in active statuses by default (available, assigned, in use, in maintenance, available for sale). Pass availability=not_sold_gifted to exclude only sold/gifted, or availability=all.',
+                'integration' => null,
+            ],
+            [
+                'key' => 'org.assets.search',
+                'label' => 'Search assets',
+                'description' => 'Search assets by name, tag, serial, description, or location. Same availability modes as list; optional category/status/condition filters.',
+                'integration' => null,
+            ],
+            [
+                'key' => 'org.assets.summary',
+                'label' => 'Asset summary',
+                'description' => 'Counts assets grouped by status. Same availability modes as list/search.',
+                'integration' => null,
+            ],
+            [
                 'key' => 'org.gmail.recent_threads',
                 'label' => 'Recent Gmail threads',
                 'description' => 'Connector stub for recent organization inbox threads.',

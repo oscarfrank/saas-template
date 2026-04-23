@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\OrgMcp\Services;
 
 use Illuminate\Support\Facades\Http;
+use Modules\Assets\Models\Asset;
+use Modules\Assets\Models\AssetCategory;
 use Modules\HR\Models\Project;
 use Modules\HR\Models\Staff;
 use Modules\HR\Models\Task;
@@ -42,6 +44,9 @@ final class OrgMcpToolExecutionService
                 'org.summary' => $this->organizationSummary($tenantId),
                 'org.projects.list_open' => $this->listOpenProjects($tenantId, $input),
                 'org.contacts.search' => $this->searchContacts($tenantId, $input),
+                'org.assets.list_available' => $this->listAvailableAssets($tenantId, $input),
+                'org.assets.search' => $this->searchAssets($tenantId, $input),
+                'org.assets.summary' => $this->assetsSummary($tenantId, $input),
                 'org.sheets.query_range',
                 'org.sheets.get_values' => $this->sheetsGetValues($tenantId, $input),
                 'org.sheets.append_rows' => $this->sheetsAppendRows($tenantId, $input),
@@ -198,6 +203,229 @@ final class OrgMcpToolExecutionService
             'query' => $q,
             'count' => count($items),
             'items' => $items,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function listAvailableAssets(string $tenantId, array $input): array
+    {
+        $limit = min(max((int) ($input['limit'] ?? 50), 1), 100);
+        $availability = strtolower(trim((string) ($input['availability'] ?? 'active')));
+
+        $query = Asset::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['category:id,name,slug']);
+
+        $this->applyAssetAvailabilityScope($query, $availability);
+        $this->applyAssetCommonFilters($query, $tenantId, $input);
+        $this->applyAssetSort($query, (string) ($input['sort'] ?? 'updated_at'), (string) ($input['direction'] ?? 'desc'));
+
+        $items = $query->limit($limit)->get()->map(fn (Asset $a) => $this->mapAssetRow($a))->values()->all();
+
+        return [
+            'tenant_id' => $tenantId,
+            'availability' => $availability,
+            'count' => count($items),
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function searchAssets(string $tenantId, array $input): array
+    {
+        $q = trim((string) ($input['query'] ?? ''));
+        if ($q === '') {
+            throw new \RuntimeException('Missing required input: query.');
+        }
+
+        $limit = min(max((int) ($input['limit'] ?? 50), 1), 100);
+        $availability = strtolower(trim((string) ($input['availability'] ?? 'active')));
+
+        $query = Asset::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['category:id,name,slug']);
+
+        $this->applyAssetAvailabilityScope($query, $availability);
+        $this->applyAssetCommonFilters($query, $tenantId, $input);
+
+        $like = '%'.$q.'%';
+        $query->where(function ($builder) use ($like): void {
+            $builder
+                ->where('name', 'like', $like)
+                ->orWhere('asset_tag', 'like', $like)
+                ->orWhere('serial_number', 'like', $like)
+                ->orWhere('description', 'like', $like)
+                ->orWhere('location', 'like', $like);
+        });
+
+        $this->applyAssetSort($query, (string) ($input['sort'] ?? 'updated_at'), (string) ($input['direction'] ?? 'desc'));
+
+        $items = $query->limit($limit)->get()->map(fn (Asset $a) => $this->mapAssetRow($a))->values()->all();
+
+        return [
+            'tenant_id' => $tenantId,
+            'query' => $q,
+            'availability' => $availability,
+            'count' => count($items),
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function assetsSummary(string $tenantId, array $input): array
+    {
+        $availability = strtolower(trim((string) ($input['availability'] ?? 'active')));
+
+        $query = Asset::query()->where('tenant_id', $tenantId);
+        $this->applyAssetAvailabilityScope($query, $availability);
+        $this->applyAssetCommonFilters($query, $tenantId, $input);
+
+        $byStatus = $query
+            ->clone()
+            ->selectRaw('status, COUNT(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->all();
+
+        $total = array_sum(array_map('intval', $byStatus));
+
+        return [
+            'tenant_id' => $tenantId,
+            'availability' => $availability,
+            'total' => $total,
+            'by_status' => $byStatus,
+        ];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\Modules\Assets\Models\Asset>  $query
+     * @param  array<string, mixed>  $input
+     */
+    private function applyAssetCommonFilters($query, string $tenantId, array $input): void
+    {
+        if (isset($input['asset_category_id'])) {
+            $categoryId = (int) $input['asset_category_id'];
+            if ($categoryId > 0) {
+                $exists = AssetCategory::query()
+                    ->where('tenant_id', $tenantId)
+                    ->whereKey($categoryId)
+                    ->exists();
+                if ($exists) {
+                    $query->where('asset_category_id', $categoryId);
+                }
+            }
+        }
+
+        $slug = trim((string) ($input['category_slug'] ?? ''));
+        if ($slug !== '') {
+            $categoryId = AssetCategory::query()
+                ->where('tenant_id', $tenantId)
+                ->where('slug', $slug)
+                ->value('id');
+            if ($categoryId !== null) {
+                $query->where('asset_category_id', (int) $categoryId);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        $statuses = $input['statuses'] ?? $input['status_in'] ?? null;
+        if (is_array($statuses) && $statuses !== []) {
+            $allowed = array_keys(Asset::statusOptions());
+            $normalized = [];
+            foreach ($statuses as $s) {
+                $s = is_string($s) ? trim($s) : '';
+                if ($s === '' || ! in_array($s, $allowed, true)) {
+                    throw new \RuntimeException(sprintf('Invalid status filter: %s', is_string($s) ? $s : json_encode($s)));
+                }
+                $normalized[] = $s;
+            }
+            $query->whereIn('status', $normalized);
+        }
+
+        $condition = trim((string) ($input['condition'] ?? ''));
+        if ($condition !== '') {
+            $allowed = array_keys(Asset::conditionOptions());
+            if (! in_array($condition, $allowed, true)) {
+                throw new \RuntimeException(sprintf('Invalid condition filter: %s', $condition));
+            }
+            $query->where('condition', $condition);
+        }
+
+        $location = trim((string) ($input['location'] ?? ''));
+        if ($location !== '') {
+            $query->where('location', 'like', '%'.$location.'%');
+        }
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\Modules\Assets\Models\Asset>  $query
+     */
+    private function applyAssetAvailabilityScope($query, string $availability): void
+    {
+        if ($availability === '' || $availability === 'active') {
+            $query->whereIn('status', Asset::activeStatuses());
+
+            return;
+        }
+
+        if ($availability === 'not_sold_gifted') {
+            $query->whereNotIn('status', [Asset::STATUS_SOLD, Asset::STATUS_GIFTED]);
+
+            return;
+        }
+
+        if ($availability === 'all') {
+            return;
+        }
+
+        throw new \RuntimeException('Invalid availability. Use active, not_sold_gifted, or all.');
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\Modules\Assets\Models\Asset>  $query
+     */
+    private function applyAssetSort($query, string $sort, string $direction): void
+    {
+        $allowedSort = ['updated_at', 'created_at', 'name', 'asset_tag', 'status', 'purchase_date'];
+        if (! in_array($sort, $allowedSort, true)) {
+            throw new \RuntimeException('Invalid sort column.');
+        }
+
+        $dir = strtolower($direction) === 'asc' ? 'asc' : 'desc';
+        $query->orderBy($sort, $dir)->orderBy('id', $dir);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapAssetRow(Asset $asset): array
+    {
+        return [
+            'uuid' => $asset->uuid,
+            'asset_tag' => $asset->asset_tag,
+            'name' => $asset->name,
+            'serial_number' => $asset->serial_number,
+            'status' => $asset->status,
+            'condition' => $asset->condition,
+            'location' => $asset->location,
+            'currency' => $asset->currency,
+            'purchase_price' => $asset->purchase_price !== null ? (string) $asset->purchase_price : null,
+            'purchase_date' => $asset->purchase_date?->toDateString(),
+            'asset_category_id' => $asset->asset_category_id,
+            'category' => $asset->category !== null
+                ? ['id' => $asset->category->id, 'name' => $asset->category->name, 'slug' => $asset->category->slug]
+                : null,
+            'updated_at' => $asset->updated_at?->toIso8601String(),
         ];
     }
 

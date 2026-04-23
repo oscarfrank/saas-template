@@ -212,7 +212,8 @@ final class OrgMcpToolExecutionService
      */
     private function listAvailableAssets(string $tenantId, array $input): array
     {
-        $limit = min(max((int) ($input['limit'] ?? 50), 1), 100);
+        $limit = min(max((int) ($input['limit'] ?? 50), 1), 500);
+        $offset = max((int) ($input['offset'] ?? 0), 0);
         $availability = strtolower(trim((string) ($input['availability'] ?? 'active')));
 
         $query = Asset::query()
@@ -223,13 +224,17 @@ final class OrgMcpToolExecutionService
         $this->applyAssetCommonFilters($query, $tenantId, $input);
         $this->applyAssetSort($query, (string) ($input['sort'] ?? 'updated_at'), (string) ($input['direction'] ?? 'desc'));
 
-        $items = $query->limit($limit)->get()->map(fn (Asset $a) => $this->mapAssetRow($a))->values()->all();
+        $page = $this->paginatedAssetRows($query, $offset, $limit);
 
         return [
             'tenant_id' => $tenantId,
             'availability' => $availability,
-            'count' => count($items),
-            'items' => $items,
+            'count' => $page['returned'],
+            'items' => $page['items'],
+            'offset' => $page['offset'],
+            'limit' => $page['limit'],
+            'has_more' => $page['has_more'],
+            'next_offset' => $page['next_offset'],
         ];
     }
 
@@ -244,7 +249,8 @@ final class OrgMcpToolExecutionService
             throw new \RuntimeException('Missing required input: query.');
         }
 
-        $limit = min(max((int) ($input['limit'] ?? 50), 1), 100);
+        $limit = min(max((int) ($input['limit'] ?? 50), 1), 500);
+        $offset = max((int) ($input['offset'] ?? 0), 0);
         $availability = strtolower(trim((string) ($input['availability'] ?? 'active')));
 
         $query = Asset::query()
@@ -266,14 +272,18 @@ final class OrgMcpToolExecutionService
 
         $this->applyAssetSort($query, (string) ($input['sort'] ?? 'updated_at'), (string) ($input['direction'] ?? 'desc'));
 
-        $items = $query->limit($limit)->get()->map(fn (Asset $a) => $this->mapAssetRow($a))->values()->all();
+        $page = $this->paginatedAssetRows($query, $offset, $limit);
 
         return [
             'tenant_id' => $tenantId,
             'query' => $q,
             'availability' => $availability,
-            'count' => count($items),
-            'items' => $items,
+            'count' => $page['returned'],
+            'items' => $page['items'],
+            'offset' => $page['offset'],
+            'limit' => $page['limit'],
+            'has_more' => $page['has_more'],
+            'next_offset' => $page['next_offset'],
         ];
     }
 
@@ -403,6 +413,31 @@ final class OrgMcpToolExecutionService
 
         $dir = strtolower($direction) === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sort, $dir)->orderBy('id', $dir);
+    }
+
+    /**
+     * Offset/limit page; fetches one extra row to set has_more without a COUNT query.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Modules\Assets\Models\Asset>  $query
+     * @return array{items: list<array<string, mixed>>, returned: int, offset: int, limit: int, has_more: bool, next_offset: int|null}
+     */
+    private function paginatedAssetRows($query, int $offset, int $limit): array
+    {
+        $take = $limit + 1;
+        $rows = $query->offset($offset)->limit($take)->get();
+        $hasMore = $rows->count() > $limit;
+        $slice = $rows->take($limit);
+        $items = $slice->map(fn (Asset $a) => $this->mapAssetRow($a))->values()->all();
+        $returned = count($items);
+
+        return [
+            'items' => $items,
+            'returned' => $returned,
+            'offset' => $offset,
+            'limit' => $limit,
+            'has_more' => $hasMore,
+            'next_offset' => $hasMore ? $offset + $returned : null,
+        ];
     }
 
     /**

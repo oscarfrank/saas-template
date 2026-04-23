@@ -33,13 +33,13 @@ final class OrgMcpToolRegistryService
             [
                 'key' => 'org.assets.list_available',
                 'label' => 'List available assets',
-                'description' => 'Lists assets in active statuses by default (available, assigned, in use, in maintenance, available for sale). Pass availability=not_sold_gifted to exclude only sold/gifted, or availability=all.',
+                'description' => 'Lists assets in active statuses by default (available, assigned, in use, in maintenance, available for sale). Pass availability=not_sold_gifted to exclude only sold/gifted, or availability=all. Paginate with offset and limit (max 500); response includes has_more and next_offset.',
                 'integration' => null,
             ],
             [
                 'key' => 'org.assets.search',
                 'label' => 'Search assets',
-                'description' => 'Search assets by name, tag, serial, description, or location. Same availability modes as list; optional category/status/condition filters.',
+                'description' => 'Search assets by name, tag, serial, description, or location. Same availability modes as list; optional category/status/condition filters. Paginate with offset and limit (max 500); response includes has_more and next_offset.',
                 'integration' => null,
             ],
             [

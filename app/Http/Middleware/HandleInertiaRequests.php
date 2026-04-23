@@ -182,6 +182,8 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'applied_task_uuid' => fn () => $request->session()->get('applied_task_uuid'),
+                'org_mcp_client_secret' => fn () => $request->session()->get('org_mcp_client_secret'),
+                'org_mcp_client_key' => fn () => $request->session()->get('org_mcp_client_key'),
             ],
         ];
     }

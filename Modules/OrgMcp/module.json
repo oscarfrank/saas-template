@@ -1,0 +1,11 @@
+{
+    "name": "OrgMcp",
+    "alias": "orgmcp",
+    "description": "Organization-scoped MCP endpoints and tool execution",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\OrgMcp\\Providers\\OrgMcpServiceProvider"
+    ],
+    "files": []
+}

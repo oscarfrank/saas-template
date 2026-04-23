@@ -1,0 +1,23 @@
+{
+    "name": "nwidart/orgmcp",
+    "description": "Organization-scoped MCP API",
+    "authors": [],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\OrgMcp\\": "app/",
+            "Modules\\OrgMcp\\Database\\Factories\\": "database/factories/",
+            "Modules\\OrgMcp\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\OrgMcp\\Tests\\": "tests/"
+        }
+    }
+}

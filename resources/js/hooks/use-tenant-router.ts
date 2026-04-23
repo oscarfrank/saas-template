@@ -6,7 +6,7 @@ interface TenantRouterOptions {
     preserveState?: boolean;
     preserveScroll?: boolean;
     only?: string[];
-    onSuccess?: () => void;
+    onSuccess?: (...args: any[]) => void;
     onError?: (errors: any) => void;
     onStart?: () => void;
     onFinish?: () => void;

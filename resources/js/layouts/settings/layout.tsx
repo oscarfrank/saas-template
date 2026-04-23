@@ -26,6 +26,7 @@ import {
     History,
     Sparkles,
     BarChart3,
+    Plug,
 } from 'lucide-react';
 
 interface SettingsGroup {
@@ -107,6 +108,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                     title: 'AI usage',
                     href: `/${effectiveTenant?.slug}/settings/organization/ai-usage`,
                     icon: BarChart3,
+                },
+                {
+                    title: 'MCP & agents',
+                    href: `/${effectiveTenant?.slug}/settings/organization/mcp`,
+                    icon: Plug,
                 },
                 {
                     title: 'Invites',

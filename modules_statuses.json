@@ -20,5 +20,6 @@
     "Assets": true,
     "Creator": true,
     "Cortex": true,
-    "WorkerAgents": true
+    "WorkerAgents": true,
+    "OrgMcp": true
 }

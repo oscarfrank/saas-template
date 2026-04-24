@@ -55,6 +55,12 @@ final class OrgMcpToolRegistryService
                 'integration' => null,
             ],
             [
+                'key' => 'org.pulse.digest.get',
+                'label' => 'Pulse digest fetch',
+                'description' => 'Returns Pulse digest ideas for today or up to 6 days ago (7-day window), scoped to the session profile user + organization. Date selectors: date=YYYY-MM-DD, days_ago, or when=today|yesterday|N days ago. Optional sections filter: tweets, shorts, youtube.',
+                'integration' => null,
+            ],
+            [
                 'key' => 'org.gmail.recent_threads',
                 'label' => 'Recent Gmail threads',
                 'description' => 'Connector stub for recent organization inbox threads.',

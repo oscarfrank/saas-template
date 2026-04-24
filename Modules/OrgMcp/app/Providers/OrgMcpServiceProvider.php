@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\OrgMcp\Http\Middleware\EnsureValidOrgMcpSession;
 use Modules\OrgMcp\Services\OrgMcpAuthService;
 use Modules\OrgMcp\Services\OrgMcpPolicyService;
+use Modules\OrgMcp\Services\OrgMcpPulseToolService;
 use Modules\OrgMcp\Services\OrgMcpToolExecutionService;
 use Modules\OrgMcp\Services\OrgMcpToolRegistryService;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -28,6 +29,7 @@ class OrgMcpServiceProvider extends ServiceProvider
     {
         $this->app->singleton(OrgMcpAuthService::class);
         $this->app->singleton(OrgMcpPolicyService::class);
+        $this->app->singleton(OrgMcpPulseToolService::class);
         $this->app->singleton(OrgMcpToolRegistryService::class);
         $this->app->singleton(OrgMcpToolExecutionService::class);
 

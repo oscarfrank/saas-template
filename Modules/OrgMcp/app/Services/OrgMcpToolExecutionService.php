@@ -19,6 +19,7 @@ final class OrgMcpToolExecutionService
     public function __construct(
         private readonly OrgMcpPolicyService $policyService,
         private readonly OrgMcpMirageToolService $mirageToolService,
+        private readonly OrgMcpPulseToolService $pulseToolService,
     ) {}
 
     /**
@@ -49,6 +50,7 @@ final class OrgMcpToolExecutionService
                 'org.assets.search' => $this->searchAssets($tenantId, $input),
                 'org.assets.summary' => $this->assetsSummary($tenantId, $input),
                 'org.mirage.generate' => $this->invokeMirageGenerate($tenantId, $profileUserId, $input),
+                'org.pulse.digest.get' => $this->invokePulseDigestGet($tenantId, $profileUserId, $input),
                 'org.sheets.query_range',
                 'org.sheets.get_values' => $this->sheetsGetValues($tenantId, $input),
                 'org.sheets.append_rows' => $this->sheetsAppendRows($tenantId, $input),
@@ -742,5 +744,20 @@ final class OrgMcpToolExecutionService
         }
 
         return $this->mirageToolService->generate($tenantId, $profileUserId, $input);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function invokePulseDigestGet(string $tenantId, ?int $profileUserId, array $input): array
+    {
+        if ($profileUserId === null || $profileUserId <= 0) {
+            throw new \RuntimeException(
+                'Pulse digest requires profile_user_id. Create the org-mcp session with profile_user_id set to the user id.'
+            );
+        }
+
+        return $this->pulseToolService->getDigest($tenantId, $profileUserId, $input);
     }
 }

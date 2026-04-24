@@ -38,6 +38,10 @@ Route::middleware([
 
     Route::get('cortex/agents/pulse', [PulseController::class, 'index'])->name('cortex.agents.pulse');
     Route::get('cortex/agents/pulse/digest/today', [PulseController::class, 'digestToday'])->name('cortex.agents.pulse.digest.today');
+    Route::get('cortex/agents/pulse/digest/history', [PulseController::class, 'digestHistory'])->name('cortex.agents.pulse.digest.history');
+    Route::get('cortex/agents/pulse/digest/{date}', [PulseController::class, 'digestByDate'])
+        ->where('date', '\d{4}-\d{2}-\d{2}')
+        ->name('cortex.agents.pulse.digest.by_date');
     Route::post('cortex/agents/pulse/digest/run', [PulseController::class, 'digestRun'])->name('cortex.agents.pulse.digest.run');
     Route::post('cortex/agents/pulse/shorts/script', [PulseController::class, 'shortScript'])->name('cortex.agents.pulse.shorts.script');
     Route::get('cortex/agents/pulse/feeds', [PulseController::class, 'feedsIndex'])->name('cortex.agents.pulse.feeds');

@@ -27,3 +27,11 @@ export type PulseDigest = {
     shorts: PulseDigestIdea[];
     youtube: PulseDigestIdea[];
 };
+
+export type PulseDigestHistoryDay = {
+    digest_date: string;
+    label: string;
+    has_digest: boolean;
+    feeds_status: string | null;
+    ideas_status: string | null;
+};

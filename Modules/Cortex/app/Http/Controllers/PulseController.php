@@ -734,6 +734,70 @@ class PulseController extends Controller
         ]);
     }
 
+    public function digestByDate(string $date): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return response()->json(['message' => 'Invalid date format. Expected YYYY-MM-DD.'], 422);
+        }
+
+        $digestRow = PulseDailyDigest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereDate('digest_date', $date)
+            ->first();
+
+        return response()->json([
+            'digest_date' => $date,
+            'digest' => $digestRow !== null ? $this->digestToArray($digestRow) : null,
+        ]);
+    }
+
+    public function digestHistory(): JsonResponse
+    {
+        $tenantId = tenant('id');
+        if (! is_string($tenantId) || $tenantId === '') {
+            return response()->json(['message' => 'Tenant context missing.'], 503);
+        }
+
+        $tz = $this->pulseDigestTimezone();
+        $today = now($tz)->toDateString();
+        $start = now($tz)->subDays(6)->toDateString();
+        $rows = PulseDailyDigest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('digest_date', [$start, $today])
+            ->orderByDesc('digest_date')
+            ->get();
+
+        $byDate = [];
+        foreach ($rows as $row) {
+            $date = $row->digest_date->toDateString();
+            $byDate[$date] = $row;
+        }
+
+        $days = [];
+        for ($i = 0; $i < 7; $i++) {
+            $date = now($tz)->subDays($i)->toDateString();
+            /** @var PulseDailyDigest|null $row */
+            $row = $byDate[$date] ?? null;
+            $days[] = [
+                'digest_date' => $date,
+                'label' => now($tz)->subDays($i)->format('D, M j'),
+                'has_digest' => $row !== null,
+                'feeds_status' => $row?->feeds_status,
+                'ideas_status' => $row?->ideas_status,
+            ];
+        }
+
+        return response()->json([
+            'days' => $days,
+            'today' => $today,
+        ]);
+    }
+
     public function shortScript(Request $request): JsonResponse
     {
         $this->raiseRuntimeLimitForAgent();
@@ -989,6 +1053,11 @@ TXT;
 
     private function todayDigestDateYmd(): string
     {
+        return now($this->pulseDigestTimezone())->toDateString();
+    }
+
+    private function pulseDigestTimezone(): string
+    {
         $tenantId = tenant('id');
         $tz = (string) config('app.timezone');
         if (is_string($tenantId) && $tenantId !== '') {
@@ -998,7 +1067,7 @@ TXT;
             }
         }
 
-        return now($tz)->toDateString();
+        return $tz;
     }
 
     private function formatDigestForChat(PulseDailyDigest $d): string

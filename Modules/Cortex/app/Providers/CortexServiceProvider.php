@@ -4,6 +4,8 @@ namespace Modules\Cortex\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Scheduling\Schedule;
+use Modules\Cortex\Console\PulsePruneDigestsCommand;
 use Modules\Cortex\Console\PulseScheduledDigestsCommand;
 use Modules\Cortex\Services\BaitTitleService;
 use Modules\Cortex\Services\CortexLlmProviderFactory;
@@ -61,6 +63,7 @@ class CortexServiceProvider extends ServiceProvider
     {
         $this->commands([
             PulseScheduledDigestsCommand::class,
+            PulsePruneDigestsCommand::class,
         ]);
     }
 
@@ -69,10 +72,11 @@ class CortexServiceProvider extends ServiceProvider
      */
     protected function registerCommandSchedules(): void
     {
-        // $this->app->booted(function () {
-        //     $schedule = $this->app->make(Schedule::class);
-        //     $schedule->command('inspire')->hourly();
-        // });
+        $this->app->booted(function () {
+            $schedule = $this->app->make(Schedule::class);
+            $schedule->command('cortex:pulse-scheduled-digests')->everyMinute()->withoutOverlapping();
+            $schedule->command('cortex:pulse-prune-digests --days=7')->dailyAt('00:20');
+        });
     }
 
     /**

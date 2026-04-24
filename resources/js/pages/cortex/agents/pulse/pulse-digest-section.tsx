@@ -8,17 +8,20 @@ import { useTenantRouter } from '@/hooks/use-tenant-router';
 import axios from 'axios';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Copy, Loader2, RefreshCw, Sparkles, Wand2, Zap } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2, RefreshCw, Sparkles, Wand2, Zap } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import type { PulseDigest, PulseDigestIdea } from './types';
+import type { PulseDigest, PulseDigestHistoryDay, PulseDigestIdea } from './types';
 
 type Props = {
     digest: PulseDigest | null;
     digestDate: string | null;
+    historyDays: PulseDigestHistoryDay[];
+    historyLoading: boolean;
     openAiConfigured: boolean;
     digestRunning: boolean;
     onRun: (mode: 'full' | 'feeds' | 'ideas') => void;
+    onSelectDate: (date: string) => void;
 };
 
 function statusBadge(status: string): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' } {
@@ -83,7 +86,16 @@ function IdeaCard({
     );
 }
 
-export function PulseDigestSection({ digest, digestDate, openAiConfigured, digestRunning, onRun }: Props) {
+export function PulseDigestSection({
+    digest,
+    digestDate,
+    historyDays,
+    historyLoading,
+    openAiConfigured,
+    digestRunning,
+    onRun,
+    onSelectDate,
+}: Props) {
     const tenantRouter = useTenantRouter();
     const [scriptIdea, setScriptIdea] = useState<PulseDigestIdea | null>(null);
     const [scriptText, setScriptText] = useState<string>('');
@@ -264,6 +276,31 @@ export function PulseDigestSection({ digest, digestDate, openAiConfigured, diges
                         {digest.intro_summary}
                     </div>
                 )}
+
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">Past 7 days</p>
+                        {historyLoading && <span className="text-muted-foreground text-xs">Loading…</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {historyDays.map((day) => {
+                            const selected = digestDate === day.digest_date;
+                            return (
+                                <Button
+                                    key={day.digest_date}
+                                    type="button"
+                                    variant={selected ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-8 gap-1.5"
+                                    onClick={() => onSelectDate(day.digest_date)}
+                                >
+                                    {day.label}
+                                    {day.has_digest ? <CheckCircle2 className="size-3.5" /> : null}
+                                </Button>
+                            );
+                        })}
+                    </div>
+                </div>
 
                 {hasIdeas && digest && (
                     <Tabs defaultValue="tweets" className="w-full gap-4">

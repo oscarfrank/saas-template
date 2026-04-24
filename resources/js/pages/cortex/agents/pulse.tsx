@@ -3,7 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { useTenantRouter } from '@/hooks/use-tenant-router';
 import axios from 'axios';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { ChevronDown, Loader2, Send, Sparkles, Rss } from 'lucide-react';
 
 import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 import { PulseDigestSection } from './pulse/pulse-digest-section';
-import { type PulseDigest, type PulseFeedRow } from './pulse/types';
+import { type PulseDigest, type PulseDigestHistoryDay, type PulseFeedRow } from './pulse/types';
 
 type PulseChatMessage = {
     role: 'user' | 'assistant';
@@ -73,7 +73,10 @@ export default function PulsePage({
     const [signalsOpen, setSignalsOpen] = useState(false);
     const [digest, setDigest] = useState<PulseDigest | null>(initialDigest);
     const [digestDate, setDigestDate] = useState<string | null>(initialDigestDate);
+    const [historyDays, setHistoryDays] = useState<PulseDigestHistoryDay[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [includeDailyDigest, setIncludeDailyDigest] = useState(false);
+    const historyLoadedOnceRef = useRef(false);
 
     const enabledFeeds = useMemo(() => feeds.filter((f) => f.enabled), [feeds]);
 
@@ -104,6 +107,49 @@ export default function PulsePage({
         }
     }, [tenantRouter]);
 
+    const loadDigestHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        try {
+            const { data } = await axios.get<{ days: PulseDigestHistoryDay[]; today: string }>(
+                tenantRouter.route('cortex.agents.pulse.digest.history'),
+                {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                },
+            );
+            setHistoryDays(Array.isArray(data.days) ? data.days : []);
+        } catch {
+            setHistoryDays([]);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, [tenantRouter]);
+
+    const loadDigestByDate = useCallback(
+        async (date: string) => {
+            try {
+                const { data } = await axios.get<{ digest: PulseDigest | null; digest_date: string }>(
+                    tenantRouter.route('cortex.agents.pulse.digest.by_date', { date }),
+                    {
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    },
+                );
+                setDigest(data.digest ?? null);
+                setDigestDate(data.digest_date);
+            } catch {
+                toast.error('Could not load digest for that day.');
+            }
+        },
+        [tenantRouter],
+    );
+
+    useEffect(() => {
+        if (historyLoadedOnceRef.current) {
+            return;
+        }
+        historyLoadedOnceRef.current = true;
+        void loadDigestHistory();
+    }, [loadDigestHistory]);
+
     useEffect(() => {
         if (!digestRunning) return;
         const id = window.setInterval(() => {
@@ -130,6 +176,7 @@ export default function PulsePage({
                 if (data.digest) setDigest(data.digest);
                 toast.success('Digest run queued.');
                 void pollDigest();
+                void loadDigestHistory();
             } catch (e) {
                 if (axios.isAxiosError(e)) {
                     toast.error((e.response?.data as { message?: string })?.message ?? 'Could not start digest run.');
@@ -138,7 +185,7 @@ export default function PulsePage({
                 }
             }
         },
-        [tenantRouter, pollDigest],
+        [tenantRouter, pollDigest, loadDigestHistory],
     );
 
     const signalsSummary = useMemo(() => {
@@ -288,9 +335,12 @@ export default function PulsePage({
                     <PulseDigestSection
                         digest={digest}
                         digestDate={digestDate}
+                        historyDays={historyDays}
+                        historyLoading={historyLoading}
                         openAiConfigured={canUseAgent}
                         digestRunning={digestRunning}
                         onRun={(mode) => void runDigest(mode)}
+                        onSelectDate={(date) => void loadDigestByDate(date)}
                     />
 
                     <Card className="overflow-hidden border-border/80 shadow-sm ring-1 ring-black/5 dark:ring-white/10">

@@ -84,7 +84,7 @@ final class OrgMcpMirageToolService
                 'style_references' => $styleRefs !== [] ? $styleRefs : null,
             ];
 
-            $ideasResponse = $this->mirageController->ideas(Request::create('/', 'POST', $ideasPayload));
+            $ideasResponse = $this->mirageController->ideas($this->mirageHttpRequest($ideasPayload));
             $ideasData = $this->jsonResponseOrThrow($ideasResponse, 'Mirage ideas step failed');
 
             /** @var list<array<string, mixed>> $ideas */
@@ -119,7 +119,7 @@ final class OrgMcpMirageToolService
                     'product_reference' => $productRef !== '' ? $productRef : null,
                     'style_references' => $styleRefs !== [] ? $styleRefs : null,
                 ];
-                $imagesResponse = $this->mirageController->images(Request::create('/', 'POST', $imagesPayload));
+                $imagesResponse = $this->mirageController->images($this->mirageHttpRequest($imagesPayload));
                 $imagesData = $this->jsonResponseOrThrow($imagesResponse, 'Mirage images step failed');
                 $results = isset($imagesData['results']) && is_array($imagesData['results']) ? $imagesData['results'] : [];
                 foreach ($results as $row) {
@@ -226,6 +226,22 @@ final class OrgMcpMirageToolService
         }
 
         return $out;
+    }
+
+    /**
+     * Synthetic POST requests do not inherit the current user; Mirage uses {@see Request::user()}
+     * for library defaults (face / style templates). Wire the resolver to the web guard.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function mirageHttpRequest(array $payload): Request
+    {
+        $request = Request::create('/', 'POST', $payload);
+        $request->setUserResolver(function ($guard = null) {
+            return Auth::guard($guard)->user();
+        });
+
+        return $request;
     }
 
     private function jsonResponseOrThrow(JsonResponse $response, string $label): array

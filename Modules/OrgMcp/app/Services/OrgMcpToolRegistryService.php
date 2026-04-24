@@ -49,6 +49,12 @@ final class OrgMcpToolRegistryService
                 'integration' => null,
             ],
             [
+                'key' => 'org.mirage.generate',
+                'label' => 'Mirage thumbnail generation',
+                'description' => 'Runs Mirage (ideas + images) as the session profile user; persists a Mirage session turn for dashboard history. Requires profile_user_id on org-mcp session. Defaults: input_mode=prompt, focus=mixed, idea_count=1. Pass text via brief|text|input|script; youtube_url + input_mode=youtube for transcript mode; input_mode=script for full script. Optional mirage_session_id to append. Optional face_reference, product_reference, style_references (data URLs). User library defaults apply when enabled in Mirage settings.',
+                'integration' => null,
+            ],
+            [
                 'key' => 'org.gmail.recent_threads',
                 'label' => 'Recent Gmail threads',
                 'description' => 'Connector stub for recent organization inbox threads.',

@@ -18,6 +18,7 @@ final class OrgMcpToolExecutionService
 {
     public function __construct(
         private readonly OrgMcpPolicyService $policyService,
+        private readonly OrgMcpMirageToolService $mirageToolService,
     ) {}
 
     /**
@@ -47,6 +48,7 @@ final class OrgMcpToolExecutionService
                 'org.assets.list_available' => $this->listAvailableAssets($tenantId, $input),
                 'org.assets.search' => $this->searchAssets($tenantId, $input),
                 'org.assets.summary' => $this->assetsSummary($tenantId, $input),
+                'org.mirage.generate' => $this->invokeMirageGenerate($tenantId, $profileUserId, $input),
                 'org.sheets.query_range',
                 'org.sheets.get_values' => $this->sheetsGetValues($tenantId, $input),
                 'org.sheets.append_rows' => $this->sheetsAppendRows($tenantId, $input),
@@ -725,5 +727,20 @@ final class OrgMcpToolExecutionService
             str_contains($toolKey, '.linear.') => 'linear',
             default => throw new \RuntimeException('No integration provider mapping for this tool.'),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function invokeMirageGenerate(string $tenantId, ?int $profileUserId, array $input): array
+    {
+        if ($profileUserId === null || $profileUserId <= 0) {
+            throw new \RuntimeException(
+                'Mirage requires profile_user_id. Create the org-mcp session with profile_user_id set to the user id (same as web Mirage history).'
+            );
+        }
+
+        return $this->mirageToolService->generate($tenantId, $profileUserId, $input);
     }
 }

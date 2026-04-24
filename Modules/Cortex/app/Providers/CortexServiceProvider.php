@@ -9,6 +9,7 @@ use Modules\Cortex\Services\BaitTitleService;
 use Modules\Cortex\Services\CortexLlmProviderFactory;
 use Modules\Cortex\Services\MirageImageService;
 use Modules\Cortex\Services\MirageReferenceVisionService;
+use Modules\Cortex\Services\MirageSessionPersistenceService;
 use Modules\Cortex\Services\PulseRssFetcher;
 use Modules\Cortex\Services\YoutubeTranscriptService;
 use Nwidart\Modules\Traits\PathNamespace;
@@ -47,6 +48,7 @@ class CortexServiceProvider extends ServiceProvider
         $this->app->singleton(BaitTitleService::class);
         $this->app->singleton(MirageImageService::class);
         $this->app->singleton(MirageReferenceVisionService::class);
+        $this->app->singleton(MirageSessionPersistenceService::class);
 
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);

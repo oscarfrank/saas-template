@@ -33,7 +33,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { route } from 'ziggy-js';
 
-import { ChevronLeft, ChevronRight, Download, Eye, FileText, Loader2, Sparkles, Wand2, Youtube, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Eye, FileText, History, Loader2, Sparkles, Trash2, Wand2, Youtube, Zap } from 'lucide-react';
 import { CortexAgentSettingsMenu } from '@/components/cortex/cortex-agent-settings-menu';
 import { MirageReferencePickerDialog } from '@/components/cortex/mirage-reference-picker-dialog';
 
@@ -49,6 +49,7 @@ type ImageResult = {
     url?: string;
     revised_prompt?: string | null;
     error?: string;
+    output_id?: number;
 };
 
 type FocusKey = 'face' | 'product' | 'mixed' | 'scene';
@@ -62,6 +63,80 @@ type IdeasSource = {
     input_mode: InputMode;
     youtube_title?: string | null;
 };
+
+type MirageImageRow = {
+    output_id?: number;
+    url?: string;
+    revised_prompt?: string | null;
+    error?: string;
+};
+
+type MirageArchivedTurn = {
+    serverTurnId: number;
+    ideas: MirageIdea[];
+    imageByIdeaId: Record<string, MirageImageRow>;
+    /** Set for turns created after this feature; older runs may omit */
+    input_mode?: InputMode;
+    focus?: FocusKey;
+    idea_count?: number;
+    input_text?: string | null;
+    youtube_url?: string | null;
+    source?: IdeasSource | null;
+};
+
+function parseInputMode(s: string | undefined): InputMode {
+    if (s === 'youtube' || s === 'prompt' || s === 'script') {
+        return s;
+    }
+    return 'script';
+}
+
+function parseFocus(s: string | undefined): FocusKey {
+    if (s === 'face' || s === 'product' || s === 'mixed' || s === 'scene') {
+        return s;
+    }
+    return 'mixed';
+}
+
+function clampPhotoCount(n: number | undefined): (typeof PHOTO_COUNTS)[number] {
+    if (n === 2 || n === 3 || n === 4) {
+        return n;
+    }
+    return 2;
+}
+
+function turnFromServerRow(t: MirageSessionTurnRow): MirageArchivedTurn {
+    return {
+        serverTurnId: t.id,
+        input_mode: parseInputMode(t.input_mode),
+        focus: parseFocus(t.focus),
+        idea_count: t.idea_count,
+        input_text: t.input_text,
+        youtube_url: t.youtube_url,
+        source: t.source,
+        ideas: t.ideas,
+        imageByIdeaId: t.imageByIdeaId,
+    };
+}
+
+type MirageSessionTurnRow = {
+    id: number;
+    position: number;
+    input_mode: string;
+    focus: string;
+    idea_count: number;
+    input_text: string | null;
+    youtube_url: string | null;
+    source: IdeasSource | null;
+    ideas: MirageIdea[];
+    imageByIdeaId: Record<string, MirageImageRow>;
+};
+
+type MirageSessionPayload = {
+    id: string;
+    title: string;
+    turns: MirageSessionTurnRow[];
+} | null;
 
 interface MiragePageProps extends PageProps {
     tenant: { slug: string };
@@ -84,6 +159,7 @@ interface Props {
         use_default_face_reference: boolean;
         use_default_style_references: boolean;
     };
+    mirageSession: MirageSessionPayload;
 }
 
 const MAX_REFERENCE_BYTES = 5 * 1024 * 1024;
@@ -129,12 +205,37 @@ function readSessionFocus(): FocusKey {
     return 'mixed';
 }
 
+function mapPayloadTurnsToArchived(m: MirageSessionPayload): MirageArchivedTurn[] {
+    if (!m?.turns?.length) {
+        return [];
+    }
+    return m.turns.map((t) => turnFromServerRow(t));
+}
+
 function safeDownloadBasename(title: string, index: number): string {
     const s = title
         .replace(/[^a-z0-9]+/gi, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 48);
     return (s || 'mirage-thumbnail') + `-${index + 1}`;
+}
+
+/**
+ * Ideation bakes an overlay phrase into `image_prompt`. If the user edits `thumb_text` in Review,
+ * we must still tell the image model the final overlay — the raw `image_prompt` can be stale.
+ */
+function imagePromptForModel(idea: MirageIdea): string {
+    const base = idea.image_prompt.trim();
+    const overlay = idea.thumb_text.trim();
+    if (overlay === '') {
+        return base;
+    }
+    return (
+        base +
+        '\n\n' +
+        'The large, readable on-thumbnail text overlay (where appropriate for a YouTube thumbnail) must use these exact words, spelled as given: ' +
+        overlay
+    );
 }
 
 async function downloadImageUrl(url: string, filenameBase: string): Promise<void> {
@@ -177,12 +278,31 @@ async function downloadImageUrl(url: string, filenameBase: string): Promise<void
     }
 }
 
+const INPUT_MODE_LABEL: Record<InputMode, string> = {
+    script: 'Script / topic',
+    youtube: 'YouTube',
+    prompt: 'Brief',
+};
+
 const FOCUS_OPTIONS: { value: FocusKey; title: string; description: string }[] = [
     { value: 'face', title: 'Face', description: 'Reaction or talking head' },
     { value: 'product', title: 'Product', description: 'Gadget, screen, or object' },
     { value: 'mixed', title: 'Face + product', description: 'Both in the frame' },
     { value: 'scene', title: 'Scene', description: 'Place or mood, no face' },
 ];
+
+function archivedTurnHasSource(turn: MirageArchivedTurn): boolean {
+    if (turn.input_mode !== undefined) {
+        return true;
+    }
+    if (turn.input_text != null && turn.input_text.trim() !== '') {
+        return true;
+    }
+    if (turn.youtube_url != null && turn.youtube_url.trim() !== '') {
+        return true;
+    }
+    return false;
+}
 
 export default function MiragePage({
     openAiConfigured,
@@ -193,6 +313,7 @@ export default function MiragePage({
     openAiImageModel,
     imageProviderLabel,
     referencePreferences,
+    mirageSession = null,
 }: Props) {
     const tenantRouter = useTenantRouter();
     const { tenant } = usePage<MiragePageProps>().props;
@@ -231,12 +352,167 @@ export default function MiragePage({
     const [ideas, setIdeas] = useState<MirageIdea[]>([]);
     const [imageByIdeaId, setImageByIdeaId] = useState<Record<string, ImageResult>>({});
 
+    const [sessionId, setSessionId] = useState<string | null>(mirageSession?.id ?? null);
+    const [archivedTurns, setArchivedTurns] = useState<MirageArchivedTurn[]>(() => mapPayloadTurnsToArchived(mirageSession));
+
     const [phase, setPhase] = useState<'ideas' | 'images' | null>(null);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
     const updateIdea = (id: string, patch: Partial<MirageIdea>) => {
         setIdeas((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
     };
+
+    const finishCurrentTurn = useCallback(
+        async (ideasList: MirageIdea[], images: Record<string, ImageResult>): Promise<boolean> => {
+            if (ideasList.length === 0) {
+                return true;
+            }
+            const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            let sid: string | null = sessionId;
+            try {
+                if (!sid) {
+                    const { data: created } = await axios.post<{ id: string }>(
+                        route('cortex.agents.mirage.sessions.store', { tenant: tenant.slug }),
+                        { title: (ideasList[0]?.title ?? 'Mirage session').slice(0, 200) },
+                        {
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrf,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        },
+                    );
+                    sid = created.id;
+                    setSessionId(created.id);
+                }
+
+                const imageByIdea: Record<string, { url?: string; revised_prompt?: string | null; error?: string }> = {};
+                for (const idea of ideasList) {
+                    const row = images[idea.id];
+                    imageByIdea[idea.id] = {
+                        url: row?.url,
+                        revised_prompt: row?.revised_prompt,
+                        error: row?.error,
+                    };
+                }
+
+                const { data } = await axios.post<{
+                    turn: MirageSessionTurnRow;
+                }>(
+                    route('cortex.agents.mirage.sessions.turns.store', { tenant: tenant.slug, mirageSession: sid! }),
+                    {
+                        input_mode: inputMode,
+                        focus,
+                        idea_count: photoCount,
+                        input_text: inputMode === 'youtube' ? null : topic.trim() === '' ? null : topic,
+                        youtube_url: inputMode === 'youtube' ? (youtubeUrl.trim() === '' ? null : youtubeUrl) : null,
+                        source: lastSource,
+                        ideas: ideasList,
+                        image_by_idea_id: imageByIdea,
+                    },
+                    {
+                        headers: {
+                            Accept: 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    },
+                );
+                const t = data.turn;
+                setArchivedTurns((prev) => [...prev, turnFromServerRow(t)]);
+                setIdeas([]);
+                setImageByIdeaId({});
+                setLastSource(null);
+                setPreviewIndex(null);
+                return true;
+            } catch (e) {
+                if (axios.isAxiosError(e)) {
+                    const msg = (e.response?.data as { message?: string } | undefined)?.message ?? e.message ?? 'Save failed.';
+                    toast.error(msg);
+                } else {
+                    toast.error('Could not save this run.');
+                }
+                return false;
+            }
+        },
+        [sessionId, inputMode, focus, photoCount, topic, youtubeUrl, lastSource, tenant.slug],
+    );
+
+    const removeServerOutput = useCallback(
+        async (outputId: number, turnIdx: number, ideaId: string) => {
+            const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+            try {
+                await axios.delete(
+                    route('cortex.agents.mirage.outputs.destroy', { tenant: tenant.slug, mirageSessionOutput: outputId }),
+                    {
+                        headers: {
+                            Accept: 'application/json',
+                            'X-CSRF-TOKEN': csrf,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                    },
+                );
+                setArchivedTurns((prev) => {
+                    const next = prev.map((turn, i) => {
+                        if (i !== turnIdx) {
+                            return turn;
+                        }
+                        const images = { ...turn.imageByIdeaId };
+                        if (images[ideaId]) {
+                            images[ideaId] = { error: 'Removed' };
+                        }
+                        return { ...turn, imageByIdeaId: images };
+                    });
+                    return next;
+                });
+            } catch {
+                toast.error('Could not remove thumbnail.');
+            }
+        },
+        [tenant.slug],
+    );
+
+    const loadTurnSourceIntoForm = useCallback((turn: MirageArchivedTurn) => {
+        const mode = turn.input_mode ?? 'script';
+        setInputMode(mode);
+        setFocus(turn.focus ?? 'mixed');
+        setPhotoCount(clampPhotoCount(turn.idea_count));
+        if (mode === 'youtube') {
+            setYoutubeUrl(turn.youtube_url?.trim() ?? '');
+            setTopic('');
+        } else {
+            setTopic(turn.input_text?.trim() ?? '');
+            setYoutubeUrl('');
+        }
+        setLastSource(turn.source ?? null);
+        try {
+            sessionStorage.setItem(MIRAGE_SESSION_PHOTO_COUNT_KEY, String(clampPhotoCount(turn.idea_count)));
+            sessionStorage.setItem(MIRAGE_SESSION_FOCUS_KEY, turn.focus ?? 'mixed');
+        } catch {
+            /* ignore */
+        }
+        toast.success('Source loaded into the form on the left — adjust and run again when ready.');
+    }, []);
+
+    const loadTurnIdeasIntoReview = useCallback((turn: MirageArchivedTurn) => {
+        if (turn.ideas.length === 0) {
+            return;
+        }
+        setIdeas(turn.ideas);
+        setImageByIdeaId({});
+        setPreviewIndex(null);
+        setPhase(null);
+        setLastSource(turn.source ?? null);
+        setReviewBeforeImages(true);
+        try {
+            localStorage.setItem(MIRAGE_REVIEW_KEY, '1');
+        } catch {
+            /* ignore */
+        }
+        toast.success('Ideas loaded in Review — edit prompts, then create images, or run a new source from the left.');
+    }, []);
 
     const canUseAgent = openAiConfigured;
     const busy = phase !== null;
@@ -489,7 +765,7 @@ export default function MiragePage({
             {
                 items: list.map((i) => ({
                     idea_id: i.id,
-                    image_prompt: i.image_prompt,
+                    image_prompt: imagePromptForModel(i),
                 })),
                 face_reference: faceDataUrl ?? undefined,
                 product_reference: productDataUrl ?? undefined,
@@ -507,24 +783,32 @@ export default function MiragePage({
         );
 
         const results = data.results ?? [];
-        setImageByIdeaId((prev) => {
-            const out = { ...prev };
-            for (const r of results) {
-                const id = r.idea_id ?? '';
-                if (!id) continue;
-                if (r.error) {
-                    out[id] = { error: r.error };
-                } else if (r.url) {
-                    out[id] = { url: r.url, revised_prompt: r.revised_prompt };
-                }
+        const nextMap: Record<string, ImageResult> = { ...imageByIdeaId };
+        for (const r of results) {
+            const id = r.idea_id ?? '';
+            if (!id) {
+                continue;
             }
-            return out;
-        });
-
+            if (r.error) {
+                nextMap[id] = { error: r.error };
+            } else if (r.url) {
+                nextMap[id] = { url: r.url, revised_prompt: r.revised_prompt };
+            }
+        }
+        setImageByIdeaId(nextMap);
+        const saved = await finishCurrentTurn(list, nextMap);
+        if (!saved) {
+            setPhase(null);
+            return;
+        }
         const ok = results.filter((r) => r.url).length;
         const bad = results.filter((r) => r.error).length;
-        if (ok) toast.success(`Created ${ok} image${ok === 1 ? '' : 's'}.`);
-        if (bad) toast.error(`${bad} image${bad === 1 ? '' : 's'} could not be created.`);
+        if (ok) {
+            toast.success(`Created ${ok} image${ok === 1 ? '' : 's'}.`);
+        }
+        if (bad) {
+            toast.error(`${bad} image${bad === 1 ? '' : 's'} could not be created.`);
+        }
     };
 
     const generateIdeasOnly = async () => {
@@ -542,9 +826,17 @@ export default function MiragePage({
         }
 
         setPhase('ideas');
-        setIdeas([]);
-        setImageByIdeaId({});
-        setLastSource(null);
+        if (ideas.length > 0) {
+            const ok = await finishCurrentTurn(ideas, imageByIdeaId);
+            if (!ok) {
+                setPhase(null);
+                return;
+            }
+        } else {
+            setIdeas([]);
+            setImageByIdeaId({});
+            setLastSource(null);
+        }
 
         try {
             const list = await fetchIdeas();
@@ -581,9 +873,17 @@ export default function MiragePage({
         }
 
         setPhase('ideas');
-        setIdeas([]);
-        setImageByIdeaId({});
-        setLastSource(null);
+        if (ideas.length > 0) {
+            const ok = await finishCurrentTurn(ideas, imageByIdeaId);
+            if (!ok) {
+                setPhase(null);
+                return;
+            }
+        } else {
+            setIdeas([]);
+            setImageByIdeaId({});
+            setLastSource(null);
+        }
 
         try {
             const list = await fetchIdeas();
@@ -641,7 +941,7 @@ export default function MiragePage({
     };
 
     const hasRightPanelContent =
-        (ideas.length > 0 && reviewBeforeImages) || showImageGrid;
+        archivedTurns.length > 0 || (ideas.length > 0 && reviewBeforeImages) || showImageGrid;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -663,8 +963,26 @@ export default function MiragePage({
                             ) : null}
                         </div>
                     </div>
-                    <CortexAgentSettingsMenu agentKey="mirage" className="shrink-0 self-start pt-0.5" />
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 self-start pt-0.5">
+                        <Button asChild type="button" variant="outline" size="sm" className="h-8 gap-1 px-2.5 text-xs">
+                            <Link href={tenantRouter.route('cortex.agents.mirage.history')}>
+                                <History className="size-3.5" />
+                                History
+                            </Link>
+                        </Button>
+                        {sessionId || mirageSession ? (
+                            <Button asChild type="button" variant="secondary" size="sm" className="h-8 px-2.5 text-xs">
+                                <Link href={tenantRouter.route('cortex.agents.mirage')}>New session</Link>
+                            </Button>
+                        ) : null}
+                        <CortexAgentSettingsMenu agentKey="mirage" className="shrink-0" />
+                    </div>
                 </header>
+                {mirageSession?.title ? (
+                    <p className="text-muted-foreground px-0.5 text-[11px]">
+                        Session: <span className="text-foreground font-medium">{mirageSession.title}</span>
+                    </p>
+                ) : null}
 
                 {!canUseAgent && (
                     <Alert variant="destructive" className="shrink-0 py-2">
@@ -1073,6 +1391,236 @@ export default function MiragePage({
 
                     <div className="border-border/50 flex min-h-0 flex-col overflow-hidden lg:min-h-[12rem] lg:border-l lg:pl-4">
                         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+                            {archivedTurns.map((turn, turnIdx) => {
+                                const mode = turn.input_mode ?? 'script';
+                                const focusTitle =
+                                    FOCUS_OPTIONS.find((f) => f.value === (turn.focus ?? 'mixed'))?.title ?? (turn.focus ?? '—');
+                                const hasSource = archivedTurnHasSource(turn);
+                                return (
+                                    <section
+                                        key={`turn-${turn.serverTurnId}`}
+                                        className="space-y-2 border-border/50 rounded-lg border p-2"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-muted-foreground px-0.5 text-[10px] font-medium">
+                                                Run {turnIdx + 1}
+                                            </p>
+                                            <div className="flex flex-wrap items-center justify-end gap-1">
+                                                {hasSource ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        className="h-7 text-[10px]"
+                                                        onClick={() => loadTurnSourceIntoForm(turn)}
+                                                    >
+                                                        Use in form
+                                                    </Button>
+                                                ) : null}
+                                                {turn.ideas.length > 0 ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 text-[10px]"
+                                                        onClick={() => loadTurnIdeasIntoReview(turn)}
+                                                    >
+                                                        Edit prompts
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        {hasSource ? (
+                                            <Accordion type="single" collapsible className="rounded-md border border-dashed px-1.5">
+                                                <AccordionItem value="source" className="border-0">
+                                                    <AccordionTrigger className="py-1.5 text-[10px] font-medium hover:no-underline">
+                                                        Source you used
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="space-y-2 pb-2">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                {INPUT_MODE_LABEL[mode]}
+                                                            </Badge>
+                                                            <Badge variant="outline" className="text-[10px]">
+                                                                Focus: {focusTitle}
+                                                            </Badge>
+                                                            {turn.idea_count != null ? (
+                                                                <Badge variant="outline" className="text-[10px]">
+                                                                    {turn.idea_count} concepts
+                                                                </Badge>
+                                                            ) : null}
+                                                        </div>
+                                                        {mode === 'youtube' && turn.source?.youtube_title ? (
+                                                            <p className="text-muted-foreground line-clamp-2 text-[10px]">
+                                                                {turn.source.youtube_title}
+                                                            </p>
+                                                        ) : null}
+                                                        {mode === 'youtube' && turn.youtube_url ? (
+                                                            <p className="text-muted-foreground break-all font-mono text-[10px]">
+                                                                {turn.youtube_url}
+                                                            </p>
+                                                        ) : null}
+                                                        {mode !== 'youtube' && turn.input_text ? (
+                                                            <pre className="bg-muted/60 max-h-32 overflow-auto rounded border p-2 text-[10px] leading-relaxed whitespace-pre-wrap">
+                                                                {turn.input_text}
+                                                            </pre>
+                                                        ) : null}
+                                                        {mode === 'youtube' && !turn.youtube_url && !turn.input_text ? (
+                                                            <p className="text-muted-foreground text-[10px]">
+                                                                YouTube URL was not stored for this run.
+                                                            </p>
+                                                        ) : null}
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            </Accordion>
+                                        ) : (
+                                            <p className="text-muted-foreground px-0.5 text-[10px]">
+                                                Per-thumbnail prompts (below) are preserved; the top-level source for this run was
+                                                not saved.
+                                            </p>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {turn.ideas.map((idea, idx) => {
+                                                const img = turn.imageByIdeaId[idea.id];
+                                                const u = img?.url;
+                                                const err = img?.error;
+                                                return (
+                                                    <article
+                                                        key={idea.id}
+                                                        className="bg-card flex h-full flex-col overflow-hidden rounded-lg border shadow-sm"
+                                                    >
+                                                        <div className="bg-muted/40 relative aspect-video w-full shrink-0">
+                                                            {u ? (
+                                                                <a
+                                                                    href={u}
+                                                                    className="block size-full"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    <img
+                                                                        src={u}
+                                                                        alt=""
+                                                                        className="size-full object-cover"
+                                                                    />
+                                                                </a>
+                                                            ) : err ? (
+                                                                <div className="flex size-full items-center justify-center p-1">
+                                                                    <p className="text-destructive text-center text-[10px] leading-tight">
+                                                                        {err}
+                                                                    </p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-muted-foreground flex size-full items-center justify-center text-[10px]">
+                                                                    No image
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-1 flex-col gap-1.5 p-2">
+                                                            <h3 className="line-clamp-2 text-[11px] font-semibold leading-tight">
+                                                                {idea.title}
+                                                            </h3>
+                                                            {idea.thumb_text ? (
+                                                                <p className="text-muted-foreground line-clamp-2 text-[10px]">
+                                                                    Overlay: {idea.thumb_text}
+                                                                </p>
+                                                            ) : null}
+                                                            <div className="mt-auto flex flex-wrap gap-1">
+                                                                <Dialog>
+                                                                    <DialogTrigger asChild>
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-7 flex-1 gap-0.5 px-1 text-[10px]"
+                                                                        >
+                                                                            <Eye className="size-3" />
+                                                                            Prompts
+                                                                        </Button>
+                                                                    </DialogTrigger>
+                                                                    <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto sm:max-w-xl">
+                                                                        <DialogHeader>
+                                                                            <DialogTitle>Text for this thumbnail</DialogTitle>
+                                                                            <DialogDescription>
+                                                                                Saved title idea and model prompts for “{idea.title}”.
+                                                                            </DialogDescription>
+                                                                        </DialogHeader>
+                                                                        <div className="space-y-3 text-sm">
+                                                                            {idea.rationale ? (
+                                                                                <div>
+                                                                                    <p className="text-muted-foreground mb-1 text-[10px] font-medium uppercase">
+                                                                                        Rationale
+                                                                                    </p>
+                                                                                    <p className="text-xs leading-relaxed">
+                                                                                        {idea.rationale}
+                                                                                    </p>
+                                                                                </div>
+                                                                            ) : null}
+                                                                            <div>
+                                                                                <p className="text-muted-foreground mb-1 text-[10px] font-medium uppercase">
+                                                                                    Image prompt
+                                                                                </p>
+                                                                                <pre className="bg-muted/80 max-h-40 overflow-auto rounded-lg border p-2 text-xs leading-relaxed whitespace-pre-wrap">
+                                                                                    {idea.image_prompt}
+                                                                                </pre>
+                                                                            </div>
+                                                                            {img?.revised_prompt ? (
+                                                                                <div>
+                                                                                    <p className="text-muted-foreground mb-1 text-[10px] font-medium uppercase">
+                                                                                        Revised by model
+                                                                                    </p>
+                                                                                    <pre className="bg-muted/80 max-h-32 overflow-auto rounded-lg border p-2 text-xs leading-relaxed whitespace-pre-wrap">
+                                                                                        {img.revised_prompt}
+                                                                                    </pre>
+                                                                                </div>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    </DialogContent>
+                                                                </Dialog>
+                                                                {u ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="secondary"
+                                                                        size="sm"
+                                                                        className="h-7 flex-1 gap-0.5 px-1 text-[10px]"
+                                                                        onClick={() =>
+                                                                            void downloadImageUrl(
+                                                                                u,
+                                                                                safeDownloadBasename(idea.title, idx),
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Download className="size-3 shrink-0" />
+                                                                        Save
+                                                                    </Button>
+                                                                ) : null}
+                                                                {img?.output_id && err !== 'Removed' ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="text-destructive h-7 px-1.5"
+                                                                        onClick={() =>
+                                                                            void removeServerOutput(
+                                                                                img.output_id!,
+                                                                                turnIdx,
+                                                                                idea.id,
+                                                                            )
+                                                                        }
+                                                                        title="Remove (usage remains logged)"
+                                                                    >
+                                                                        <Trash2 className="size-3" />
+                                                                    </Button>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    </article>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                );
+                            })}
+
                             {!hasRightPanelContent ? (
                                 <div className="text-muted-foreground flex h-full min-h-[140px] flex-col items-center justify-center rounded-lg border border-dashed p-3 text-center text-[11px] leading-relaxed">
                                     <p className="max-w-[14rem]">

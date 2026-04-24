@@ -15,6 +15,7 @@ use Inertia\Response;
 use Modules\Cortex\Http\Controllers\Concerns\InteractsWithCortexLlm;
 use Modules\Cortex\Models\MirageReferenceAsset;
 use Modules\Cortex\Models\MirageSetting;
+use Modules\Cortex\Models\MirageUsageEvent;
 use Modules\Cortex\Models\MirageUserPreference;
 use Modules\Cortex\Neuron\MirageAgent;
 use Modules\Cortex\Services\MirageImageService;
@@ -39,6 +40,16 @@ class MirageController extends Controller
     ) {}
 
     public function index(Request $request): Response
+    {
+        return Inertia::render('cortex/agents/mirage', $this->miragePageBaseProps($request) + [
+            'mirageSession' => null,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function miragePageBaseProps(Request $request): array
     {
         /** @var array<string, mixed> $definitions */
         $definitions = config('ai_prompts.definitions', []);
@@ -74,7 +85,7 @@ class MirageController extends Controller
             }
         }
 
-        return Inertia::render('cortex/agents/mirage', [
+        return [
             'openAiConfigured' => $this->cortexOpenAiConfiguredProp(is_string($tenantId) ? $tenantId : null, CortexAgentKey::Mirage),
             'promptKey' => self::PROMPT_KEY,
             'promptLabel' => is_array($meta) ? (string) ($meta['label'] ?? 'Mirage') : 'Mirage',
@@ -83,7 +94,7 @@ class MirageController extends Controller
             'openAiImageModel' => $openAiImageModel,
             'imageProviderLabel' => $imageProviderLabel,
             'referencePreferences' => $referencePreferences,
-        ]);
+        ];
     }
 
     public function chat(Request $request): JsonResponse
@@ -316,6 +327,10 @@ class MirageController extends Controller
                 return response()->json(['message' => 'No valid ideas were returned. Try again.'], 422);
             }
 
+            if ($request->user() !== null) {
+                MirageUsageEvent::logIdeas($tenantId, (int) $request->user()->id, count($ideas));
+            }
+
             return response()->json([
                 'ideas' => $ideas,
                 'source' => [
@@ -415,6 +430,14 @@ class MirageController extends Controller
                 'url' => $out['url'] ?? null,
                 'revised_prompt' => $out['revised_prompt'] ?? null,
             ];
+        }
+
+        if ($request->user() !== null) {
+            MirageUsageEvent::logImages(
+                $tenantId,
+                (int) $request->user()->id,
+                count($validated['items']),
+            );
         }
 
         return response()->json(['results' => $results]);

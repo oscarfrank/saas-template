@@ -7,6 +7,7 @@ use Modules\Cortex\Http\Controllers\CortexController;
 use Modules\Cortex\Http\Controllers\CortexLlmSettingsController;
 use Modules\Cortex\Http\Controllers\MirageController;
 use Modules\Cortex\Http\Controllers\MirageReferenceAssetController;
+use Modules\Cortex\Http\Controllers\MirageSessionController;
 use Modules\Cortex\Http\Controllers\MirageSettingsController;
 use Modules\Cortex\Http\Controllers\MirageUserPreferenceController;
 use Modules\Cortex\Http\Controllers\NexusPlannerController;
@@ -59,6 +60,13 @@ Route::middleware([
     Route::post('cortex/agents/bait/generate', [BaitController::class, 'generate'])->name('cortex.agents.bait.generate');
 
     Route::get('cortex/agents/mirage', [MirageController::class, 'index'])->name('cortex.agents.mirage');
+    Route::get('cortex/agents/mirage/history', [MirageSessionController::class, 'historyIndex'])->name('cortex.agents.mirage.history');
+    Route::get('cortex/agents/mirage/sessions/{mirageSession}', [MirageSessionController::class, 'show'])->name('cortex.agents.mirage.sessions.show');
+    Route::post('cortex/agents/mirage/sessions', [MirageSessionController::class, 'store'])->name('cortex.agents.mirage.sessions.store');
+    Route::post('cortex/agents/mirage/sessions/{mirageSession}/turns', [MirageSessionController::class, 'storeTurn'])->name('cortex.agents.mirage.sessions.turns.store');
+    Route::delete('cortex/agents/mirage/sessions/{mirageSession}', [MirageSessionController::class, 'destroySession'])->name('cortex.agents.mirage.sessions.destroy');
+    Route::delete('cortex/agents/mirage/outputs/{mirageSessionOutput}', [MirageSessionController::class, 'destroyOutput'])->name('cortex.agents.mirage.outputs.destroy');
+    Route::get('cortex/agents/mirage/outputs/{mirageSessionOutput}/file', [MirageSessionController::class, 'file'])->name('cortex.agents.mirage.outputs.file');
     Route::get('cortex/agents/mirage/settings', [MirageSettingsController::class, 'index'])->name('cortex.agents.mirage.settings');
     Route::patch('cortex/agents/mirage/settings', [MirageSettingsController::class, 'update'])->name('cortex.agents.mirage.settings.update');
     Route::post('cortex/agents/mirage/chat', [MirageController::class, 'chat'])->name('cortex.agents.mirage.chat');

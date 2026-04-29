@@ -21,8 +21,7 @@ final class MirageImageService
         MirageImageProvider $provider,
         MirageOpenAiImageModel $openAiModel,
         array $referenceLayers = [],
-    ): array
-    {
+    ): array {
         $prompt = trim($prompt);
         if ($prompt === '') {
             return ['error' => 'Empty prompt.'];
@@ -105,8 +104,12 @@ final class MirageImageService
                 'size' => (string) config('openai.gpt_image_size', '1536x1024'),
                 'quality' => (string) config('openai.gpt_image_quality', 'auto'),
                 'output_format' => (string) config('openai.gpt_image_output_format', 'png'),
-                'input_fidelity' => 'high',
             ];
+
+            // gpt-image-2 rejects input_fidelity; 1.5 and earlier GPT Image edit models accept it.
+            if (strtolower($model) !== MirageOpenAiImageModel::GptImage2->value) {
+                $params['input_fidelity'] = 'high';
+            }
 
             $response = OpenAI::images()->edit($params);
 
